@@ -80,6 +80,10 @@ _PROFILE_EXTRA_COLS = [
     ("hours_per_week", "INTEGER"),
     ("has_resume_portfolio", "TEXT"),
     ("acquisition_source", "TEXT"),
+    ("career_priority", "TEXT"),
+    ("monthly_focus_skill", "TEXT"),
+    ("monthly_focus_project", "TEXT"),
+    ("weekly_progress_note", "TEXT"),
 ]
 
 _JOB_EXTRA_COLS = [

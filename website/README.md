@@ -6,15 +6,15 @@
 
 ## Быстрый запуск
 
-Из **корня** монорепозитория:
+Из **корня** монорепозитория поднимите весь стек (включая сайт на :8765):
 
 ```bash
-"./launch files/launch-website.sh"
+bash "launch files/launch-stack.sh"
 ```
 
-Windows: `launch files\launch-website.bat`
+Windows: `launch files\launch-stack.bat`
 
-Перед первым запуском создайте окружение (см. ниже).
+При первом запуске `website/.venv` создаётся автоматически. Для ручной установки см. ниже.
 
 ## Требования
 

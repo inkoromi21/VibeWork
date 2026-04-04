@@ -11,10 +11,10 @@
 
 | Действие | macOS / Linux | Windows |
 |----------|----------------|---------|
-| Только API миниаппы | `python miniapp/run.py` | то же |
-| Только бот (API уже запущен) | `"./launch files/launch-bot.sh"` | `launch files\launch-bot.bat` |
-| Только сайт CareerCompass | `"./launch files/launch-website.sh"` | `launch files\launch-website.bat` |
-| API + бот + сайт (три окна) | `"./launch files/launch-stack.sh"` | `launch files\launch-stack.bat` |
+| **Весь стек** (API :8000, ngrok, бот, сайт :8765) | `bash "launch files/launch-stack.sh"` | `launch files\launch-stack.bat` |
+| Только API (ручной отладочный запуск) | `python miniapp/run.py` | то же |
+
+Отдельные окна поднимает только **`launch files/launch-stack`**. Вспомогательные сценарии лежат в **`launch files/stack/`** и не предназначены для ручного запуска.
 
 Подробности: [miniapp/README.md](miniapp/README.md), [miniapp/bot/README.md](miniapp/bot/README.md), [website/README.md](website/README.md).
 
@@ -124,26 +124,17 @@ python miniapp/run.py
 
 Сервер слушает `0.0.0.0:8000`. Проверка: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
 
-### 4. Запуск Telegram-бота
+### 4. Telegram-бот и ngrok
 
-В отдельном терминале (тоже из корня, с активированным `venv`):
+Используйте **`bash "launch files/launch-stack.sh"`** (или **`launch files\launch-stack.bat`**): откроются окна API, ngrok, бота и сайта. Для ручной отладки бота из активированного `venv`: `python miniapp/bot/bot.py` (предварительно запустите API).
 
-```bash
-"./launch files/launch-bot.sh"
-# или: python miniapp/bot/bot.py
-```
+Бот по `/start` открывает мини-приложение по `{PUBLIC_BASE_URL}/miniapp/`. При запущенном ngrok URL кнопки берётся из `http://127.0.0.1:4040/api/tunnels`.
 
-Бот по команде `/start` открывает мини-приложение по адресу `{PUBLIC_BASE_URL}/miniapp/`. Если запущен локальный ngrok на порту 4040, URL кнопки подхватывается из API туннелей ngrok.
-
-### Несколько процессов сразу
-
-- **`"./launch files/launch-stack.sh"`** / **`launch files\launch-stack.bat`** — из корня: отдельные окна с API (:8000), ботом и сайтом (:8765). Перед первым запуском сайта создайте `website/.venv` (см. [website/README.md](website/README.md)).
-- **Ollama** (если включена в `.env`): перед `miniapp/run.py` выполните `bash miniapp/scripts/ensure-ollama.sh` (macOS/Linux) или `miniapp\scripts\windows\ensure-ollama.bat` (Windows).
-- **Публичный URL для миниаппы** (ngrok и т.п.) — запускайте туннель на порт 8000 вручную; бот подхватывает URL из ngrok API (`127.0.0.1:4040`), если туннель уже поднят.
+- **Ollama** (если в `.env`): скрипт стека вызывает `miniapp/scripts/ensure-ollama.sh` / `miniapp\scripts\windows\ensure-ollama.bat`.
 
 ## Запуск сайта (`website/`)
 
-Рекомендуется из корня: `"./launch files/launch-website.sh"` (или `launch files\launch-website.bat`). Вручную:
+Через полный стек — см. выше. Вручную для разработки:
 
 ```bash
 cd website
@@ -163,10 +154,9 @@ wibe-work/
 ├── tests/                      # дымовые тесты (miniapp / website отдельно)
 ├── scripts/verify.sh           # локальная проверка как в CI
 ├── .github/workflows/ci.yml    # GitHub Actions
-├── launch files/               # скрипты бота, сайта, полного стека
-│   ├── launch-bot.sh / .bat
-│   ├── launch-website.sh / .bat
-│   └── launch-stack.sh / .bat
+├── launch files/
+│   ├── launch-stack.sh / .bat  # единственная точка входа: весь стек
+│   └── stack/                  # внутренние шаги (ngrok, бот, сайт) — не вызывать вручную
 ├── miniapp/
 │   ├── README.md
 │   ├── run.py                  # запуск API миниаппы

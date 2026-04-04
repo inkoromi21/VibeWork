@@ -33,17 +33,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     base = get_public_base_url()
     web_app_url = f"{base}/miniapp/"
-    keyboard = [[InlineKeyboardButton("Открыть Wibe work", web_app=WebAppInfo(url=web_app_url))]]
-    await update.message.reply_text(
-        "Wibe work — нажми кнопку:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
+    # Telegram accepts only https:// for WebApp buttons; http (e.g. localhost) must use a normal link.
+    if base.lower().startswith("https://"):
+        keyboard = [
+            [InlineKeyboardButton("Открыть Wibe work", web_app=WebAppInfo(url=web_app_url))]
+        ]
+        text = "Wibe work — нажми кнопку:"
+    else:
+        keyboard = [[InlineKeyboardButton("Открыть в браузере", url=web_app_url)]]
+        text = (
+            "Wibe work — мини-приложение в Telegram требует HTTPS (запустите ngrok "
+            "или задайте PUBLIC_BASE_URL=https://… в .env). "
+            "Ниже — ссылка для браузера на этом компьютере (localhost)."
+        )
+    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 def main():
     token = (os.environ.get("TELEGRAM_BOT_TOKEN") or "").strip()
     if not token:
-        print("Задайте TELEGRAM_BOT_TOKEN в .env")
+        env_path = ROOT / ".env"
+        print("Нужен TELEGRAM_BOT_TOKEN в .env в корне репозитория:")
+        print(f"  {env_path}")
+        print("Создайте файл: cp miniapp/.env.example .env  и вставьте токен от @BotFather.")
         sys.exit(1)
     app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))

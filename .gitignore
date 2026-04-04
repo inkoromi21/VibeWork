@@ -56,3 +56,4 @@ build/
 
 # Downloaded dev binaries (install separately)
 miniapp/scripts/bin/ngrok
+miniapp/scripts/bin/ngrok.exe

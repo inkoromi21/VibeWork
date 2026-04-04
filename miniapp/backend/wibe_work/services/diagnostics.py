@@ -21,6 +21,10 @@ def _basic_data_block(profile: Dict[str, Any]) -> Dict[str, Any]:
         "target_salary": profile.get("target_salary"),
         "internship_ready": profile.get("internship_ready"),
         "hours_per_week": profile.get("hours_per_week"),
+        "career_priority": profile.get("career_priority"),
+        "monthly_focus_skill": profile.get("monthly_focus_skill"),
+        "monthly_focus_project": profile.get("monthly_focus_project"),
+        "weekly_progress_note": profile.get("weekly_progress_note"),
     }
 
 

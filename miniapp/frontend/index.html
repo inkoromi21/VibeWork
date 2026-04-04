@@ -449,6 +449,18 @@
             opacity: 1;
             filter: brightness(1.05);
         }
+        .btn-tinder-yes {
+            border-radius: var(--radius-cta);
+            border: 1.5px solid #0a5c0a;
+            background: linear-gradient(165deg, #4caf50 0%, #2e7d32 100%);
+            color: #fff;
+            font-weight: 700;
+            box-shadow: 0 2px 10px rgba(46, 125, 50, 0.35);
+        }
+        .btn-tinder-yes:hover {
+            filter: brightness(1.06);
+            border-color: #063a06;
+        }
         input, textarea, select {
             width: 100%;
             padding: 10px 12px;
@@ -787,21 +799,45 @@
         .job-card h4 { margin: 0 0 6px; font-size: .95rem; color: var(--text); }
         .job-req { font-size: .75rem; color: var(--text-muted); margin-top: 8px; }
         .job-req span { display: inline-block; margin: 2px 6px 2px 0; padding: 2px 8px; background: var(--accent-soft); border-radius: 4px; font-family: var(--font-mono); font-size: .68rem; }
-        .tinder-stack { position: relative; min-height: 120px; max-width: 440px; margin: 0 auto; }
+        .tinder-stack {
+            position: relative;
+            max-width: 440px;
+            margin: 0 auto;
+            min-height: 0;
+        }
         .tinder-card {
-            position: absolute;
-            left: 50%;
-            top: 0;
-            transform: translateX(-50%);
+            position: relative;
             width: 100%;
             max-width: 380px;
+            margin: 0 auto;
             background: var(--card);
             border-radius: var(--radius-lg);
             border: 1px solid var(--border);
             padding: 20px;
             box-shadow: var(--shadow-card);
         }
-        .tinder-actions { display: flex; justify-content: center; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+        .tinder-actions-host {
+            display: none;
+            max-width: 440px;
+            margin: 18px auto 0;
+            padding-top: 4px;
+        }
+        .tinder-actions-host.visible {
+            display: block;
+        }
+        .tinder-actions {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .tinder-actions button {
+            font-size: 1.75rem;
+            line-height: 1;
+            padding: 14px 20px;
+            min-width: 56px;
+        }
         .filters-panel { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; align-items: end; }
         .filters-panel label { margin-top: 0; }
         .filters-panel input[type="number"] { margin-bottom: 0; }
@@ -1068,7 +1104,7 @@
     function tabTagline(tabId) {
         const map = {
             home: 'Главная страница приложения: выбор раздела.',
-            profile: 'Заполните профиль — основа подбора и теста.',
+            profile: 'Анкета: база, формат работы, блок «Фокус на месяц» (навык, проект, прогресс раз в неделю) — для чата и плана.',
             test: 'Ответьте честно: так точнее разбор по сфере.',
             analysis: 'Метрики, сценарии и план роста в одном месте.',
             chat: 'ИИ опирается на ваш сохранённый разбор.',
@@ -1535,7 +1571,8 @@
         } else if (field.type === 'text') {
             input = '<input type="text" data-fid="' + id + '" value="' + esc(String(v)) + '" placeholder="' + esc(field.placeholder || '') + '">';
         } else if (field.type === 'textarea') {
-            input = '<textarea data-fid="' + id + '" rows="3" placeholder="' + esc(field.placeholder || '') + '">' + esc(String(v)) + '</textarea>';
+            const ml = field.max_length != null ? ' maxlength="' + esc(String(field.max_length)) + '"' : '';
+            input = '<textarea data-fid="' + id + '" rows="3"' + ml + ' placeholder="' + esc(field.placeholder || '') + '">' + esc(String(v)) + '</textarea>';
         } else if (field.type === 'select') {
             const opts = optionsFromSphere(schema, field);
             let optsH = '<option value="">—</option>';
@@ -2091,7 +2128,7 @@
             '<div class="chat-log" id="chatLog"></div>' +
             '<div class="chat-foot">' +
             '<label for="chatInput">Сообщение</label>' +
-            '<textarea id="chatInput" rows="2" placeholder="Например: какие шаги на ближайший месяц?"></textarea>' +
+            '<textarea id="chatInput" rows="2" placeholder="Например: привет — или вопрос по плану на месяц"></textarea>' +
             '<button type="button" class="btn-primary" style="margin-top:8px" id="btnSendChat">Отправить</button></div></div>';
         redraw();
         document.getElementById('btnSendChat').onclick = async function () {
@@ -2368,6 +2405,7 @@
             '</div></div>' +
             '<div class="jobs-search-hint muted" id="jobsSearchHint"></div>' +
             '<div id="jobsInner"></div>' +
+            '<div class="tinder-actions-host" id="tinderActionsHost" aria-hidden="true"></div>' +
             '<button type="button" class="btn-secondary btn-more-jobs" id="jobsMoreBtn" style="display:none;margin-top:12px">Загрузить ещё</button>'
         );
     }
@@ -2390,16 +2428,33 @@
         if (!list.length) {
             inner.innerHTML =
                 '<div class="banner-warn">По запросу ничего не найдено. Снимите фильтры или укажите город в анкете.</div>';
+            const emptyHost = root.querySelector('#tinderActionsHost');
+            if (emptyHost) {
+                emptyHost.innerHTML = '';
+                emptyHost.classList.remove('visible');
+                emptyHost.setAttribute('aria-hidden', 'true');
+            }
             return;
         }
         if (jobsViewMode === 'tinder') {
-            inner.innerHTML =
-                '<div class="tinder-stack" id="tinderStack"></div>' +
-                '<div class="tinder-actions">' +
-                '<button type="button" class="btn-secondary btn-tinder-no" id="tinderSkip">Пропуск</button>' +
-                '<button type="button" class="btn-primary" id="tinderLike" style="margin-top:0">Дальше →</button></div>';
+            inner.innerHTML = '<div class="tinder-stack" id="tinderStack"></div>';
+            const host = root.querySelector('#tinderActionsHost');
+            if (host) {
+                host.innerHTML =
+                    '<div class="tinder-actions">' +
+                    '<button type="button" class="btn-secondary btn-tinder-no" id="tinderSkip" aria-label="Пропуск">👎</button>' +
+                    '<button type="button" class="btn-primary btn-tinder-yes" id="tinderLike" aria-label="Лайк">❤️</button></div>';
+                host.classList.add('visible');
+                host.setAttribute('aria-hidden', 'false');
+            }
             wireTinderHh(list);
         } else {
+            const hostClassic = root.querySelector('#tinderActionsHost');
+            if (hostClassic) {
+                hostClassic.innerHTML = '';
+                hostClassic.classList.remove('visible');
+                hostClassic.setAttribute('aria-hidden', 'true');
+            }
             let html = '';
             for (let i = 0; i < list.length; i++) html += renderOneHhJobCard(list[i]);
             inner.innerHTML = html;
@@ -2415,6 +2470,12 @@
         if (!append) {
             jobsHhPage = 0;
             inner.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+            const loadHost = root.querySelector('#tinderActionsHost');
+            if (loadHost) {
+                loadHost.innerHTML = '';
+                loadHost.classList.remove('visible');
+                loadHost.setAttribute('aria-hidden', 'true');
+            }
         } else if (moreBtn) {
             moreBtn.disabled = true;
         }
@@ -2437,6 +2498,12 @@
                 '<div class="banner-warn">Не удалось загрузить вакансии: ' +
                 esc(e.message) +
                 '. Проверьте интернет и настройку HH_USER_AGENT на сервере.</div>';
+            const errHost = root.querySelector('#tinderActionsHost');
+            if (errHost) {
+                errHost.innerHTML = '';
+                errHost.classList.remove('visible');
+                errHost.setAttribute('aria-hidden', 'true');
+            }
             if (hint) hint.textContent = '';
             if (moreBtn) {
                 moreBtn.style.display = 'none';

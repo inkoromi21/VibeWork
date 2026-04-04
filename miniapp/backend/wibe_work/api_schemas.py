@@ -43,6 +43,10 @@ class ProfileData(BaseModel):
     hours_per_week: Optional[int] = None
     has_resume_portfolio: Optional[str] = None
     acquisition_source: Optional[str] = None
+    career_priority: Optional[str] = None
+    monthly_focus_skill: Optional[str] = None
+    monthly_focus_project: Optional[str] = None
+    weekly_progress_note: Optional[str] = None
 
 
 class AnswerItem(BaseModel):

@@ -47,7 +47,7 @@ def get_profile_schema() -> Dict[str, Any]:
                         "id": "city",
                         "type": "text",
                         "label": "Город",
-                        "placeholder": "Например, Москва",
+                        "placeholder": "Уточните город — для подбора и чата (например, Москва)",
                         "required": False,
                     },
                     {
@@ -116,7 +116,7 @@ def get_profile_schema() -> Dict[str, Any]:
                     {
                         "id": "work_format_pref",
                         "type": "multiselect",
-                        "label": "Интересные форматы работы",
+                        "label": "Формат работы (офис / удалёнка / гибрид)",
                         "max_select": 3,
                         "options": [
                             {"id": "office", "label": "Офис"},
@@ -131,6 +131,43 @@ def get_profile_schema() -> Dict[str, Any]:
                         "placeholder": "например, 10",
                         "min": 0,
                         "max": 60,
+                    },
+                ],
+            },
+            {
+                "id": "focus_month",
+                "title": "ФОКУС НА МЕСЯЦ И ЧАТ «ПРИВЕТ»",
+                "fields": [
+                    {
+                        "id": "career_priority",
+                        "type": "select",
+                        "label": "Что сейчас важнее",
+                        "required": False,
+                        "options": [
+                            {"id": "learning", "label": "Обучение и рост"},
+                            {"id": "money", "label": "Деньги и стабильный доход"},
+                            {"id": "balance", "label": "Баланс жизни и работы"},
+                        ],
+                    },
+                    {
+                        "id": "monthly_focus_skill",
+                        "type": "text",
+                        "label": "Один навык на этот месяц",
+                        "placeholder": "Например: уверенный SQL, презентации в Figma…",
+                    },
+                    {
+                        "id": "monthly_focus_project",
+                        "type": "textarea",
+                        "label": "Маленький проект на месяц",
+                        "placeholder": "Что сделаете до конца месяца (одно предложение или список)",
+                        "max_length": 600,
+                    },
+                    {
+                        "id": "weekly_progress_note",
+                        "type": "textarea",
+                        "label": "Прогресс за неделю",
+                        "placeholder": "Раз в неделю: что сделали по фокусу и проекту (обновляйте поле)",
+                        "max_length": 800,
                     },
                 ],
             },

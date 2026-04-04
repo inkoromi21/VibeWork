@@ -18,4 +18,4 @@
 
 ## Запуск
 
-Из **корня**: `python miniapp/run.py` (API), `"./launch files/launch-bot.sh"` или полный стек — `"./launch files/launch-stack.sh"`. Подробнее — [README.md](../README.md).
+Из **корня**: полный стек — `bash "launch files/launch-stack.sh"` (Windows: `launch files\launch-stack.bat`); только API для отладки — `python miniapp/run.py`. Подробнее — [README.md](../README.md).

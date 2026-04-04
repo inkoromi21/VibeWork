@@ -47,6 +47,39 @@ def load_profile(user_id: str) -> Dict[str, Any]:
         return dict(row) if row else {}
 
 
+_PRIORITY_RU = {
+    "learning": "обучение и рост",
+    "money": "деньги и стабильный доход",
+    "balance": "баланс жизни и работы",
+}
+
+
+def coach_profile_snippet(profile: Dict[str, Any]) -> str:
+    """Краткий текст для ИИ-чата: город, формат, приоритет, фокус месяца, недельный прогресс."""
+    if not profile:
+        return ""
+    lines: List[str] = []
+    city = (profile.get("city") or "").strip()
+    if city:
+        lines.append(f"Город: {city}")
+    wf = (profile.get("work_format_preference") or profile.get("work_format_pref") or "").strip()
+    if wf:
+        lines.append(f"Формат работы: {wf}")
+    pr = (profile.get("career_priority") or "").strip().lower()
+    if pr:
+        lines.append(f"Приоритет сейчас: {_PRIORITY_RU.get(pr, pr)}")
+    sk = (profile.get("monthly_focus_skill") or "").strip()
+    if sk:
+        lines.append(f"Навык месяца: {sk}")
+    pj = (profile.get("monthly_focus_project") or "").strip()
+    if pj:
+        lines.append(f"Проект месяца: {pj[:400]}")
+    wk = (profile.get("weekly_progress_note") or "").strip()
+    if wk:
+        lines.append(f"Прогресс за неделю: {wk[:400]}")
+    return "\n".join(lines)
+
+
 def load_competencies(user_id: str) -> List[Dict[str, Any]]:
     with get_db() as conn:
         rows = conn.execute(

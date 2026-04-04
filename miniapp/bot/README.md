@@ -4,28 +4,22 @@ Polling-бот для кнопки **Web App**: открывает мини-пр
 
 ## Требования
 
-- Запущенный **API** из корня репозитория (`python miniapp/run.py`, порт **8000**).
+- Запущенный **API** из корня репозитория (`python miniapp/run.py`, порт **8000**), если поднимаете бота отдельно.
 - В корне репозитория файл **`.env`** с `TELEGRAM_BOT_TOKEN` (и при необходимости `PUBLIC_BASE_URL`).
 
 Пакет `wibe_work` подхватывается из `miniapp/backend/` через `sys.path`.
 
 ## Запуск
 
-### Вариант 1 — из корня монорепозитория (рекомендуется)
+Обычно бот поднимается вместе со всем стеком из корня репозитория:
 
 ```bash
-"./launch files/launch-bot.sh"
+bash "launch files/launch-stack.sh"
 ```
 
-Windows:
+Windows: `launch files\launch-stack.bat`
 
-```bat
-launch files\launch-bot.bat
-```
-
-### Вариант 2 — вручную
-
-Из корня репозитория, с активированным `venv`:
+Для отладки вручную (из корня, активированный `venv`):
 
 ```bash
 python miniapp/bot/bot.py
@@ -33,4 +27,4 @@ python miniapp/bot/bot.py
 
 ## Файлы
 
-- `bot.py` — точка входа. Скрипты запуска — в **`launch files/`** в корне репозитория (`launch-bot.sh` / `.bat`).
+- `bot.py` — точка входа. Полный запуск — только через **`launch files/launch-stack`**.

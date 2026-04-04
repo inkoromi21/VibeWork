@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from wibe_work.sqlite_db import get_db
 from wibe_work.bearer_auth import require_bearer_matches_user
 from wibe_work.questionnaire_fields import get_profile_schema
-from wibe_work.services.user_context import load_profile, parse_interest_spheres
+from wibe_work.services.user_context import coach_profile_snippet, load_profile, parse_interest_spheres
 from wibe_work.services.career_analysis import build_analysis_result, public_analysis_payload
 from wibe_work.services.llm_client import career_coach_chat_reply
 from wibe_work.services.aptitude_quiz import get_questions_for_interest
@@ -174,7 +174,8 @@ async def career_coach_chat(user_id: str, request: Request, body: ChatRequest):
     )
     hint = (snap or {}).get("directions_hint") or ""
     msgs = [{"role": m.role, "content": m.content} for m in body.messages[-20:]]
-    reply, source, notice = career_coach_chat_reply(msgs, summary, hint)
+    snippet = coach_profile_snippet(load_profile(user_id))
+    reply, source, notice = career_coach_chat_reply(msgs, summary, hint, snippet)
     return {"reply": reply, "source": source, "notice": notice}
 
 
