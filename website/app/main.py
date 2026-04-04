@@ -1,0 +1,214 @@
+"""FastAPI: карьерный консультант для молодежи 16–22."""
+
+from __future__ import annotations
+
+import logging
+import os
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from app.account_auth_routes import router as auth_router
+from app.career_advisor import (
+    build_analysis,
+    career_chat,
+    load_vacancies_for_match,
+    llm_configured,
+    match_jobs,
+    mts_preview_rank,
+    quiz_questions_bundle,
+    simulator_advance,
+    simulator_start,
+)
+from app.mts_tracks_catalog import MtsTrack, load_mts_tracks
+from app.questionnaire_fields import get_profile_schema
+from app.sqlite_async_session import engine, init_db
+from app.api_schemas import (
+    AnalysisResult,
+    ChatRequest,
+    ChatResponse,
+    DiagnosisPayload,
+    Interest,
+    JobMatchRequest,
+    MockVacancy,
+    MtsMatrixMatch,
+    MtsPreviewPayload,
+    SimulatorAdvance,
+    VacancyEnriched,
+)
+
+# Явный путь: иначе .env не находится при другом cwd или uvicorn --reload
+ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(ROOT / ".env")
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+FRONTEND_DIR = ROOT / "frontend"
+
+_PORT = int(os.environ.get("PORT", "8765"))
+_CORS_ORIGINS = [
+    f"http://127.0.0.1:{_PORT}",
+    f"http://localhost:{_PORT}",
+]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
+    await engine.dispose()
+
+
+app = FastAPI(title="Youth Career Advisor", version="1.0.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth_router)
+
+if FRONTEND_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+
+
+@app.get("/")
+async def serve_index():
+    index = FRONTEND_DIR / "index.html"
+    if not index.is_file():
+        raise HTTPException(status_code=404, detail="frontend/index.html не найден")
+    return FileResponse(index)
+
+
+@app.get("/api/health")
+async def health():
+    return {"status": "ok"}
+
+
+@app.get("/api/profile/schema")
+async def profile_schema():
+    """Поля профиля по структуре Google Sheet (можно править app/questionnaire_fields.py)."""
+    return get_profile_schema()
+
+
+@app.get("/api/health/llm")
+async def health_llm():
+    """Показывает, задан ли ключ/URL для реального LLM (иначе чат и нарратив — заглушки)."""
+    return {"llm_configured": llm_configured()}
+
+
+@app.get("/api/mts/tracks", response_model=list[MtsTrack])
+async def mts_tracks() -> list[MtsTrack]:
+    return list(load_mts_tracks())
+
+
+@app.get("/api/quiz/questions")
+async def quiz_questions(
+    interest: str = Query(..., description="Значение из профиля: IT, дизайн, маркетинг, …"),
+    target_mts_role_id: str | None = Query(None, description="id роли из /api/mts/tracks"),
+):
+    """Вопросы теста под интерес и (если задано) целевую роль матрицы МТС."""
+    return quiz_questions_bundle(interest, target_mts_role_id)
+
+
+@app.post("/api/mts/preview", response_model=list[MtsMatrixMatch])
+async def mts_preview(body: MtsPreviewPayload) -> list[MtsMatrixMatch]:
+    try:
+        return mts_preview_rank(body)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat(body: ChatRequest) -> ChatResponse:
+    try:
+        text, source, notice = await career_chat(body)
+        return ChatResponse(reply=text, source=source, notice=notice)
+    except Exception as e:
+        logger.exception("Чат ИИ")
+        raise HTTPException(status_code=500, detail="Не удалось получить ответ") from e
+
+
+@app.post("/api/analyze", response_model=AnalysisResult)
+async def analyze(payload: DiagnosisPayload) -> AnalysisResult:
+    try:
+        return await build_analysis(payload)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Ошибка анализа")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера") from e
+
+
+@app.get("/api/jobs", response_model=list[MockVacancy])
+async def jobs(
+    profession: str | None = Query(None),
+    level: str | None = Query(None),
+    city: str | None = Query(None),
+    work_format: str | None = Query(None, description="удалённо | офис | гибрид"),
+    salary_bracket: str | None = Query(None, description="low | medium | high"),
+    interest: str = Query("IT", description="Код из профиля: IT, дизайн, маркетинг, …"),
+) -> list[MockVacancy]:
+    try:
+        try:
+            intr = Interest(interest)
+        except ValueError:
+            intr = Interest.IT
+        body = JobMatchRequest(
+            skills=[],
+            interests=[intr],
+            profession=profession,
+            level=level,
+            city=city,
+            work_format=work_format,
+            salary_bracket=salary_bracket,
+        )
+        return await load_vacancies_for_match(body)
+    except Exception as e:
+        logger.exception("Ошибка выдачи вакансий")
+        raise HTTPException(status_code=500, detail="Не удалось загрузить вакансии") from e
+
+
+@app.post("/api/jobs/match", response_model=list[VacancyEnriched])
+async def jobs_match(body: JobMatchRequest) -> list[VacancyEnriched]:
+    try:
+        return await match_jobs(body)
+    except Exception as e:
+        logger.exception("Ошибка персонального матчинга")
+        raise HTTPException(status_code=500, detail="Не удалось подобрать вакансии") from e
+
+
+@app.get("/api/simulator/start")
+async def sim_start(role: str = Query("analyst", description="analyst | designer")):
+    try:
+        return simulator_start(role)
+    except Exception as e:
+        logger.exception("Симулятор")
+        raise HTTPException(status_code=500, detail="Ошибка симулятора") from e
+
+
+@app.post("/api/simulator/step")
+async def sim_step(body: SimulatorAdvance):
+    try:
+        return simulator_advance(body)
+    except Exception as e:
+        logger.exception("Симулятор шаг")
+        raise HTTPException(status_code=500, detail="Ошибка симулятора") from e
+
+
+if __name__ == "__main__":
+    import os
+
+    import uvicorn
+
+    port = int(os.environ.get("PORT", "8765"))
+    uvicorn.run("app.main:app", host="127.0.0.1", port=port, reload=False)

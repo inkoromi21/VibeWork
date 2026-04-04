@@ -1,0 +1,58 @@
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Local env & secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Local databases (keep JSON/fixtures tracked)
+*.db
+*.db-journal
+*.sqlite3
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Tests & tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Build / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+
+# Logs & temp
+*.log
+*.tmp
+
+# Downloaded dev binaries (install separately)
+miniapp/scripts/bin/ngrok

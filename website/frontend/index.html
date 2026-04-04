@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>VibeWork — карьерный навигатор</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem("vibework_theme") === "dark") document.documentElement.setAttribute("data-theme", "dark");
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <div class="app-bg" aria-hidden="true">
+    <div class="app-bg-waves">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 720" preserveAspectRatio="xMidYMid slice" fill="none">
+        <g class="app-bg-waves-g" stroke="#22a954" stroke-width="1.2" stroke-linecap="round">
+          <path d="M-80 300c200-48 400 48 600 0s400-48 600 0 400 48 600 0" />
+          <path d="M-80 326c220 52 420-52 640 0s380 52 600 0 420-52 640 0" />
+          <path d="M-80 352c180-40 380 40 560 0s420-40 600 0 420 40 600 0" />
+          <path d="M-80 378c240 44 440-44 680 0s360 44 560 0 440-44 680 0" />
+          <path d="M-80 404c160-36 360 36 520 0s440-36 600 0 440 36 600 0" />
+          <path d="M-80 430c210 40 410-40 620 0s390 40 580 0 410-40 620 0" />
+          <path d="M-80 456c190-44 390 44 580 0s410-44 590 0 410 44 590 0" />
+          <path d="M-80 482c230 36 430-36 660 0s370 36 550 0 430-36 660 0" />
+          <path d="M-80 508c170-32 370 32 540 0s430-32 600 0 430 32 600 0" />
+          <path d="M-80 534c200 38 400-38 600 0s400 38 600 0 400-38 600 0" />
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <div id="auth-gate" class="auth-gate" role="dialog" aria-modal="true" aria-labelledby="auth-gate-title">
+    <div class="auth-gate-waves" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 720" preserveAspectRatio="xMidYMid slice" fill="none">
+        <g stroke="#22a954" stroke-width="1.15" stroke-linecap="round" opacity="0.38">
+          <path d="M-80 300c200-48 400 48 600 0s400-48 600 0 400 48 600 0" />
+          <path d="M-80 326c220 52 420-52 640 0s380 52 600 0 420-52 640 0" />
+          <path d="M-80 352c180-40 380 40 560 0s420-40 600 0 420 40 600 0" />
+          <path d="M-80 378c240 44 440-44 680 0s360 44 560 0 440-44 680 0" />
+          <path d="M-80 404c160-36 360 36 520 0s440-36 600 0 440 36 600 0" />
+          <path d="M-80 430c210 40 410-40 620 0s390 40 580 0 410-40 620 0" />
+          <path d="M-80 456c190-44 390 44 580 0s410-44 590 0 410 44 590 0" />
+          <path d="M-80 482c230 36 430-36 660 0s370 36 550 0 430-36 660 0" />
+          <path d="M-80 508c170-32 370 32 540 0s430-32 600 0 430 32 600 0" />
+          <path d="M-80 534c200 38 400-38 600 0s400 38 600 0 400-38 600 0" />
+        </g>
+      </svg>
+    </div>
+    <div class="auth-gate-card">
+      <h1 id="auth-gate-title" class="auth-gate-title">Вход в профиль</h1>
+      <p class="auth-gate-sub muted">Профиль, тесты и разбор — после входа в аккаунт VibeWork.</p>
+      <input type="email" id="auth-email" class="auth-field auth-gate-field" placeholder="Email" autocomplete="username" />
+      <input type="password" id="auth-password" class="auth-field auth-gate-field" placeholder="Пароль (не короче 8 символов)" autocomplete="current-password" />
+      <div class="auth-gate-actions">
+        <button type="button" class="btn-auth-gate btn-auth-gate-primary" id="btn-auth-login">Войти</button>
+        <button type="button" class="btn-auth-gate btn-auth-gate-secondary" id="btn-auth-register">Регистрация</button>
+      </div>
+      <p class="auth-hint auth-gate-hint muted small" id="auth-forgot-hint">Забыли пароль? Восстановление по email пока недоступно — можно <strong>зарегистрировать новый аккаунт</strong> на другой почте.</p>
+      <p class="auth-gate-brand" aria-hidden="true">
+        <span class="brand-lockup brand-lockup--gate" translate="no">
+          <span class="brand-brace" aria-hidden="true">{</span><span class="brand-name">VibeWork</span><span class="brand-brace" aria-hidden="true">}</span>
+        </span>
+        <span class="auth-gate-brand-tag">карьерный навигатор</span>
+      </p>
+    </div>
+  </div>
+
+  <div class="app-layout">
+    <aside class="sidebar" aria-label="Меню">
+      <div class="sidebar-brand">
+        <span class="brand-lockup brand-lockup--sidebar" translate="no">
+          <span class="brand-brace" aria-hidden="true">{</span><span class="brand-name">VibeWork</span><span class="brand-brace" aria-hidden="true">}</span>
+        </span>
+      </div>
+      <nav class="sidebar-nav" aria-label="Разделы">
+        <button type="button" class="nav-pill side-nav-item active" data-tab="profile">
+          <span class="sn-ico" aria-hidden="true">◇</span> Профиль
+        </button>
+        <button type="button" class="nav-pill side-nav-item" data-tab="test">
+          <span class="sn-ico" aria-hidden="true">☑</span> Тестирование
+        </button>
+        <button type="button" class="nav-pill side-nav-item" data-tab="ai">
+          <span class="sn-ico" aria-hidden="true">💬</span> Чат с ИИ
+        </button>
+        <button type="button" class="nav-pill side-nav-item" data-tab="jobs">
+          <span class="sn-ico" aria-hidden="true">▦</span> Вакансии
+        </button>
+        <div class="sidebar-sep" role="separator"></div>
+        <button type="button" class="nav-pill side-nav-item" data-tab="sim">
+          <span class="sn-ico" aria-hidden="true">▶</span> Симулятор
+        </button>
+      </nav>
+    </aside>
+
+    <div class="main-column">
+      <header class="main-topbar">
+        <div class="topbar-left">
+          <div class="avatar-bubble sm" id="avatar-bubble" title="Сфера из профиля">VW</div>
+          <div class="topbar-copy">
+            <div class="topbar-heading-row">
+              <p class="topbar-title">Карьерный трек</p>
+              <div class="step-dots" id="header-step-dots" aria-hidden="true">
+                <span class="step-dot" data-step="1" title="Профиль"></span>
+                <span class="step-dot" data-step="2" title="Тест"></span>
+                <span class="step-dot" data-step="3" title="Разбор"></span>
+                <span class="step-dot" data-step="4" title="ИИ"></span>
+                <span class="step-dot" data-step="5" title="Вакансии"></span>
+              </div>
+            </div>
+            <p class="topbar-quote">«Дорогу осилит идущий — а траекторию строит каждый выбранный шаг.»</p>
+            <p class="profile-tagline" id="profile-tagline">Шаги откроются по мере прохождения</p>
+          </div>
+        </div>
+        <div class="topbar-tools">
+          <span class="streak-chip" id="streak-chip" hidden>фокус</span>
+          <button type="button" class="spark-btn" id="btn-spark-tip" title="Случайный совет">✦</button>
+          <button type="button" class="theme-toggle-btn" id="btn-theme-toggle" title="Тёмная тема" aria-pressed="false" aria-label="Переключить тему">🌙</button>
+          <span class="live-pill compact live-pill--local" id="sync-pill" title="">
+            <span class="dot" aria-hidden="true"></span>
+            <span id="sync-pill-text">Локально</span>
+          </span>
+          <div class="auth-cluster auth-cluster-inline" id="auth-cluster">
+            <span id="auth-email-label" class="auth-email-label muted small" hidden></span>
+            <button type="button" class="btn-inline" id="btn-auth-logout" hidden>Выйти</button>
+          </div>
+        </div>
+      </header>
+
+  <main class="shell">
+    <section class="panel active" id="panel-profile" data-panel="profile">
+      <div class="cdek-profile-layout">
+        <div class="cdek-profile-bg" aria-hidden="true"></div>
+        <div class="card float-in cdek-profile-card">
+        <div class="card-head cdek-card-head">
+          <h1>Шаг 1 — профиль</h1>
+          <p class="muted">Сверху — возраст и главная сфера (от неё зависят вопросы теста). Ниже по странице — полный профиль: базовые данные, интересы, навыки, опыт и дополнительные поля.</p>
+        </div>
+        <ol class="flow-steps cdek-flow-steps" aria-label="Порядок шагов">
+          <li><strong>Профиль</strong></li>
+          <li><strong>Тесты</strong> — 2 блока (сфера + личность)</li>
+          <li><strong>Разбор</strong></li>
+          <li><strong>Чат ИИ</strong></li>
+        </ol>
+        <div class="profi-method" aria-labelledby="profi-method-title">
+          <h2 id="profi-method-title" class="profi-method-title">Три опоры перед выбором трека</h2>
+          <p class="muted small profi-method-lead">Опираемся на практику профориентации: так проще честно заполнить профиль и интерпретировать тесты.</p>
+          <div class="profi-method-grid">
+            <article class="profi-pillar">
+              <span class="profi-pillar-num" aria-hidden="true">1</span>
+              <h3 class="profi-pillar-title">Сильные стороны</h3>
+              <p class="profi-pillar-text muted small">Выписывайте, на что опираетесь: коммуникация, аналитика, организация, креатив, техническая рука — то, что реально даёт уверенность.</p>
+            </article>
+            <article class="profi-pillar">
+              <span class="profi-pillar-num" aria-hidden="true">2</span>
+              <h3 class="profi-pillar-title">Интерес и энергия</h3>
+              <p class="profi-pillar-text muted small">Где сейчас тянет развиваться и копать глубже. Интересы меняются — это нормально. Если нравится специальность выпускника — берите её за основу и «докручивайте» роль под себя.</p>
+            </article>
+            <article class="profi-pillar">
+              <span class="profi-pillar-num" aria-hidden="true">3</span>
+              <h3 class="profi-pillar-title">Для других людей</h3>
+              <p class="profi-pillar-text muted small">Хобби — в основном для себя. Работа — про запросы тех, кто платит: готовы ли в рамках интереса решать чужие задачи день за днём? Это и отличает любимое дело от «просто нравится».</p>
+            </article>
+          </div>
+          <p class="profi-method-foot muted small"><strong>Карьерные ценности</strong> (в духе якорей Шейна): что в работе мотивирует — служение людям, рост до эксперта, управление и статус, баланс жизни. Если важен баланс, роль «24/7» будет давить; если служение, одни деньги редко хватят.</p>
+        </div>
+        <div class="field full prep-block">
+          <span>Уровень подготовки <span class="muted small">(ветка на схеме)</span></span>
+          <div class="prep-cards" role="radiogroup" aria-label="Уровень подготовки">
+            <label class="prep-card">
+              <input type="radio" name="preparation_level" value="слабый" />
+              <strong>Слабый</strong>
+              <span class="muted small">Нужна база: курсы, микро-проекты</span>
+            </label>
+            <label class="prep-card">
+              <input type="radio" name="preparation_level" value="средний" checked />
+              <strong>Средний</strong>
+              <span class="muted small">Курс + проект параллельно</span>
+            </label>
+            <label class="prep-card">
+              <input type="radio" name="preparation_level" value="сильный" />
+              <strong>Сильный</strong>
+              <span class="muted small">Кейсы, хакатоны, нетворк</span>
+            </label>
+          </div>
+        </div>
+        <div class="progress-wrap profile-metrics-wrap" id="profile-metrics-wrap" hidden>
+          <div class="progress-label"><span>Сводка профиля</span><span id="profile-pct">0%</span></div>
+          <div class="progress-bar"><div class="progress-fill" id="profile-bar"></div></div>
+        </div>
+        <p id="profile-metrics-hint" class="muted small metrics-hint">Эта шкала и итоговые метрики появятся после теста и разбора — до этого заполните поля и пройдите вопросы.</p>
+        <form id="diag-form" class="cdek-profile-form" novalidate>
+          <input type="hidden" name="education" id="field-education-sync" value="школа" />
+          <div class="cdek-core-row form-grid">
+            <label class="field">
+              <span>Возраст</span>
+              <input type="number" name="age" id="field-age" min="14" max="30" value="18" required />
+            </label>
+            <label class="field">
+              <span>Главная сфера <span class="muted small">(тест)</span></span>
+              <select name="interest" id="field-interest" required>
+                <option value="IT">IT и разработка</option>
+                <option value="данные_и_AI">Данные и AI</option>
+                <option value="DevOps_и_SRE">DevOps и SRE</option>
+                <option value="дизайн">Дизайн</option>
+                <option value="маркетинг">Маркетинг</option>
+                <option value="продажи">Продажи</option>
+                <option value="инженерия">Инженерия</option>
+                <option value="наука">Наука</option>
+                <option value="бизнес">Бизнес и управление</option>
+                <option value="финансы_и_контроль">Финансы и контроль</option>
+                <option value="HR_и_рекрутинг">HR и рекрутинг</option>
+                <option value="юриспруденция">Юриспруденция</option>
+                <option value="закупки">Закупки</option>
+                <option value="логистика">Логистика</option>
+                <option value="недвижимость_и_эксплуатация">Недвижимость и эксплуатация</option>
+                <option value="офис_и_администрирование">Офис и администрирование</option>
+                <option value="продукт_и_PMO">Продукт и PMO</option>
+                <option value="поддержка_и_сервис">Поддержка и сервис</option>
+              </select>
+            </label>
+          </div>
+          <div id="sheet-profile-root" class="sheet-profile-root" aria-live="polite"></div>
+          <label class="field full">
+            <span>Комментарий для ИИ (опционально)</span>
+            <textarea name="motivation" id="field-motivation" rows="2" placeholder="Цели, страхи, контекст для чата…"></textarea>
+          </label>
+        </form>
+        <p class="muted small skills-note">Заполненный профиль учитывается в разборе и подборе вакансий вместе с тестом.</p>
+        <div class="actions flow-actions">
+          <p id="flow-hint" class="flow-hint muted small"></p>
+          <button type="button" id="btn-analyze" class="btn primary" disabled>Сначала заполните профиль</button>
+          <button type="button" id="btn-restore" class="btn ghost">Загрузить сохранённый отчёт</button>
+        </div>
+        <p id="form-error" class="error" hidden></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-test" data-panel="test">
+      <div class="card float-in">
+        <div class="card-head">
+          <h1>Шаг 2 — тест</h1>
+          <p class="muted"><strong>Два отдельных теста:</strong> (1) <strong>10 вопросов</strong> по выбранной сфере — (2) <strong>8 вопросов</strong> «тип личности». Оба блока нужны для разбора. Учитывается время ответа.</p>
+        </div>
+        <p class="banner-warn" id="test-blocked-banner" hidden>Сначала заполните шаг 1 — профиль: возраст, главная сфера и уровень образования в форме ниже.</p>
+        <div class="quiz-metrics-wrap" id="quiz-metrics-wrap" hidden>
+          <div class="progress-wrap">
+            <div class="progress-label"><span>Тест 1 — сфера и задачи</span><span id="quiz-progress-label">0/10</span></div>
+            <div class="progress-bar"><div class="progress-fill" id="quiz-bar"></div></div>
+          </div>
+          <div class="progress-wrap" style="margin-top:0.65rem">
+            <div class="progress-label"><span>Тест 2 — тип личности</span><span id="quiz-personality-progress-label">0/8</span></div>
+            <div class="progress-bar"><div class="progress-fill" id="quiz-personality-bar"></div></div>
+          </div>
+        </div>
+        <p id="quiz-metrics-hint" class="muted small metrics-hint">Шкалы — после готового профиля. Разбор откроется, когда заполнены <strong>оба</strong> теста.</p>
+        <div class="quiz-test-section">
+          <h2 class="quiz-test-heading">Тест 1 — стиль задач в вашей сфере</h2>
+          <p class="muted small">Первые пять вопросов зависят от главной сферы в профиле; далее — общий блок.</p>
+          <div id="quiz" class="quiz"></div>
+        </div>
+        <div class="quiz-test-section quiz-test-section--personality">
+          <h2 class="quiz-test-heading">Тест 2 — тип личности</h2>
+          <p class="muted small">Короткий блок про стиль работы и среду — в духе профориентации (ориентиры вроде типов Холланда, «логика / этика / практика / идеи»).</p>
+          <p class="muted small">По ответам виднее, где вам комфортно: порядок или постоянные сдвиги, опора на факты или на эмоции в решениях, много контактов или глубокий фокус. Вместе с тестом 1 это уходит в разбор как профиль «логика / идеи / люди».</p>
+          <div id="quiz-personality" class="quiz"></div>
+        </div>
+        <div class="actions test-footer" id="test-footer" hidden>
+          <p class="muted small" id="test-footer-hint"></p>
+          <button type="button" id="btn-request-ai" class="btn primary glow">Открыть чат с ИИ</button>
+        </div>
+      </div>
+
+      <div id="post-test-wrap" class="post-test-stack results-stack" hidden>
+        <p id="post-test-loading" class="card float-in muted" hidden>Собираем разбор по ответам…</p>
+        <div id="results" class="results-inner results-inner--compact">
+          <p class="results-timestamp muted small" id="results-timestamp" hidden></p>
+          <div class="results-dashboard-top">
+            <div class="card float-in metric-panel metric-panel--segments" id="res-gap">
+              <h2 class="metric-panel-title">Готовность к цели трека</h2>
+              <p class="muted small" id="gap-headline"></p>
+              <div id="gap-segmented-host" class="cdek-segmented-wrap" aria-hidden="true"></div>
+              <div class="hp-legend metric-bars-compact" id="gap-bars"></div>
+              <p class="muted small gap-closing-line" id="gap-closing"></p>
+            </div>
+            <div class="card float-in metric-panel metric-panel--radar" id="res-style-fit">
+              <h2 class="metric-panel-title">Профиль задач</h2>
+              <p class="muted small">Четыре «лепестка» — чем длиннее сегмент, тем сильнее выражено качество (по тесту и профилю). Подписи — ниже, полностью.</p>
+              <div id="style-radar-host" class="cdek-radar-host"></div>
+              <div id="style-fit-legend" class="style-radar-legend muted small"></div>
+            </div>
+          </div>
+          <div class="results-metrics-grid results-metrics-grid--secondary">
+            <div class="card float-in metric-panel metric-panel--quad metric-panel--fullrow" id="res-quad-insights" hidden>
+              <h2 class="metric-panel-title">Четыре индикатора</h2>
+              <p class="muted small">
+                Психологическая готовность к роли, усиленный вклад <strong>теста личности</strong>, совпадение теста сферы с рекомендуемым треком и ориентир по работе с людьми и чужими запросами.
+                Проценты — модельные оценки для рефлексии, не медицинское заключение.
+              </p>
+              <div id="insight-tiles-grid" class="insight-tiles-grid"></div>
+            </div>
+            <div class="card float-in metric-panel metric-panel--thermo metric-panel--fullrow" id="res-mts-metrics" hidden>
+              <h2 class="metric-panel-title">Роли: близость по профилю</h2>
+              <p class="muted small">Топ направлений из матрицы.</p>
+              <div id="mts-metrics-block" class="mts-thermo-list"></div>
+            </div>
+          </div>
+          <div class="card float-in" id="res-learn">
+            <h2>Обучение</h2>
+            <div class="grid learn" id="learning-block"></div>
+          </div>
+          <div class="card float-in" id="res-advice">
+            <h2>Индивидуальные советы</h2>
+            <div id="advice-block" class="advice-stack"></div>
+          </div>
+          <div class="card float-in" id="res-stages">
+            <h2>Этапы роста</h2>
+            <p class="muted small">Ориентир по уровням и срокам — ваш путь может быть короче или длиннее.</p>
+            <div class="grade-plan-wrap" id="grade-plan-wrap" hidden>
+              <h3 class="grade-plan-heading">План грейда</h3>
+              <p class="muted small grade-plan-lead">Условные уровни L1–L4+ и что обычно ожидают, чтобы перейти на ступень выше.</p>
+              <div class="grade-plan-table-wrap" id="grade-plan-block"></div>
+            </div>
+            <div class="stages stages--rich" id="stages-block"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-ai" data-panel="ai">
+      <div id="ai-gate" class="card float-in hint-card">
+        <h2>Чат с ИИ</h2>
+        <p class="muted">Чат открывается после профиля и теста: сначала появится <strong>разбор под тестом</strong>, затем можно задавать вопросы здесь. Подбор вакансий на вкладке «Работа» учитывает разбор и последние сообщения чата.</p>
+        <ul class="checklist" id="ai-readiness">
+          <li id="chk-profile">Профиль: возраст, сфера, уровень образования</li>
+          <li id="chk-test">Тесты: оба блока заполнены</li>
+          <li id="chk-report">Разбор получен (под тестом)</li>
+        </ul>
+        <div class="actions">
+          <button type="button" class="btn secondary" id="btn-go-profile">К профилю</button>
+          <button type="button" class="btn secondary" id="btn-go-test">К тесту и разбору</button>
+        </div>
+      </div>
+      <div id="ai-chat-shell" class="card float-in chat-shell chat-shell--framed" hidden>
+        <div class="chat-head chat-head--bar">
+          <h2>Чат с ИИ по карьере</h2>
+          <p class="muted small">Контекст: тест и разбор. Стажировки, страхи, резюме, города.</p>
+        </div>
+        <div id="chat-messages" class="chat-messages" role="log" aria-live="polite"></div>
+        <form id="chat-form" class="chat-form chat-form--inline">
+          <textarea id="chat-input" rows="2" placeholder="Ваш вопрос…"></textarea>
+          <button type="submit" class="btn chat-send-btn" id="chat-send" title="Отправить" aria-label="Отправить">➤</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-jobs" data-panel="jobs">
+      <div class="card float-in">
+        <div class="card-head">
+          <h1>Вакансии</h1>
+          <p class="muted">Матчинг — после разбора и (если есть) чата. Переключайте <strong>классику</strong>, <strong>компакт</strong> или <strong>тиндер</strong>.</p>
+        </div>
+        <div class="filters">
+          <label>
+            Область
+            <input type="text" id="job-profession" placeholder="IT, дизайн…" />
+          </label>
+          <label>
+            Уровень
+            <select id="job-level">
+              <option value="">Любой</option>
+              <option value="стажер">Стажёр</option>
+              <option value="джуниор">Джуниор</option>
+              <option value="мидл">Мидл</option>
+              <option value="сеньор">Сеньор</option>
+            </select>
+          </label>
+          <label>
+            Город
+            <input type="text" id="job-city" placeholder="Москва…" />
+          </label>
+          <label>
+            Формат
+            <select id="job-format">
+              <option value="">Любой</option>
+              <option value="удалённо">Удалённо</option>
+              <option value="офис">Офис</option>
+              <option value="гибрид">Гибрид</option>
+            </select>
+          </label>
+          <label>
+            Зарплата
+            <select id="job-salary">
+              <option value="">Любая</option>
+              <option value="low">До ~70k</option>
+              <option value="medium">70–120k</option>
+              <option value="high">120k+</option>
+            </select>
+          </label>
+        </div>
+        <div class="view-toggle">
+          <button type="button" class="btn tab-toggle active" data-view="match">Классика</button>
+          <button type="button" class="btn tab-toggle" data-view="list">Компакт</button>
+          <button type="button" class="btn tab-toggle" data-view="swipe">Тиндер</button>
+        </div>
+        <div id="jobs-match" class="jobs-view active"></div>
+        <div id="jobs-list" class="jobs-view"></div>
+        <div id="jobs-swipe" class="jobs-view">
+          <div class="tinder-deck" id="tinder-deck">
+            <div class="swipe-stack tinder-stack" id="swipe-stack"></div>
+            <div class="tinder-stamp nope" id="tinder-stamp-nope" aria-hidden="true">МИМО</div>
+            <div class="tinder-stamp like" id="tinder-stamp-like" aria-hidden="true">ИНТЕРЕСНО</div>
+          </div>
+          <div class="swipe-actions tinder-actions">
+            <button type="button" class="btn swipe-nope tinder-round" id="swipe-left" title="Мимо">✕</button>
+            <button type="button" class="btn swipe-rewind" id="swipe-rewind" title="Назад на одну">↺</button>
+            <button type="button" class="btn swipe-yep tinder-round" id="swipe-right" title="В избранное">♥</button>
+          </div>
+          <p class="muted small swipe-hint">Свайп вправо — в локальное избранное (демо)</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-sim" data-panel="sim">
+      <div class="card float-in">
+        <div class="card-head">
+          <h1>Симулятор дня</h1>
+          <p class="muted">Текстовый квест: проживите смену аналитика или дизайнера</p>
+        </div>
+        <div class="sim-controls">
+          <label>
+            Роль
+            <select id="sim-role">
+              <option value="analyst">Аналитик данных</option>
+              <option value="designer">Продуктовый дизайнер</option>
+            </select>
+          </label>
+          <button type="button" class="btn secondary" id="sim-restart">Начать заново</button>
+        </div>
+        <div class="sim-card" id="sim-card">
+          <div class="sim-meta">
+            <span class="badge" id="sim-step-badge">Шаг 0</span>
+            <span class="mono" id="sim-points">Очки: 50</span>
+          </div>
+          <h3 id="sim-title">Нажмите «Начать заново»</h3>
+          <p id="sim-text" class="sim-text"></p>
+          <div class="sim-choices" id="sim-choices"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+    </div>
+  </div>
+
+  <div id="app-toast" class="app-toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>

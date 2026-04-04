@@ -1,0 +1,2614 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>VibeWork — Карьерный навигатор 14–30</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Roboto:wght@400;500&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Токены из Figma-export: зелёная волна, лайм #00FF00, кнопки #3DB13D, обводка полей #9C9C9C */
+        :root {
+            --accent: #3db13d;
+            --accent-dark: #2d942d;
+            --accent-lime: #00ff00;
+            --accent-wave: #43c243;
+            --accent-soft: rgba(67, 194, 67, 0.14);
+            --accent-border: rgba(0, 255, 0, 0.35);
+            --field-glow: 0 2px 20px -3px rgba(0, 255, 0, 0.45);
+            --field-outline: #9c9c9c;
+            --bg-page: #ffffff;
+            --card: #ffffff;
+            --text: #000000;
+            --text-muted: #4a4a4a;
+            --border: #dbdada;
+            --danger: #ac3e46;
+            --radius: 16px;
+            --radius-lg: 22px;
+            --radius-sm: 10px;
+            --radius-field: 7px;
+            --radius-cta: 40px;
+            --shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+            --shadow-card: 0 2px 20px -4px rgba(0, 255, 0, 0.2), 0 4px 24px rgba(0, 0, 0, 0.05);
+            --font: "Open Sans", system-ui, sans-serif;
+            --font-input: "Roboto", system-ui, sans-serif;
+            --font-mono: "JetBrains Mono", ui-monospace, monospace;
+            --sidebar-w: 240px;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; min-height: 100%; }
+        body {
+            font-family: var(--font);
+            background: var(--bg-page);
+            color: var(--text);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 50% at 50% -10%, rgba(67, 194, 67, 0.12), transparent 55%),
+                radial-gradient(ellipse 60% 40% at 100% 100%, rgba(0, 255, 0, 0.06), transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        #app {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+        }
+        .layout {
+            display: flex;
+            min-height: 100vh;
+        }
+        .layout--auth {
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 32px 20px 48px;
+        }
+        .layout--auth .auth-card {
+            width: 100%;
+            max-width: 420px;
+            margin-top: 24px;
+            padding: 24px 20px 28px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-card);
+            background: var(--card);
+        }
+        .sidebar {
+            width: var(--sidebar-w);
+            flex-shrink: 0;
+            background: var(--card);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 20px 14px 16px;
+            position: sticky;
+            top: 0;
+            align-self: flex-start;
+            min-height: 100vh;
+            box-shadow: 2px 0 24px rgba(26, 29, 33, 0.03);
+        }
+        .sidebar-brand {
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 1rem;
+            letter-spacing: -0.02em;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+        .sidebar-tagline {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            line-height: 1.35;
+            margin-bottom: 20px;
+        }
+        .nav-sep {
+            height: 1px;
+            background: var(--border);
+            margin: 12px 0 16px;
+        }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 10px 12px;
+            margin-bottom: 4px;
+            border: none;
+            border-radius: 999px;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: var(--font);
+            font-size: 0.8125rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: left;
+            transition: background 0.15s, color 0.15s;
+        }
+        .nav-item:hover { background: var(--accent-soft); color: var(--text); }
+        .nav-item.active {
+            background: var(--accent);
+            color: #fff;
+            box-shadow: 0 2px 16px rgba(61, 177, 61, 0.45);
+        }
+        .nav-ico { font-size: 1rem; width: 1.25rem; text-align: center; flex-shrink: 0; }
+        .sidebar-foot {
+            margin-top: auto;
+            padding-top: 16px;
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+        .main-col {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .vw-wave-strip {
+            position: relative;
+            width: 100%;
+            height: 88px;
+            flex-shrink: 0;
+            overflow: hidden;
+            background: var(--card);
+        }
+        .vw-wave-strip-inner {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .vw-wave-strip .vw-wave-back {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+        }
+        .vw-wave-strip .vw-wave-front {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 68%;
+            width: 100%;
+            z-index: 2;
+        }
+        .topbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px 16px;
+            padding: 12px 20px 14px;
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+        }
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1 1 200px;
+            min-width: 0;
+        }
+        .avatar-bubble {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--accent-soft);
+            border: 2px solid var(--accent-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--accent-dark);
+            flex-shrink: 0;
+        }
+        .topbar-titles h1 {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+        .topbar-titles .dynamic-tagline {
+            margin: 2px 0 0;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .step-dots {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .step-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--border);
+        }
+        .step-dot.on { background: var(--accent); }
+        .step-dot.current { box-shadow: 0 0 0 3px var(--accent-soft); }
+        .topbar-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .topbar-profile-hint {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 12px 5px 8px;
+            border-radius: 999px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(26, 29, 33, 0.04);
+        }
+        .profile-hint-bar {
+            width: 40px;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+        .profile-hint-bar::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: var(--p, 0%);
+            max-width: 100%;
+            border-radius: 3px;
+            background: linear-gradient(90deg, var(--accent-dark), var(--accent-lime));
+        }
+        .profile-hint-text {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+        .chip-pill {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent-dark);
+            border: 1px solid var(--accent-border);
+            font-family: var(--font-mono);
+        }
+        .btn-tip {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 1px solid var(--accent-border);
+            background: var(--card);
+            color: var(--accent);
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s;
+        }
+        .btn-tip:hover { background: var(--accent-soft); }
+        .auth-inline {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            gap: 8px 10px;
+        }
+        .auth-inline input {
+            width: auto;
+            min-width: 120px;
+            max-width: 160px;
+            margin: 0;
+            padding: 8px 10px;
+            font-size: 0.8125rem;
+        }
+        .auth-inline .btn-auth {
+            padding: 8px 14px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+            border: none;
+            cursor: pointer;
+            font-family: var(--font);
+        }
+        .btn-auth-primary {
+            background: #fff;
+            color: var(--text);
+            border: 1px solid var(--accent);
+        }
+        .btn-auth-primary:hover {
+            background: var(--accent-soft);
+            border-color: var(--accent-dark);
+            color: var(--text);
+        }
+        .btn-auth-ghost {
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        .auth-note {
+            width: 100%;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin: 0;
+            max-width: 320px;
+        }
+        .shell {
+            flex: 1;
+            padding: 22px 22px 40px;
+            overflow-x: hidden;
+        }
+        h2, h3 { margin: 0 0 12px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
+        h2 { font-size: 1.125rem; }
+        h3 { font-size: 1rem; }
+        p { margin: 0 0 12px; color: var(--text-muted); font-size: .9rem; }
+        p.muted, .muted { color: var(--text-muted); font-size: .85rem; }
+        code { background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; font-size: .8em; font-family: var(--font-mono); color: var(--accent-dark); }
+        a { color: var(--accent-dark); }
+        .brand-mono { font-family: var(--font-mono); font-weight: 700; font-size: 1.05rem; color: var(--text); }
+        .tagline { font-size: .78rem; color: var(--text-muted); font-weight: 500; line-height: 1.35; }
+        .pill {
+            font-size: .72rem;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            border: 1px solid var(--accent-border);
+            color: var(--accent-dark);
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: var(--font-mono);
+        }
+        .subtab-bar { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+        .subtab {
+            padding: 6px 12px;
+            font-size: .75rem;
+            font-weight: 600;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--text-muted);
+            cursor: pointer;
+            font-family: var(--font);
+        }
+        .subtab.active { border-color: var(--accent-border); color: var(--accent-dark); background: var(--accent-soft); }
+        .banner-warn {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px 14px;
+            border-radius: var(--radius);
+            background: #fff7ed;
+            border: 1px solid #fdba74;
+            color: #9a3412;
+            margin-bottom: 16px;
+            font-size: .85rem;
+        }
+        .status { padding: 10px 14px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 16px; font-size: .85rem; background: var(--card); }
+        .status.ok { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent-dark); }
+        .status.warn { border-color: #fdba74; background: #fff7ed; color: #9a3412; }
+        button.btn-primary {
+            padding: 12px 22px;
+            margin-top: 8px;
+            border: 1.5px solid var(--accent);
+            border-radius: var(--radius-cta);
+            background: #fff;
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 1px 8px rgba(61, 177, 61, 0.12);
+        }
+        button.btn-primary:hover {
+            background: var(--accent-soft);
+            border-color: var(--accent-dark);
+            color: var(--text);
+        }
+        button.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+        button.btn-secondary {
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--text);
+            font-family: var(--font);
+            font-size: .85rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button.btn-secondary:hover { border-color: var(--accent-border); background: var(--accent-soft); }
+        .btn-tinder-no {
+            border-radius: var(--radius-cta);
+            border: 1.5px solid #000;
+            background: var(--danger);
+            color: #000;
+            font-weight: 600;
+            opacity: 0.92;
+        }
+        .btn-tinder-no:hover {
+            opacity: 1;
+            filter: brightness(1.05);
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px 12px;
+            min-height: 35px;
+            margin: 6px 0 12px;
+            border: none;
+            border-radius: var(--radius-field);
+            background: rgba(255, 255, 255, 0.92);
+            color: var(--text);
+            font-family: var(--font-input);
+            font-size: 14px;
+            font-weight: 400;
+            box-shadow: var(--field-glow);
+            outline: 3px solid var(--field-outline);
+            outline-offset: -3px;
+        }
+        input::placeholder, textarea::placeholder {
+            color: rgba(0, 0, 0, 0.45);
+        }
+        input:focus, textarea:focus, select:focus {
+            outline-color: var(--accent);
+            box-shadow: var(--field-glow), 0 0 0 1px var(--accent-lime);
+        }
+        label {
+            display: block;
+            font-size: 16px;
+            font-weight: 400;
+            letter-spacing: 0;
+            text-transform: none;
+            color: var(--text);
+            margin-top: 8px;
+            margin-bottom: 2px;
+            font-family: var(--font);
+        }
+        .profile-shell {
+            position: relative;
+            border-radius: var(--radius-lg);
+            padding: 0;
+            background: transparent;
+        }
+        .profile-shell::before {
+            display: none;
+        }
+        .profile-card {
+            position: relative;
+            z-index: 1;
+            background: var(--card);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            padding: 20px 16px 12px;
+            box-shadow: var(--shadow-card);
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0;
+            color: var(--text);
+            margin: 24px 0 14px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            font-family: var(--font);
+            text-align: center;
+        }
+        .section-title:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+        .block {
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 14px 16px;
+            border-radius: var(--radius);
+            margin-bottom: 12px;
+            font-size: .88rem;
+            box-shadow: var(--shadow);
+        }
+        .block b { color: var(--text); }
+        .multiselect-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--card);
+            font-size: .8rem;
+            cursor: pointer;
+            user-select: none;
+        }
+        .chip.on { border-color: var(--accent-border); background: var(--accent-soft); color: var(--text); }
+        .scale-row { display: flex; align-items: center; gap: 12px; margin: 8px 0 14px; }
+        .scale-row input[type="range"] { flex: 1; margin: 0; accent-color: var(--accent); }
+        .scale-val { font-family: var(--font-mono); font-size: .9rem; min-width: 1.5rem; color: var(--accent-dark); }
+        .quiz-progress-figma {
+            margin-bottom: 20px;
+        }
+        .quiz-progress-figma .quiz-progress-caption {
+            font-size: 18px;
+            font-weight: 400;
+            font-family: var(--font);
+            color: var(--text);
+            margin: 0 0 10px;
+        }
+        .quiz-progress-row {
+            height: 8px;
+            border-radius: 2px;
+            border: 0.5px solid rgba(0, 0, 0, 0.35);
+            overflow: hidden;
+            margin-bottom: 6px;
+            background: rgba(0, 0, 0, 0.06);
+        }
+        .quiz-progress-row--total {
+            background: #008000;
+        }
+        .quiz-progress-row--total .quiz-progress-fill {
+            height: 100%;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 2px;
+            transition: width .25s ease;
+        }
+        .quiz-progress-row--lime {
+            background: rgba(0, 128, 0, 0.25);
+        }
+        .quiz-progress-row--lime .quiz-progress-fill {
+            height: 100%;
+            background: var(--accent-lime);
+            border-radius: 2px;
+            transition: width .25s ease;
+        }
+        .quiz-q {
+            margin-bottom: 22px;
+            padding: 18px 16px 16px;
+            background: var(--card);
+            border-radius: 20px;
+            outline: 3px solid var(--field-outline);
+            outline-offset: -3px;
+            box-shadow: var(--shadow);
+        }
+        .quiz-q strong {
+            font-size: 15px;
+            font-weight: 600;
+            font-family: var(--font);
+        }
+        .quiz-q > p {
+            font-size: 18px;
+            font-weight: 400;
+            font-family: var(--font);
+            color: var(--text);
+            line-height: 1.45;
+        }
+        .quiz-opt {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 12px 14px;
+            margin-bottom: 8px;
+            border-radius: var(--radius-sm);
+            border: 1.5px solid #000;
+            background: rgba(61, 177, 61, 0.15);
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: border-color .15s, background .15s, box-shadow .15s;
+        }
+        .quiz-opt:hover {
+            border-color: var(--accent-dark);
+            background: rgba(61, 177, 61, 0.22);
+        }
+        .quiz-opt.selected {
+            border-color: var(--accent);
+            background: rgba(61, 177, 61, 0.35);
+            box-shadow: 0 0 0 2px var(--accent-lime);
+        }
+        .readiness-track-wrap { position: relative; margin: 8px 0 28px; }
+        .readiness-bar {
+            height: 18px;
+            border-radius: 9px;
+            overflow: hidden;
+            display: flex;
+            border: 1px solid var(--border);
+        }
+        .readiness-seg { flex: 1; min-width: 0; }
+        .readiness-pointer {
+            position: absolute;
+            top: -6px;
+            left: 0;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 10px solid var(--text);
+            transition: left .3s ease;
+        }
+        .readiness-badge {
+            position: absolute;
+            top: 22px;
+            left: 0;
+            transform: translateX(-50%);
+            font-family: var(--font-mono);
+            font-size: .8rem;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: var(--accent);
+            color: #fff;
+            white-space: nowrap;
+        }
+        .dash-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 16px; }
+        .dash-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px;
+            box-shadow: var(--shadow-card);
+        }
+        .dash-card h3 { margin-bottom: 8px; font-size: .875rem; }
+        .radar-svg-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+        .radar-svg-wrap svg { max-width: 100%; height: auto; }
+        .radar-legend { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+        .radar-chip {
+            font-family: var(--font-mono);
+            font-size: .7rem;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            border: 1px solid var(--accent-border);
+            color: var(--accent-dark);
+        }
+        .scenario-hero { text-align: center; margin-bottom: 16px; }
+        .scenario-hero .big-pct { font-size: 2.25rem; font-weight: 800; font-family: var(--font-mono); color: var(--accent-dark); line-height: 1.1; }
+        .scenario-hero .sub { font-size: .75rem; color: var(--text-muted); margin-top: 4px; }
+        .scenario-hero .plan-name { font-weight: 600; margin-top: 8px; font-size: .9rem; }
+        .scenario-lane { margin-bottom: 12px; }
+        .scenario-lane .lane-label { font-size: .78rem; font-weight: 600; margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .plan-bar-outer { height: 10px; background: #eef0f4; border-radius: 5px; overflow: hidden; }
+        .plan-bar-inner { height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--accent-dark), var(--accent)); }
+        .mts-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .mts-row .mts-name { flex: 0 0 38%; font-size: .8rem; font-weight: 500; }
+        .mts-thermo { flex: 1; height: 14px; border-radius: 7px; overflow: hidden; background: var(--border); }
+        .mts-fill { height: 100%; border-radius: 7px; }
+        .mts-pct { flex: 0 0 42px; text-align: right; font-family: var(--font-mono); font-size: .78rem; font-weight: 600; color: var(--accent-dark); }
+        .growth-card {
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            padding: 20px;
+            margin-bottom: 14px;
+            background: var(--card);
+            box-shadow: var(--shadow);
+        }
+        .growth-card .num {
+            font-family: var(--font-mono);
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--accent-soft);
+            -webkit-text-stroke: 1px var(--accent-border);
+            color: var(--accent-dark);
+            opacity: .9;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+        .growth-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+        .growth-tags span {
+            font-size: .65rem;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent-dark);
+        }
+        .chat-gate { max-width: 520px; }
+        .chat-gate ul { margin: 0; padding-left: 20px; color: var(--text-muted); font-size: .88rem; }
+        .chat-gate li { margin-bottom: 8px; }
+        .chat-shell { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--card); box-shadow: var(--shadow-card); }
+        .chat-shell-hd { padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: .85rem; background: var(--accent-soft); color: var(--accent-dark); }
+        .chat-log {
+            min-height: 280px;
+            max-height: 420px;
+            overflow-y: auto;
+            padding: 14px;
+            background: #fafbfc;
+        }
+        .chat-bubble { margin-bottom: 10px; padding: 10px 12px; border-radius: var(--radius-sm); font-size: .88rem; line-height: 1.45; border: 1px solid var(--border); }
+        .chat-bubble.user { background: var(--card); margin-left: 32px; border-color: var(--accent-border); }
+        .chat-bubble.ai { background: var(--card); margin-right: 32px; }
+        .chat-bubble .who { font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 4px; font-family: var(--font-mono); }
+        .chat-foot { padding: 14px; border-top: 1px solid var(--border); background: var(--card); }
+        .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 40px 20px; color: var(--text-muted); }
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin .8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .auth-error {
+            color: var(--danger);
+            font-size: .85rem;
+            margin-bottom: 12px;
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            background: #fff1f2;
+            border: 1px solid #fecdd3;
+        }
+        .auth-card {
+            background: var(--card);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-card);
+        }
+        .auth-switch { margin-top: 18px; text-align: center; font-size: .88rem; color: var(--text-muted); }
+        .auth-switch a { cursor: pointer; color: var(--accent-dark); font-weight: 600; }
+        .pwd-input { margin-bottom: 6px; }
+        .pwd-reveal { display: flex; flex-direction: row; align-items: center; gap: 10px; margin: 0 0 14px; }
+        .pwd-square {
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 5px;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--text-muted);
+            font-size: 11px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .pwd-square:hover { border-color: var(--accent); color: var(--accent); }
+        .pwd-square[aria-pressed="true"] { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent-dark); }
+        .pwd-reveal-caption { font-size: .68rem; color: var(--text-muted); flex: 1; }
+        .job-card h4 { margin: 0 0 6px; font-size: .95rem; color: var(--text); }
+        .job-req { font-size: .75rem; color: var(--text-muted); margin-top: 8px; }
+        .job-req span { display: inline-block; margin: 2px 6px 2px 0; padding: 2px 8px; background: var(--accent-soft); border-radius: 4px; font-family: var(--font-mono); font-size: .68rem; }
+        .tinder-stack { position: relative; min-height: 120px; max-width: 440px; margin: 0 auto; }
+        .tinder-card {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 380px;
+            background: var(--card);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            padding: 20px;
+            box-shadow: var(--shadow-card);
+        }
+        .tinder-actions { display: flex; justify-content: center; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+        .filters-panel { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; align-items: end; }
+        .filters-panel label { margin-top: 0; }
+        .filters-panel input[type="number"] { margin-bottom: 0; }
+        .jobs-toolbar {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 14px 16px;
+            margin-bottom: 14px;
+            box-shadow: var(--shadow);
+        }
+        .jobs-filters-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 12px 14px;
+            margin-bottom: 14px;
+            align-items: end;
+        }
+        @media (max-width: 900px) {
+            .jobs-filters-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        @media (max-width: 480px) {
+            .jobs-filters-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .job-filter-field label {
+            display: block;
+            margin: 0 0 6px;
+            font-size: 0.62rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+        }
+        .job-filter-field select {
+            width: 100%;
+            margin: 0;
+            padding: 8px 10px;
+            font-size: 0.8rem;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--bg-page);
+            color: var(--text);
+            font-family: var(--font);
+        }
+        .jobs-view-modes {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .jobs-view-modes .subtab {
+            flex: 1;
+            min-width: 0;
+            justify-content: center;
+            text-align: center;
+        }
+        @media (min-width: 520px) {
+            .jobs-view-modes .subtab {
+                flex: 0 1 auto;
+                min-width: 120px;
+            }
+        }
+        .jobs-search-hint {
+            font-size: 0.78rem;
+            margin-bottom: 12px;
+            line-height: 1.45;
+        }
+        .hh-job-card {
+            position: relative;
+            overflow: hidden;
+        }
+        .hh-job-card .hh-job-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .hh-job-card h4 {
+            margin: 0;
+            font-size: 0.95rem;
+            line-height: 1.35;
+            color: var(--text);
+            flex: 1;
+            min-width: 0;
+        }
+        .hh-job-meta {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        .hh-job-snippet {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.45;
+            margin-bottom: 12px;
+        }
+        .hh-job-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            background: #fff;
+            color: var(--text) !important;
+            font-weight: 600;
+            font-size: 0.82rem;
+            text-decoration: none;
+            border: 1.5px solid var(--accent);
+            cursor: pointer;
+            font-family: var(--font);
+            box-shadow: 0 1px 8px rgba(61, 177, 61, 0.12);
+        }
+        .hh-job-cta:hover {
+            background: var(--accent-soft);
+            border-color: var(--accent-dark);
+            color: var(--text) !important;
+        }
+        .btn-more-jobs {
+            width: 100%;
+            margin-top: 8px;
+        }
+        .sim-progress {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background: var(--accent-soft);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--accent-border);
+        }
+        .layout--full { flex-direction: column; }
+        .layout--full .main-col { width: 100%; max-width: none; }
+        @media (max-width: 900px) {
+            .topbar-left { flex-wrap: wrap; }
+        }
+        .row-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .analysis-ts { font-size: .8rem; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 16px; }
+        .hub-back {
+            flex-shrink: 0;
+            padding: 8px 12px;
+            font-size: .78rem;
+            margin: 0;
+        }
+        .hub-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 14px;
+            margin-top: 8px;
+        }
+        .hub-card {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 18px 16px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: var(--card);
+            cursor: pointer;
+            text-align: left;
+            font-family: var(--font);
+            transition: border-color .15s, box-shadow .15s;
+            box-shadow: var(--shadow);
+        }
+        .hub-card:hover {
+            border-color: var(--accent-border);
+            box-shadow: 0 6px 28px rgba(0, 255, 0, 0.12), var(--shadow-card);
+        }
+        .hub-card-ico { font-size: 1.5rem; line-height: 1; }
+        .hub-card-title { font-size: 1rem; font-weight: 700; color: var(--text); }
+        .hub-card-hint { font-size: .78rem; color: var(--text-muted); line-height: 1.35; }
+    </style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function () {
+    const ACCESS_TOKEN_KEY = 'career_access_token';
+    const USER_EMAIL_KEY = 'userEmail';
+
+    const HOME_TAB = { id: 'home', label: 'Разделы', ico: '☰' };
+    const SECTION_TABS = [
+        { id: 'profile', label: 'Анкета', ico: '◇' },
+        { id: 'test', label: 'Тест', ico: '☑️' },
+        { id: 'analysis', label: 'Разбор', ico: '▦' },
+        { id: 'chat', label: 'ИИ-чат', ico: '💬' },
+        { id: 'jobs', label: 'Вакансии', ico: '◆' },
+        { id: 'simulator', label: 'Симулятор', ico: '▶️' },
+    ];
+
+    const RANDOM_TIPS = [
+        'Разбейте цель недели на 3 конкретных действия.',
+        'Запишите один навык, который усилит отклик работодателя.',
+        'Спросите у наставника обратную связь по одному артефакту.',
+        'Просмотрите 5 вакансий и выпишите общие требования.',
+        'Выделите 2 часа без отвлечений на учёбу по треку.',
+    ];
+
+    const TAB_ORDER = ['profile', 'test', 'analysis', 'chat', 'jobs', 'simulator'];
+
+    let userId = localStorage.getItem('userId');
+    let authMode = 'login';
+    let currentTab = 'home';
+    let profileSchema = null;
+    let profileDraft = {};
+    let cachedProfile = {};
+    /** Пока false — чипы анкеты не знают данные с сервера (до первого GET /profile). */
+    let profileFetchDone = false;
+    let quizState = { interest: '', questions: [], answers: {}, testGradeLabel: '', testGradeHint: '' };
+    let chatMessages = [];
+    let jobsViewMode = 'classic';
+    let jobsFilters = {
+        search_direction: '',
+        hh_city: '',
+        work_format: 'any',
+        level: 'any',
+        min_salary: ''
+    };
+    let jobsFilterReloadTimer = null;
+    let jobsListCache = [];
+    let jobsHhPage = 0;
+    let jobsHhHasMore = false;
+    let tinderIndex = 0;
+    let simulatorState = null;
+    let testSphereSelection = null;
+    let hasSavedAnalysis = false;
+    let analysisCheckDone = false;
+    let randomTipIndex = 0;
+
+    function apiUrl(path) {
+        if (!path.startsWith('/')) path = '/' + path;
+        return path;
+    }
+    function apiFetchHeaders() {
+        const h = {};
+        if (location.hostname && location.hostname.indexOf('ngrok') !== -1) {
+            h['ngrok-skip-browser-warning'] = 'true';
+        }
+        const t = localStorage.getItem(ACCESS_TOKEN_KEY);
+        if (t) h['Authorization'] = 'Bearer ' + t;
+        return h;
+    }
+
+    function esc(s) {
+        if (s == null) return '';
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    function getTabById(id) {
+        if (id === HOME_TAB.id) return HOME_TAB;
+        for (let i = 0; i < SECTION_TABS.length; i++) if (SECTION_TABS[i].id === id) return SECTION_TABS[i];
+        return HOME_TAB;
+    }
+
+    function tabTagline(tabId) {
+        const map = {
+            home: 'Главная страница приложения: выбор раздела.',
+            profile: 'Заполните профиль — основа подбора и теста.',
+            test: 'Ответьте честно: так точнее разбор по сфере.',
+            analysis: 'Метрики, сценарии и план роста в одном месте.',
+            chat: 'ИИ опирается на ваш сохранённый разбор.',
+            jobs: 'Вакансии с hh.ru по вашей анкете — ссылки на отклик.',
+            simulator: 'Текстовый день на работе — выбор решений.',
+        };
+        return map[tabId] || 'Карьерный навигатор 14–30';
+    }
+
+    function stepDotsHtml(activeId) {
+        if (activeId === 'home') return '';
+        const idx = TAB_ORDER.indexOf(activeId);
+        if (idx < 0) return '';
+        let h = '';
+        for (let i = 0; i < TAB_ORDER.length; i++) {
+            const on = i <= idx ? ' on' : '';
+            const cur = i === idx ? ' current' : '';
+            h += '<span class="step-dot' + on + cur + '" title="' + esc(getTabById(TAB_ORDER[i]).label) + '"></span>';
+        }
+        return h;
+    }
+
+    function userInitials() {
+        const em = localStorage.getItem(USER_EMAIL_KEY) || '';
+        const sphere = (cachedProfile.main_sphere || '').toString();
+        if (sphere.length >= 2) return sphere.substring(0, 2).toUpperCase();
+        const p = em.split('@')[0] || 'VW';
+        if (p.length >= 2) return p.substring(0, 2).toUpperCase();
+        return 'VW';
+    }
+
+    function profileQuickChips() {
+        let filled = 0;
+        const total = 3;
+        if (cachedProfile && Object.keys(cachedProfile).length) {
+            if (cachedProfile.age) filled++;
+            if (cachedProfile.main_sphere) filled++;
+            if (cachedProfile.education_detail || cachedProfile.education_level) filled++;
+        }
+        const pct = Math.min(100, Math.round((filled / total) * 100));
+        return (
+            '<div class="topbar-profile-hint" title="Заполните анкету — точнее подбор вакансий и разбор">' +
+            '<span class="profile-hint-bar" style="--p:' +
+            pct +
+            '%"></span>' +
+            '<span class="profile-hint-text">Анкета ' +
+            filled +
+            '/' +
+            total +
+            '</span></div>'
+        );
+    }
+
+    function isProfileComplete(schema, profile) {
+        if (!schema || !profile) return false;
+        const sections = schema.sections || [];
+        for (let si = 0; si < sections.length; si++) {
+            const fields = sections[si].fields || [];
+            for (let fi = 0; fi < fields.length; fi++) {
+                const f = fields[fi];
+                if (f.type === 'hidden' || !f.required) continue;
+                const v = profile[f.id];
+                if (v == null || v === '') return false;
+                if (f.type === 'multiselect' && (!Array.isArray(v) || !v.length) && typeof v === 'string' && !v.trim()) return false;
+            }
+        }
+        return true;
+    }
+
+    function buildRadarSvg(axes) {
+        const ax = axes || [];
+        if (!ax.length) return '';
+        const n = ax.length;
+        const R = 88;
+        const cx = 100;
+        const cy = 100;
+        let grid = '';
+        for (let g = 1; g <= 4; g++) {
+            const r = (R * g) / 4;
+            grid += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="#e2e5eb" stroke-width="1"/>';
+        }
+        let pts = '';
+        let nodes = '';
+        let labels = '';
+        for (let i = 0; i < n; i++) {
+            const pct = Math.max(0, Math.min(100, ax[i].value_percent != null ? ax[i].value_percent : 0));
+            const rad = (Math.PI / 2) + (i * 2 * Math.PI) / n;
+            const rr = (R * pct) / 100;
+            const x = cx + rr * Math.cos(rad);
+            const y = cy - rr * Math.sin(rad);
+            pts += (i ? ' ' : '') + x.toFixed(1) + ',' + y.toFixed(1);
+            nodes += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="4" fill="#fff" stroke="#3DB13D" stroke-width="2"/>';
+            const lx = cx + (R + 22) * Math.cos(rad);
+            const ly = cy - (R + 22) * Math.sin(rad);
+            const anchor = lx < cx - 20 ? 'end' : lx > cx + 20 ? 'start' : 'middle';
+            labels +=
+                '<text x="' +
+                lx.toFixed(1) +
+                '" y="' +
+                ly.toFixed(1) +
+                '" text-anchor="' +
+                anchor +
+                '" font-size="11" fill="#5c6370" font-family="Inter,sans-serif">' +
+                esc(ax[i].label || '') +
+                '</text>';
+        }
+        return (
+            '<svg viewBox="0 0 200 200" width="220" height="220" aria-label="Профориентационный радар">' +
+            grid +
+            '<polygon points="' +
+            pts +
+            '" fill="rgba(61,177,61,0.22)" stroke="#3DB13D" stroke-width="2"/>' +
+            nodes +
+            labels +
+            '</svg>'
+        );
+    }
+
+    function mtsFillStyle(rank) {
+        const stops = [
+            'linear-gradient(90deg, #3DB13D, #00FF00)',
+            'linear-gradient(90deg, #2d942d, #43C243)',
+            'linear-gradient(90deg, #15803d, #1a8f45)',
+            'linear-gradient(90deg, #166534, #15803d)',
+            'linear-gradient(90deg, #14532d, #166534)',
+            'linear-gradient(90deg, #134e2a, #14532d)',
+        ];
+        return stops[Math.min(rank || 0, stops.length - 1)];
+    }
+
+    async function refreshAnalysisFlag() {
+        if (!userId) return;
+        try {
+            const res = await fetchJson('/vibework/analysis/' + encodeURIComponent(userId));
+            hasSavedAnalysis = res.ok;
+        } catch (e) {
+            hasSavedAnalysis = false;
+        }
+        analysisCheckDone = true;
+    }
+
+    function clearAuth() {
+        localStorage.removeItem('userId');
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+        localStorage.removeItem(USER_EMAIL_KEY);
+        userId = null;
+        testSphereSelection = null;
+        cachedProfile = {};
+        profileFetchDone = false;
+        hasSavedAnalysis = false;
+        analysisCheckDone = false;
+    }
+
+    function logout() {
+        clearAuth();
+        showAuthScreen();
+    }
+
+    function wirePasswordToggle(buttonId, inputId) {
+        const btn = document.getElementById(buttonId);
+        const inp = document.getElementById(inputId);
+        if (!btn || !inp) return;
+        btn.onclick = function () {
+            const show = inp.type === 'password';
+            inp.type = show ? 'text' : 'password';
+            btn.textContent = show ? '◉' : '○';
+            btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+            btn.setAttribute('aria-label', show ? 'Скрыть пароль' : 'Показать пароль');
+        };
+        btn.textContent = inp.type === 'password' ? '○' : '◉';
+    }
+
+    /** Проверка формата почты перед запросом; на сервере — Pydantic EmailStr. */
+    function isValidEmailAddress(s) {
+        if (!s || typeof s !== 'string') return false;
+        var t = s.trim();
+        if (t.length < 5 || t.length > 254 || /\s/.test(t)) return false;
+        return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(t);
+    }
+
+    function showAuthScreen() {
+        authMode = 'login';
+        renderAuthForm();
+    }
+
+    function renderAuthForm() {
+        const isReg = authMode === 'register';
+        document.getElementById('app').innerHTML =
+            '<div class="layout layout--auth">' +
+            '<div style="text-align:center;margin-bottom:8px"><span class="brand-mono">{ VibeWork }</span></div>' +
+            '<p class="tagline" style="text-align:center;margin:0 0 8px">Карьерный навигатор 14–30</p>' +
+            '<div class="auth-card">' +
+            '<h2 style="margin-top:0">' + (isReg ? 'Регистрация' : 'Вход') + '</h2>' +
+            '<p class="muted">Почта и пароль — доступ к анкете, тесту и разбору.</p>' +
+            '<p class="auth-note" style="margin-bottom:14px">Сброс пароля по email не предусмотрен — сохраните пароль в надёжном месте.</p>' +
+            '<div id="authErr" class="auth-error" style="display:none"></div>' +
+            '<label for="authEmail">Email</label>' +
+            '<input type="email" id="authEmail" autocomplete="email" placeholder="you@example.com">' +
+            '<label for="authPass">Пароль</label>' +
+            '<input class="pwd-input" type="password" id="authPass" autocomplete="' + (isReg ? 'new-password' : 'current-password') + '" placeholder="' + (isReg ? 'Не меньше 8 символов' : '••••••••') + '">' +
+            '<div class="pwd-reveal">' +
+            '<button type="button" class="pwd-square" id="toggleAuthPass" aria-pressed="false" aria-label="Показать пароль">○</button>' +
+            '<span class="pwd-reveal-caption">Показать пароль</span></div>' +
+            (isReg
+                ? '<label for="authPass2">Пароль ещё раз</label>' +
+                  '<input class="pwd-input" type="password" id="authPass2" autocomplete="new-password">' +
+                  '<div class="pwd-reveal">' +
+                  '<button type="button" class="pwd-square" id="toggleAuthPass2" aria-pressed="false" aria-label="Показать пароль">○</button>' +
+                  '<span class="pwd-reveal-caption">Показать пароль</span></div>'
+                : '') +
+            '<button type="button" class="btn-primary" style="width:100%;margin-top:4px" onclick="window.__vw.submitAuth()">' + (isReg ? 'Зарегистрироваться' : 'Войти') + '</button>' +
+            '<p class="auth-switch">' +
+            (isReg
+                ? 'Уже есть аккаунт? <a role="button" id="swLogin">Войти</a>'
+                : 'Нет аккаунта? <a role="button" id="swReg">Регистрация</a>') +
+            '</p></div></div>';
+        const swLogin = document.getElementById('swLogin');
+        if (swLogin) swLogin.onclick = function (e) { e.preventDefault(); authMode = 'login'; renderAuthForm(); };
+        const swReg = document.getElementById('swReg');
+        if (swReg) swReg.onclick = function (e) { e.preventDefault(); authMode = 'register'; renderAuthForm(); };
+        wirePasswordToggle('toggleAuthPass', 'authPass');
+        wirePasswordToggle('toggleAuthPass2', 'authPass2');
+    }
+
+    async function submitAuth() {
+        const errBox = document.getElementById('authErr');
+        errBox.style.display = 'none';
+        const email = document.getElementById('authEmail').value.trim();
+        const pass = document.getElementById('authPass').value;
+        if (!email) {
+            errBox.textContent = 'Укажите почту';
+            errBox.style.display = 'block';
+            return;
+        }
+        if (!isValidEmailAddress(email)) {
+            errBox.textContent = 'Введите корректный адрес почты (например, name@example.com)';
+            errBox.style.display = 'block';
+            return;
+        }
+        if (authMode === 'register') {
+            const p2 = document.getElementById('authPass2').value;
+            if (pass !== p2) {
+                errBox.textContent = 'Пароли не совпадают';
+                errBox.style.display = 'block';
+                return;
+            }
+            if (pass.length < 8) {
+                errBox.textContent = 'Пароль — не короче 8 символов';
+                errBox.style.display = 'block';
+                return;
+            }
+        }
+        const path = authMode === 'register' ? '/auth/email/register' : '/auth/email/login';
+        let res;
+        try {
+            res = await fetch(apiUrl(path), {
+                method: 'POST',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, apiFetchHeaders()),
+                body: JSON.stringify({ email: email, password: pass })
+            });
+        } catch (e) {
+            errBox.textContent = 'Нет связи с сервером';
+            errBox.style.display = 'block';
+            return;
+        }
+        const data = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+            let m = data.detail;
+            if (Array.isArray(m)) m = m.map(function (x) { return x.msg || JSON.stringify(x); }).join('; ');
+            if (typeof m === 'object' && m !== null) m = JSON.stringify(m);
+            if (typeof m !== 'string') m = 'Ошибка ' + res.status;
+            errBox.textContent = m;
+            errBox.style.display = 'block';
+            return;
+        }
+        localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
+        localStorage.setItem('userId', data.user_id);
+        localStorage.setItem(USER_EMAIL_KEY, data.email || email);
+        userId = data.user_id;
+        profileFetchDone = false;
+        currentTab = 'home';
+        await renderShell();
+    }
+
+    async function fetchJson(path, opts) {
+        const res = await fetch(apiUrl(path), Object.assign({ headers: apiFetchHeaders() }, opts || {}));
+        if (res.status === 401) {
+            clearAuth();
+            showAuthScreen();
+            throw new Error('Сессия истекла');
+        }
+        return res;
+    }
+
+    async function refreshCachedProfile() {
+        if (!userId) {
+            cachedProfile = {};
+            profileFetchDone = false;
+            return;
+        }
+        try {
+            const res = await fetchJson('/profile/' + encodeURIComponent(userId));
+            if (res.ok) {
+                const p = await res.json();
+                cachedProfile = p && typeof p === 'object' ? Object.assign({}, p) : {};
+                profileFetchDone = true;
+            }
+        } catch (e) {
+            /* офлайн — повторим при следующем renderShell */
+        }
+    }
+
+    async function renderShell() {
+        if (userId && !profileFetchDone) await refreshCachedProfile();
+        if (!userId) {
+            cachedProfile = {};
+            profileFetchDone = false;
+        }
+        const disp = localStorage.getItem(USER_EMAIL_KEY) || userId;
+        const tabMeta = getTabById(currentTab);
+        const isHome = currentTab === 'home';
+        const topLeft = isHome
+            ? '<div class="topbar-left">' +
+              '<div class="topbar-titles">' +
+              '<h1 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="brand-mono">{ VibeWork }</span></h1>' +
+              '<p class="dynamic-tagline">Карьерный навигатор 14–30 · анкета, тест, разбор и остальное — с этой страницы</p>' +
+              '</div></div>'
+            : '<div class="topbar-left">' +
+              '<button type="button" class="btn-secondary hub-back" onclick="window.__vw.goTab(\'home\')">← К разделам</button>' +
+              '<div class="avatar-bubble" title="Профиль">' +
+              esc(userInitials()) +
+              '</div>' +
+              '<div class="topbar-titles">' +
+              '<h1>' +
+              esc(tabMeta.label) +
+              '</h1>' +
+              '<p class="dynamic-tagline">' +
+              esc(tabTagline(currentTab)) +
+              '</p></div></div>';
+        const vwWaveStrip =
+            '<div class="vw-wave-strip" aria-hidden="true"><div class="vw-wave-strip-inner">' +
+            '<svg class="vw-wave-back" viewBox="0 0 393 151" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" focusable="false">' +
+            '<path fill="#43C243" fill-rule="evenodd" clip-rule="evenodd" d="M393 151L376.625 132.125C360.25 113.25 327.5 75.5 294.75 72.3542C262 69.2083 229.25 100.667 196.5 122.688C163.75 144.708 131 157.292 98.25 141.563C65.5 125.833 32.75 81.7917 16.375 59.7708L0 37.75V0H393V151Z"/>' +
+            '</svg>' +
+            '<svg class="vw-wave-front" viewBox="0 0 393 103" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" focusable="false">' +
+            '<path fill="#00FF00" stroke="#DBDADA" stroke-width="3" fill-rule="evenodd" clip-rule="evenodd" d="M393 99L376.625 86.625C360.25 74.25 327.5 49.5 294.75 47.4375C262 45.375 229.25 66 196.5 80.4375C163.75 94.875 131 103.125 98.25 92.8125C65.5 82.5 32.75 53.625 16.375 39.1875L0 24.75V0H393V99Z"/>' +
+            '</svg></div></div>';
+        document.getElementById('app').innerHTML =
+            '<div class="layout layout--full">' +
+            '<div class="main-col">' +
+            vwWaveStrip +
+            '<header class="topbar">' +
+            topLeft +
+            '<div class="step-dots">' +
+            stepDotsHtml(currentTab) +
+            '</div>' +
+            '<div class="topbar-chips">' +
+            profileQuickChips() +
+            '<button type="button" class="btn-tip" id="btnRandomTip" title="Совет">✦</button>' +
+            '</div>' +
+            '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%">' +
+            '<span class="pill" title="' +
+            esc(userId) +
+            '">' +
+            esc(disp) +
+            '</span>' +
+            '<button type="button" class="btn-auth btn-auth-ghost" onclick="window.__vw.logout()">Выйти</button>' +
+            '</div>' +
+            '<p class="auth-note">Сброс пароля по email не предусмотрен. При утере пароля создайте новый аккаунт или обратитесь к администратору.</p>' +
+            '</header>' +
+            '<main class="shell" id="tabContent"></main></div></div>';
+        document.getElementById('btnRandomTip').onclick = function () {
+            randomTipIndex = (randomTipIndex + 1) % RANDOM_TIPS.length;
+            alert(RANDOM_TIPS[randomTipIndex]);
+        };
+        refreshAnalysisFlag();
+        renderTabContent();
+    }
+
+    function workFormatPreferenceRu(ids) {
+        if (!ids || !ids.length) return '';
+        const map = { office: 'офис', remote: 'удалённо', hybrid: 'гибрид' };
+        return ids.map(function (id) { return map[id] || id; }).join(', ');
+    }
+
+    async function ensureSchema() {
+        if (profileSchema) return profileSchema;
+        const res = await fetchJson('/api/profile/schema');
+        profileSchema = await res.json();
+        return profileSchema;
+    }
+
+    function optionsFromSphere(schema, field) {
+        if (field.options_from === 'interest_spheres') {
+            return (schema.interest_spheres || []).map(function (o) {
+                return { id: o.id, label: o.label };
+            });
+        }
+        return field.options || [];
+    }
+
+    function educationLevelFromDetail(fieldDetail, detailId) {
+        const opts = fieldDetail.options || [];
+        for (let i = 0; i < opts.length; i++) {
+            if (opts[i].id === detailId) return opts[i].maps_education || '';
+        }
+        return '';
+    }
+
+    function buildProfilePayload(schema, draft) {
+        const out = {};
+        const sections = schema.sections || [];
+        for (let si = 0; si < sections.length; si++) {
+            const fields = sections[si].fields || [];
+            for (let fi = 0; fi < fields.length; fi++) {
+                const f = fields[fi];
+                if (f.type === 'hidden') continue;
+                const v = draft[f.id];
+                if (f.type === 'number') {
+                    if (v !== '' && v != null && !isNaN(Number(v))) out[f.id] = parseInt(String(v), 10);
+                } else if (f.type === 'scale') {
+                    const n = parseInt(String(v), 10);
+                    if (!isNaN(n) && n >= (f.scale_min || 1) && n <= (f.scale_max || 5)) out[f.id] = n;
+                } else if (f.type === 'multiselect') {
+                    const arr = Array.isArray(v) ? v : [];
+                    if (arr.length) {
+                        out[f.id] = arr.join(',');
+                        if (f.id === 'work_format_pref') {
+                            out.work_format_preference = workFormatPreferenceRu(arr);
+                        }
+                    }
+                } else if (v !== '' && v != null) {
+                    out[f.id] = String(v).trim();
+                }
+            }
+        }
+        let eduDetailField = null;
+        for (let si = 0; si < sections.length; si++) {
+            const fields = sections[si].fields || [];
+            for (let fi = 0; fi < fields.length; fi++) {
+                if (fields[fi].id === 'education_detail') eduDetailField = fields[fi];
+            }
+        }
+        if (eduDetailField && draft.education_detail) {
+            const lev = educationLevelFromDetail(eduDetailField, draft.education_detail);
+            if (lev) out.education_level = lev;
+        }
+        if (draft.main_sphere) {
+            try {
+                out.interest_spheres = JSON.stringify([draft.main_sphere]);
+            } catch (e) {}
+        }
+        return out;
+    }
+
+    function renderFieldHtml(schema, field, val) {
+        const id = esc(field.id);
+        let v = val;
+        if (v == null) v = '';
+        if (field.type === 'hidden') return '';
+        let input = '';
+        if (field.type === 'number') {
+            input = '<input type="number" data-fid="' + id + '" min="' + esc(field.min != null ? field.min : '') + '" max="' + esc(field.max != null ? field.max : '') + '" value="' + esc(String(v)) + '" placeholder="' + esc(field.placeholder || '') + '">';
+        } else if (field.type === 'text') {
+            input = '<input type="text" data-fid="' + id + '" value="' + esc(String(v)) + '" placeholder="' + esc(field.placeholder || '') + '">';
+        } else if (field.type === 'textarea') {
+            input = '<textarea data-fid="' + id + '" rows="3" placeholder="' + esc(field.placeholder || '') + '">' + esc(String(v)) + '</textarea>';
+        } else if (field.type === 'select') {
+            const opts = optionsFromSphere(schema, field);
+            let optsH = '<option value="">—</option>';
+            for (let i = 0; i < opts.length; i++) {
+                const sel = String(v) === String(opts[i].id) ? ' selected' : '';
+                optsH += '<option value="' + esc(opts[i].id) + '"' + sel + '>' + esc(opts[i].label) + '</option>';
+            }
+            input = '<select data-fid="' + id + '">' + optsH + '</select>';
+        } else if (field.type === 'scale') {
+            const mn = field.scale_min || 1;
+            const mx = field.scale_max || 5;
+            const n = parseInt(String(v), 10);
+            const cur = !isNaN(n) ? n : 3;
+            input = '<div class="scale-row"><input type="range" data-fid="' + id + '" min="' + mn + '" max="' + mx + '" value="' + cur + '"><span class="scale-val" data-scale-for="' + id + '">' + cur + '</span></div>';
+        } else if (field.type === 'multiselect') {
+            const opts = field.options || [];
+            const selected = Array.isArray(v) ? v : (typeof v === 'string' && v ? v.split(',').map(function (x) { return x.trim(); }) : []);
+            const maxSel = field.max_select || 99;
+            let chips = '';
+            for (let i = 0; i < opts.length; i++) {
+                const on = selected.indexOf(opts[i].id) >= 0 ? ' on' : '';
+                chips += '<span class="chip' + on + '" data-ms="' + id + '" data-opt="' + esc(opts[i].id) + '" data-max="' + maxSel + '">' + esc(opts[i].label) + '</span>';
+            }
+            input = '<div class="multiselect-row" data-ms-group="' + id + '">' + chips + '</div>';
+        }
+        const req = field.required ? ' *' : '';
+        return '<label>' + esc(field.label) + req + '</label>' + input;
+    }
+
+    function wireProfileForm(schema) {
+        const root = document.getElementById('profileFormRoot');
+        if (!root) return;
+        root.querySelectorAll('[data-fid]').forEach(function (el) {
+            const fid = el.getAttribute('data-fid');
+            const ev = el.tagName === 'SELECT' || el.type === 'number' || el.type === 'range' ? 'change' : 'input';
+            el.addEventListener(ev, function () {
+                if (el.type === 'range') {
+                    const lab = root.querySelector('[data-scale-for="' + fid + '"]');
+                    if (lab) lab.textContent = el.value;
+                }
+                profileDraft[fid] = el.type === 'number' && el.value === '' ? '' : el.value;
+            });
+        });
+        root.querySelectorAll('.chip[data-ms]').forEach(function (chip) {
+            chip.onclick = function () {
+                const fid = chip.getAttribute('data-ms');
+                const opt = chip.getAttribute('data-opt');
+                const maxSel = parseInt(chip.getAttribute('data-max'), 10) || 99;
+                let arr = Array.isArray(profileDraft[fid]) ? profileDraft[fid].slice() : [];
+                const idx = arr.indexOf(opt);
+                if (idx >= 0) {
+                    arr.splice(idx, 1);
+                    chip.classList.remove('on');
+                } else {
+                    if (arr.length >= maxSel) return;
+                    arr.push(opt);
+                    chip.classList.add('on');
+                }
+                profileDraft[fid] = arr;
+            };
+        });
+    }
+
+    async function renderProfileTab() {
+        const el = document.getElementById('tabContent');
+        el.innerHTML = '<div class="loading"><div class="spinner"></div><span>Анкета…</span></div>';
+        try {
+            const schema = await ensureSchema();
+            const res = await fetchJson('/profile/' + encodeURIComponent(userId));
+            const profile = await res.json();
+            cachedProfile = Object.assign({}, profile);
+            profileFetchDone = true;
+            profileDraft = Object.assign({}, profile);
+            if (profileDraft.work_format_pref && typeof profileDraft.work_format_pref === 'string' && !Array.isArray(profileDraft.work_format_pref)) {
+                profileDraft.work_format_pref = profileDraft.work_format_pref.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+            }
+            let html =
+                '<h2>Профиль</h2><p class="muted">Структура как в рабочей таблице: секции и поля подтягиваются с сервера.</p>' +
+                '<div class="profile-shell"><div class="profile-card"><div id="profileFormRoot">';
+            const sections = schema.sections || [];
+            for (let si = 0; si < sections.length; si++) {
+                const sec = sections[si];
+                html += '<div class="section-title">' + esc(sec.title) + '</div>';
+                const fields = sec.fields || [];
+                for (let fi = 0; fi < fields.length; fi++) {
+                    const f = fields[fi];
+                    if (f.type === 'hidden') continue;
+                    let val = profileDraft[f.id];
+                    if (f.type === 'multiselect' && typeof val === 'string') {
+                        val = val.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+                    }
+                    html += renderFieldHtml(schema, f, val);
+                }
+            }
+            html += '</div><button type="button" class="btn-primary" id="btnSaveProfile">Сохранить анкету</button></div></div>';
+            el.innerHTML = html;
+            document.getElementById('btnSaveProfile').onclick = async function () {
+                const btn = this;
+                btn.disabled = true;
+                try {
+                    const payload = buildProfilePayload(schema, profileDraft);
+                    const r = await fetchJson('/profile/' + encodeURIComponent(userId), {
+                        method: 'POST',
+                        headers: Object.assign({ 'Content-Type': 'application/json' }, apiFetchHeaders()),
+                        body: JSON.stringify(payload)
+                    });
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    try {
+                        const pr = await fetchJson('/profile/' + encodeURIComponent(userId));
+                        cachedProfile = await pr.json();
+                    } catch (e2) {}
+                    alert('Сохранено');
+                } catch (e) {
+                    alert(e.message || String(e));
+                }
+                btn.disabled = false;
+            };
+            wireProfileForm(schema);
+        } catch (e) {
+            el.innerHTML = '<p class="muted">' + esc(e.message) + '</p><p class="muted">Запустите сервер и откройте <code>http://127.0.0.1:8000/miniapp/</code></p>';
+        }
+    }
+
+    async function loadQuiz(interestId) {
+        let url = '/vibework/quiz/questions/' + encodeURIComponent(userId);
+        if (interestId) url += '?interest=' + encodeURIComponent(interestId);
+        const res = await fetchJson(url);
+        const data = await res.json();
+        quizState.interest = data.interest || '';
+        quizState.testGradeLabel = data.test_grade_label || '';
+        quizState.testGradeHint = data.test_grade_hint || '';
+        quizState.questions = data.questions || [];
+        quizState.answers = {};
+    }
+
+    async function renderTestTab() {
+        const el = document.getElementById('tabContent');
+        el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+        try {
+            const schema = await ensureSchema();
+            const pres = await fetchJson('/profile/' + encodeURIComponent(userId));
+            const profile = await pres.json();
+            cachedProfile = Object.assign({}, profile);
+            profileFetchDone = true;
+            if (testSphereSelection == null) {
+                testSphereSelection = (profile.main_sphere || '').trim() || 'other';
+            }
+            await loadQuiz(testSphereSelection);
+            const qs = quizState.questions;
+            const spheres = schema.interest_spheres || [];
+            const profileOk = isProfileComplete(schema, profile);
+            const warnBanner = profileOk
+                ? ''
+                : '<div class="banner-warn"><strong>Анкета не заполнена.</strong> Для точного разбора заполните обязательные поля во вкладке «Анкета» (возраст, сфера, образование, подготовка).</div>';
+            const gradeBanner =
+                quizState.testGradeLabel
+                    ? '<div class="banner-grade" style="margin-bottom:12px;padding:10px 14px;background:var(--accent-soft);border-radius:var(--radius-sm);border:1px solid var(--accent-border);font-size:.82rem;line-height:1.45"><strong>Грейд теста:</strong> ' +
+                      esc(quizState.testGradeLabel) +
+                      (quizState.testGradeHint
+                          ? '<br><span class="muted" style="font-size:.92em">' + esc(quizState.testGradeHint) + '</span>'
+                          : '') +
+                      '</div>'
+                    : '';
+            let sphereOpts = '';
+            for (let i = 0; i < spheres.length; i++) {
+                const s = spheres[i];
+                const sel = String(testSphereSelection) === String(s.id) ? ' selected' : '';
+                sphereOpts += '<option value="' + esc(s.id) + '"' + sel + '>' + esc(s.label) + '</option>';
+            }
+            if (!qs.length) {
+                el.innerHTML =
+                    '<h2>Профориентационный тест</h2>' +
+                    warnBanner +
+                    gradeBanner +
+                    '<label for="testSphereSelect">Сфера для теста</label>' +
+                    '<select id="testSphereSelect">' + sphereOpts + '</select>' +
+                    '<p class="muted">По умолчанию — «Главная сфера» из анкеты; можно выбрать другую.</p>' +
+                    '<p>Нет вопросов для выбранной сферы.</p>';
+                document.getElementById('testSphereSelect').onchange = async function () {
+                    testSphereSelection = this.value;
+                    quizState.answers = {};
+                    await renderTestTab();
+                };
+                return;
+            }
+            let answered = 0;
+            for (let i = 0; i < qs.length; i++) if (quizState.answers[qs[i].id]) answered++;
+            const pctLime = qs.length ? Math.round((answered / qs.length) * 100) : 0;
+            const curQ = qs.length ? Math.min(answered + 1, qs.length) : 0;
+            const pctStep = qs.length ? Math.round((curQ / qs.length) * 100) : 0;
+            let html =
+                '<h2>Профориентационный тест</h2>' +
+                warnBanner +
+                gradeBanner +
+                '<label for="testSphereSelect">Сфера для теста</label>' +
+                '<select id="testSphereSelect">' + sphereOpts + '</select>' +
+                '<p class="muted">По умолчанию — «Главная сфера» из анкеты. Смена сферы меняет 10 профильных вопросов; последние 5 подстраиваются под грейд (школа / СПО / вуз) по возрасту и образованию в анкете.</p>' +
+                '<p class="muted">Сейчас: <strong>' + esc(quizState.interest) + '</strong></p>' +
+                '<div class="quiz-progress-figma" aria-hidden="false">' +
+                '<p class="quiz-progress-caption" id="quizProgCaption">Вопрос ' +
+                curQ +
+                ' из ' +
+                qs.length +
+                '</p>' +
+                '<div class="quiz-progress-row quiz-progress-row--lime"><div class="quiz-progress-fill" id="quizProgLime" style="width:' +
+                pctLime +
+                '%"></div></div>' +
+                '<div class="quiz-progress-row quiz-progress-row--total"><div class="quiz-progress-fill" id="quizProgTotal" style="width:' +
+                pctStep +
+                '%"></div></div>' +
+                '</div>';
+            for (let i = 0; i < qs.length; i++) {
+                const q = qs[i];
+                const qid = q.id;
+                const picked = quizState.answers[qid];
+                html += '<div class="quiz-q"><strong>Вопрос ' + (i + 1) + '</strong><p style="margin:10px 0 12px">' + esc(q.text) + '</p>';
+                const opts = q.options || [];
+                for (let j = 0; j < opts.length; j++) {
+                    const o = opts[j];
+                    const sel = picked === o.id ? ' selected' : '';
+                    html += '<button type="button" class="quiz-opt' + sel + '" data-qid="' + qid + '" data-choice="' + esc(o.id) + '">' + esc(o.id) + '. ' + esc(o.label) + '</button>';
+                }
+                html += '</div>';
+            }
+            html += '<button type="button" class="btn-primary" id="btnSubmitQuiz">Отправить ответы и получить разбор</button>';
+            el.innerHTML = html;
+            document.getElementById('testSphereSelect').onchange = async function () {
+                testSphereSelection = this.value;
+                quizState.answers = {};
+                await renderTestTab();
+            };
+            function refreshQuizProgress() {
+                let a = 0;
+                for (let i = 0; i < qs.length; i++) if (quizState.answers[qs[i].id]) a++;
+                const pl = qs.length ? Math.round((a / qs.length) * 100) : 0;
+                const cq = qs.length ? Math.min(a + 1, qs.length) : 0;
+                const pt = qs.length ? Math.round((cq / qs.length) * 100) : 0;
+                const lime = document.getElementById('quizProgLime');
+                if (lime) lime.style.width = pl + '%';
+                const tot = document.getElementById('quizProgTotal');
+                if (tot) tot.style.width = pt + '%';
+                const cap = document.getElementById('quizProgCaption');
+                if (cap) cap.textContent = 'Вопрос ' + cq + ' из ' + qs.length;
+            }
+            el.querySelectorAll('.quiz-opt').forEach(function (b) {
+                b.onclick = function () {
+                    const qid = parseInt(b.getAttribute('data-qid'), 10);
+                    const ch = b.getAttribute('data-choice');
+                    quizState.answers[qid] = ch;
+                    const parent = b.closest('.quiz-q');
+                    parent.querySelectorAll('.quiz-opt').forEach(function (x) { x.classList.remove('selected'); });
+                    b.classList.add('selected');
+                    refreshQuizProgress();
+                };
+            });
+            document.getElementById('btnSubmitQuiz').onclick = async function () {
+                const answers = [];
+                for (let i = 0; i < qs.length; i++) {
+                    const qid = qs[i].id;
+                    if (!quizState.answers[qid]) {
+                        alert('Ответьте на все вопросы');
+                        return;
+                    }
+                    answers.push({ question_id: qid, choice: quizState.answers[qid] });
+                }
+                const btn = this;
+                btn.disabled = true;
+                try {
+                    const r = await fetchJson('/vibework/quiz/analyze/' + encodeURIComponent(userId), {
+                        method: 'POST',
+                        headers: Object.assign({ 'Content-Type': 'application/json' }, apiFetchHeaders()),
+                        body: JSON.stringify({
+                            answers: answers,
+                            interest: quizState.interest || testSphereSelection || undefined
+                        })
+                    });
+                    const data = await r.json();
+                    if (!r.ok) throw new Error(data.detail || 'Ошибка');
+                    alert('Разбор готов — откройте вкладку «Разбор».');
+                    currentTab = 'analysis';
+                    await renderShell();
+                } catch (e) {
+                    alert(e.message || String(e));
+                }
+                btn.disabled = false;
+            };
+        } catch (e) {
+            el.innerHTML = '<p>' + esc(e.message) + '</p>';
+        }
+    }
+
+    function renderReadinessGauge(r) {
+        if (!r) return '';
+        const segs = r.segments || [];
+        let bar = '';
+        for (let i = 0; i < segs.length; i++) {
+            bar += '<div class="readiness-seg" style="background:' + esc(segs[i].color) + '"></div>';
+        }
+        const v = r.value_percent != null ? r.value_percent : 0;
+        const left = Math.max(0, Math.min(100, v));
+        return (
+            '<div class="readiness-track-wrap">' +
+            '<div class="muted" style="margin-bottom:8px;font-size:.8rem;font-weight:600">Готовность к цели трека</div>' +
+            '<div class="readiness-bar">' +
+            bar +
+            '</div>' +
+            '<div class="readiness-pointer" style="left:' +
+            left +
+            '%"></div>' +
+            '<div class="readiness-badge" style="left:' +
+            left +
+            '%">' +
+            esc(String(v)) +
+            '%</div>' +
+            '</div>'
+        );
+    }
+
+    function radarLegendChips(axes) {
+        let h = '<div class="radar-legend">';
+        for (let i = 0; i < axes.length; i++) {
+            const a = axes[i];
+            const pct = a.value_percent != null ? a.value_percent : 0;
+            h += '<span class="radar-chip">' + esc(a.label) + ' · ' + pct + '%</span>';
+        }
+        h += '</div>';
+        return h;
+    }
+
+    async function renderAnalysisTab() {
+        const el = document.getElementById('tabContent');
+        el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+        try {
+            const res = await fetchJson('/vibework/analysis/' + encodeURIComponent(userId));
+            if (res.status === 404) {
+                el.innerHTML = '<h2>Разбор</h2><p class="muted">Сначала пройдите тест на вкладке «Тест» — появятся метрики, сценарии и план развития.</p>';
+                return;
+            }
+            const d = await res.json();
+            hasSavedAnalysis = true;
+            const axes = (d.style_radar && d.style_radar.axes) || [];
+            let html = '<h2>Автоматический разбор</h2>';
+            html += '<p class="analysis-ts">Разбор: ' + esc(d.analyzed_at || '') + '</p>';
+            html += '<div class="dash-grid-2">';
+            html += '<div class="dash-card">' + renderReadinessGauge(d.readiness) + '</div>';
+            html +=
+                '<div class="dash-card"><h3>Оси методики (самопознание, люди, структура, баланс)</h3><div class="radar-svg-wrap">' +
+                buildRadarSvg(axes) +
+                radarLegendChips(axes) +
+                '</div></div></div>';
+            if (d.behavioral_hint) {
+                html +=
+                    '<div class="dash-card" style="margin-bottom:16px"><h3>Поведенческая подсказка</h3><p class="muted" style="font-size:.9rem;line-height:1.5">' +
+                    esc(d.behavioral_hint) +
+                    '</p></div>';
+            }
+            if (d.ai_narrative) {
+                html +=
+                    '<div class="dash-card" style="margin-bottom:16px"><h3>Краткий вывод</h3><p style="font-size:.9rem;line-height:1.5">' +
+                    esc(d.ai_narrative) +
+                    '</p>';
+                if (d.ai_narrative_source === 'mock' && d.ai_narrative_notice) {
+                    html +=
+                        '<p class="muted" style="font-size:.78rem;margin-top:8px">' +
+                        esc(d.ai_narrative_notice) +
+                        '</p>';
+                }
+                html += '</div>';
+            }
+            const sc = d.scenarios || {};
+            const plans = sc.plans || [];
+            if (plans.length) {
+                const bestPct = sc.best_avg_percent != null ? sc.best_avg_percent : plans[0].score_percent;
+                const bestName = sc.best_plan_name || '';
+                const cap = sc.caption || 'средний показатель по лучшему сценарию';
+                html += '<div class="dash-card" style="margin-bottom:16px">';
+                html += '<div class="scenario-hero">';
+                html += '<div class="big-pct">' + esc(String(bestPct)) + '%</div>';
+                html += '<div class="sub">' + esc(cap) + '</div>';
+                html += '<div class="plan-name">' + esc(bestName) + '</div></div>';
+                for (let i = 0; i < plans.length; i++) {
+                    const p = plans[i];
+                    const pct = p.score_percent != null ? p.score_percent : 0;
+                    html +=
+                        '<div class="scenario-lane"><div class="lane-label"><span>' +
+                        esc(p.name || '') +
+                        '</span><span class="muted">' +
+                        pct +
+                        '%</span></div><div class="plan-bar-outer"><div class="plan-bar-inner" style="width:' +
+                        pct +
+                        '%"></div></div></div>';
+                }
+                html += '</div>';
+            }
+            const mts = (d.mts_matrix && d.mts_matrix.rows) || [];
+            if (mts.length) {
+                html += '<div class="dash-card" style="margin-bottom:16px"><h3>Роли (матрица направлений)</h3>';
+                for (let i = 0; i < mts.length; i++) {
+                    const row = mts[i];
+                    const pct = row.percent != null ? row.percent : 0;
+                    const rank = row.rank != null ? row.rank : i;
+                    html +=
+                        '<div class="mts-row"><div class="mts-name">' +
+                        esc(row.role_name || '') +
+                        '</div><div class="mts-thermo"><div class="mts-fill" style="width:' +
+                        pct +
+                        '%;background:' +
+                        mtsFillStyle(rank) +
+                        '"></div></div><div class="mts-pct">' +
+                        pct +
+                        '%</div></div>';
+                }
+                html += '</div>';
+            }
+            const learn = d.learning || [];
+            if (learn.length) {
+                html += '<h3 style="margin-top:8px">Обучение</h3><div class="dash-grid-2">';
+                for (let i = 0; i < learn.length; i++) {
+                    const L = learn[i];
+                    const u = L.url && L.url !== '#' ? ' <a href="' + esc(L.url) + '" target="_blank" rel="noopener">перейти</a>' : '';
+                    html +=
+                        '<div class="block" style="box-shadow:var(--shadow)"><b>' +
+                        esc(L.title) +
+                        '</b> <span class="muted">· ' +
+                        esc(L.kind || '') +
+                        '</span>' +
+                        u +
+                        '</div>';
+                }
+                html += '</div>';
+            }
+            const adv = d.individual_advice && d.individual_advice.by_plan;
+            if (adv && typeof adv === 'object') {
+                html += '<h3 style="margin-top:20px">Индивидуальные советы</h3>';
+                const ids = ['A', 'B', 'C'];
+                for (let k = 0; k < ids.length; k++) {
+                    const block = adv[ids[k]];
+                    if (!block) continue;
+                    html += '<div class="block" style="margin-bottom:12px"><b>' + esc(block.title || 'План ' + ids[k]) + '</b>';
+                    if (block.priority_skills && block.priority_skills.length) {
+                        html += '<p class="muted" style="margin:8px 0 4px;font-size:.8rem">Приоритетные навыки из разрыва:</p><ul style="margin:0 0 8px;padding-left:18px;color:var(--text-muted);font-size:.85rem">';
+                        for (let s = 0; s < block.priority_skills.length; s++) {
+                            html += '<li>' + esc(block.priority_skills[s]) + '</li>';
+                        }
+                        html += '</ul>';
+                    }
+                    if (block.steps && block.steps.length) {
+                        html += '<ol style="margin:0;padding-left:18px;color:var(--text);font-size:.85rem">';
+                        for (let s = 0; s < block.steps.length; s++) {
+                            html += '<li style="margin-bottom:4px">' + esc(block.steps[s]) + '</li>';
+                        }
+                        html += '</ol>';
+                    }
+                    html += '</div>';
+                }
+            }
+            const stages = d.growth_stages || [];
+            if (stages.length) {
+                html += '<h3 style="margin-top:20px">Этапы роста</h3>';
+                for (let i = 0; i < stages.length; i++) {
+                    const s = stages[i];
+                    const tags = s.focus_tags || [];
+                    let tagH = '<div class="growth-tags">';
+                    for (let t = 0; t < tags.length; t++) tagH += '<span>' + esc(tags[t]) + '</span>';
+                    tagH += '</div>';
+                    let ul = '<ul style="margin:8px 0;padding-left:18px;color:var(--text-muted);font-size:.85rem">';
+                    const ms = s.milestones || [];
+                    for (let m = 0; m < ms.length; m++) ul += '<li>' + esc(ms[m]) + '</li>';
+                    ul += '</ul>';
+                    html +=
+                        '<div class="growth-card"><div class="num">' +
+                        esc(String(s.stage != null ? s.stage : i + 1)) +
+                        '</div><h3 style="margin:0 0 4px">' +
+                        esc(s.title || '') +
+                        '</h3><p class="muted" style="margin:0 0 8px;font-weight:600">' +
+                        esc(s.subtitle || '') +
+                        '</p><p class="muted" style="font-size:.9rem">' +
+                        esc(s.body || '') +
+                        '</p>' +
+                        tagH +
+                        '<p class="muted" style="font-size:.75rem;margin:0 0 4px"><strong>Срок:</strong> ' +
+                        esc(s.horizon || '') +
+                        '</p>' +
+                        ul +
+                        '<p class="muted" style="font-size:.85rem;margin:12px 0 0"><strong>Когда переходить дальше:</strong> ' +
+                        esc(s.when_next || '') +
+                        '</p></div>';
+                }
+            }
+            el.innerHTML = html;
+        } catch (e) {
+            el.innerHTML = '<p>' + esc(e.message) + '</p>';
+        }
+    }
+
+    async function renderChatTab() {
+        const el = document.getElementById('tabContent');
+        el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+        let analysisOk = false;
+        try {
+            const ar = await fetchJson('/vibework/analysis/' + encodeURIComponent(userId));
+            analysisOk = ar.ok;
+            hasSavedAnalysis = ar.ok;
+        } catch (e) {
+            analysisOk = false;
+        }
+        let schema = null;
+        let profile = {};
+        try {
+            schema = await ensureSchema();
+            const pr = await fetchJson('/profile/' + encodeURIComponent(userId));
+            profile = await pr.json();
+        } catch (e) {}
+        const profileOk = schema ? isProfileComplete(schema, profile) : false;
+        function redraw() {
+            const log = document.getElementById('chatLog');
+            if (!log) return;
+            let h = '';
+            for (let i = 0; i < chatMessages.length; i++) {
+                const m = chatMessages[i];
+                const cl = m.role === 'user' ? 'user' : 'ai';
+                const who = m.role === 'user' ? 'Вы' : 'ИИ';
+                h += '<div class="chat-bubble ' + cl + '"><div class="who">' + who + '</div>' + esc(m.content) + '</div>';
+            }
+            log.innerHTML = h;
+            log.scrollTop = log.scrollHeight;
+        }
+        if (!analysisOk) {
+            const li1 = profileOk ? '✓ Анкета заполнена' : '○ Заполните анкету (обязательные поля)';
+            const li2 = '○ Пройдите тест: 10 вопросов по сфере + 5 профориентационных';
+            const li3 = '○ Получите автоматический разбор';
+            el.innerHTML =
+                '<h2>Чат с ИИ</h2>' +
+                '<div class="chat-gate block">' +
+                '<p style="color:var(--text);font-weight:600;margin-top:0">Сначала подготовьте контекст</p>' +
+                '<p class="muted">После разбора ИИ опирается на ваши метрики и план. Пока разбора нет — ответы общие.</p>' +
+                '<ul><li>' +
+                li1 +
+                '</li><li>' +
+                li2 +
+                '</li><li>' +
+                li3 +
+                '</li></ul>' +
+                '<button type="button" class="btn-secondary" onclick="window.__vw.goTab(\'profile\')">К анкете</button> ' +
+                '<button type="button" class="btn-primary" style="margin-top:0" onclick="window.__vw.goTab(\'test\')">К тесту</button></div>';
+            return;
+        }
+        el.innerHTML =
+            '<h2>Чат с ИИ</h2>' +
+            '<p class="muted">Диалог с учётом сохранённого разбора.</p>' +
+            '<div class="chat-shell">' +
+            '<div class="chat-shell-hd">Карьерный ассистент</div>' +
+            '<div class="chat-log" id="chatLog"></div>' +
+            '<div class="chat-foot">' +
+            '<label for="chatInput">Сообщение</label>' +
+            '<textarea id="chatInput" rows="2" placeholder="Например: какие шаги на ближайший месяц?"></textarea>' +
+            '<button type="button" class="btn-primary" style="margin-top:8px" id="btnSendChat">Отправить</button></div></div>';
+        redraw();
+        document.getElementById('btnSendChat').onclick = async function () {
+            const inp = document.getElementById('chatInput');
+            const text = (inp.value || '').trim();
+            if (!text) return;
+            inp.value = '';
+            chatMessages.push({ role: 'user', content: text });
+            redraw();
+            const btn = this;
+            btn.disabled = true;
+            try {
+                const r = await fetchJson('/vibework/chat/' + encodeURIComponent(userId), {
+                    method: 'POST',
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, apiFetchHeaders()),
+                    body: JSON.stringify({ messages: chatMessages })
+                });
+                const data = await r.json();
+                if (!r.ok) throw new Error(data.detail || 'Ошибка');
+                let aiText = data.reply || '…';
+                if (data.notice && data.source === 'mock') {
+                    aiText += '\n\n— ' + data.notice;
+                }
+                chatMessages.push({ role: 'assistant', content: aiText });
+            } catch (e) {
+                chatMessages.push({ role: 'assistant', content: 'Ошибка: ' + (e.message || String(e)) });
+            }
+            btn.disabled = false;
+            redraw();
+        };
+    }
+
+    function jobsHhQueryString() {
+        let q = '?page=' + jobsHhPage + '&per_page=15';
+        if (jobsFilters.work_format === 'remote') q += '&only_remote=true';
+        if (jobsFilters.work_format === 'profile') q += '&strict_work_format=true';
+        if (jobsFilters.level === 'entry') q += '&only_entry_level=true';
+        const ms = parseInt(String(jobsFilters.min_salary || '').trim(), 10);
+        if (!isNaN(ms) && ms > 0) q += '&min_salary=' + ms;
+        if (jobsFilters.search_direction)
+            q += '&search_direction=' + encodeURIComponent(jobsFilters.search_direction);
+        if (jobsFilters.hh_city) q += '&hh_city=' + encodeURIComponent(jobsFilters.hh_city);
+        return q;
+    }
+
+    function hhSalaryLine(s) {
+        if (!s || typeof s !== 'object') return '';
+        const cur = s.currency === 'RUR' || s.currency === 'RUB' ? '₽' : s.currency || '';
+        const f = s.from,
+            t = s.to;
+        if (f != null && t != null) return String(f) + '–' + String(t) + ' ' + cur;
+        if (f != null) return 'от ' + String(f) + ' ' + cur;
+        if (t != null) return 'до ' + String(t) + ' ' + cur;
+        return '';
+    }
+
+    function renderOneHhJobCard(v) {
+        const url = v.alternate_url || '';
+        const sal = hhSalaryLine(v.salary);
+        let sn = '';
+        if (v.snippet && typeof v.snippet === 'object') {
+            const r = v.snippet.requirement || v.snippet.responsibility || '';
+            sn = String(r);
+            if (sn.length > 220) sn = sn.substring(0, 220) + '…';
+        }
+        const meta = [];
+        if (v.employer_name) meta.push(v.employer_name);
+        if (v.area_name) meta.push(v.area_name);
+        if (sal) meta.push(sal);
+        if (v.experience) meta.push(v.experience);
+        if (v.schedule) meta.push(v.schedule);
+        let html = '<div class="block hh-job-card"><div class="hh-job-head"><h4>' + esc(v.name || 'Вакансия') + '</h4></div>';
+        if (meta.length) html += '<div class="hh-job-meta">' + esc(meta.join(' · ')) + '</div>';
+        if (sn) html += '<div class="hh-job-snippet">' + esc(sn) + '</div>';
+        if (url) {
+            html +=
+                '<a class="hh-job-cta" href="' +
+                esc(url) +
+                '" target="_blank" rel="noopener noreferrer">Открыть на hh.ru</a>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    function wireTinderHh(list) {
+        function show() {
+            const wrap = document.getElementById('tinderStack');
+            if (!wrap || !list.length) return;
+            if (tinderIndex >= list.length) {
+                wrap.innerHTML =
+                    '<div class="block">Карточки закончились. Нажмите «Загрузить ещё» или смените фильтры.</div>';
+                return;
+            }
+            const v = list[tinderIndex];
+            wrap.innerHTML = '<div class="tinder-card">' + renderOneHhJobCard(v) + '</div>';
+        }
+        show();
+        const skip = document.getElementById('tinderSkip');
+        const like = document.getElementById('tinderLike');
+        if (skip) {
+            skip.onclick = function () {
+                tinderIndex++;
+                show();
+            };
+        }
+        if (like) {
+            like.onclick = function () {
+                tinderIndex++;
+                show();
+            };
+        }
+    }
+
+    function readJobsFiltersFromUi(root) {
+        const a = root.querySelector('#jfArea');
+        jobsFilters.search_direction = a ? a.value : '';
+        const c = root.querySelector('#jfCity');
+        jobsFilters.hh_city = c ? c.value : '';
+        const lv = root.querySelector('#jfLevel');
+        jobsFilters.level = lv ? lv.value : 'any';
+        const f = root.querySelector('#jfFormat');
+        jobsFilters.work_format = f ? f.value : 'any';
+        const s = root.querySelector('#jfSalary');
+        jobsFilters.min_salary = s ? s.value.trim() : '';
+    }
+
+    function scheduleJobsFilterReload(root) {
+        if (!root) return;
+        clearTimeout(jobsFilterReloadTimer);
+        jobsFilterReloadTimer = setTimeout(function () {
+            readJobsFiltersFromUi(root);
+            tinderIndex = 0;
+            loadHhVacancies(root, false);
+        }, 320);
+    }
+
+    function jobsSelectOpts(current, pairs) {
+        let h = '';
+        for (let i = 0; i < pairs.length; i++) {
+            const p = pairs[i];
+            const sel = String(current) === String(p.v) ? ' selected' : '';
+            h += '<option value="' + esc(p.v) + '"' + sel + '>' + esc(p.l) + '</option>';
+        }
+        return h;
+    }
+
+    function wireJobsToolbar(root) {
+        root.querySelectorAll('.job-filter-field select').forEach(function (sel) {
+            sel.onchange = function () {
+                scheduleJobsFilterReload(root);
+            };
+        });
+        root.querySelectorAll('.jobs-view-modes .subtab[data-vm]').forEach(function (b) {
+            b.onclick = function () {
+                jobsViewMode = b.getAttribute('data-vm');
+                tinderIndex = 0;
+                paintJobsList(root);
+            };
+        });
+        const moreBtn = root.querySelector('#jobsMoreBtn');
+        if (moreBtn) {
+            moreBtn.onclick = function () {
+                readJobsFiltersFromUi(root);
+                loadHhVacancies(root, true);
+            };
+        }
+        const resetBtn = root.querySelector('#jfResetFilters');
+        if (resetBtn) {
+            resetBtn.onclick = async function () {
+                jobsFilters = {
+                    search_direction: '',
+                    hh_city: '',
+                    work_format: 'any',
+                    level: 'any',
+                    min_salary: ''
+                };
+                jobsHhPage = 0;
+                tinderIndex = 0;
+                resetBtn.disabled = true;
+                try {
+                    await fetch(apiUrl('/career/hh/regenerate/' + encodeURIComponent(userId)), {
+                        method: 'POST',
+                        headers: apiFetchHeaders()
+                    });
+                } catch (e) {
+                    /* нет сервера или анкета не проходит can_finalize — всё равно обновим список */
+                }
+                resetBtn.disabled = false;
+                renderJobsTab();
+            };
+        }
+    }
+
+    function jobsToolbarHtml() {
+        const vmClassic = jobsViewMode === 'classic' ? ' active' : '';
+        const vmTinder = jobsViewMode === 'tinder' ? ' active' : '';
+        const areaPairs = [
+            { v: '', l: 'Как в анкете' },
+            { v: 'IT / разработка', l: 'IT, разработка' },
+            { v: 'Дизайн и креатив', l: 'Дизайн, креатив' },
+            { v: 'Маркетинг и продажи', l: 'Маркетинг, продажи' },
+            { v: 'Аналитика и данные', l: 'Аналитика, данные' },
+            { v: 'Управление и продукт', l: 'Продукт, проекты' },
+            { v: 'HR и подбор', l: 'HR, подбор' },
+            { v: 'Инженерия и производство', l: 'Инженерия' },
+            { v: 'Образование и наука', l: 'Образование' },
+            { v: 'Юриспруденция', l: 'Юриспруденция' }
+        ];
+        const cityPairs = [
+            { v: '', l: 'Как в анкете' },
+            { v: 'Москва', l: 'Москва' },
+            { v: 'Санкт-Петербург', l: 'Санкт-Петербург' },
+            { v: 'Новосибирск', l: 'Новосибирск' },
+            { v: 'Екатеринбург', l: 'Екатеринбург' },
+            { v: 'Казань', l: 'Казань' },
+            { v: 'Красноярск', l: 'Красноярск' },
+            { v: 'Кемерово', l: 'Кемерово' },
+            { v: 'Нижний Новгород', l: 'Нижний Новгород' },
+            { v: 'Ростов-на-Дону', l: 'Ростов-на-Дону' },
+            { v: 'Воронеж', l: 'Воронеж' }
+        ];
+        const levelPairs = [
+            { v: 'any', l: 'Любой' },
+            { v: 'entry', l: 'Без опыта' }
+        ];
+        const formatPairs = [
+            { v: 'any', l: 'Любой' },
+            { v: 'remote', l: 'Удалённо' },
+            { v: 'profile', l: 'Как в анкете' }
+        ];
+        const salaryPairs = [
+            { v: '', l: 'Любая' },
+            { v: '50000', l: 'от 50 000 ₽' },
+            { v: '80000', l: 'от 80 000 ₽' },
+            { v: '100000', l: 'от 100 000 ₽' },
+            { v: '150000', l: 'от 150 000 ₽' },
+            { v: '200000', l: 'от 200 000 ₽' }
+        ];
+        return (
+            '<div class="jobs-toolbar" id="jobsToolbar">' +
+            '<div class="jobs-filters-grid">' +
+            '<div class="job-filter-field"><label for="jfArea">Область</label>' +
+            '<select id="jfArea">' +
+            jobsSelectOpts(jobsFilters.search_direction, areaPairs) +
+            '</select></div>' +
+            '<div class="job-filter-field"><label for="jfLevel">Уровень</label>' +
+            '<select id="jfLevel">' +
+            jobsSelectOpts(jobsFilters.level, levelPairs) +
+            '</select></div>' +
+            '<div class="job-filter-field"><label for="jfCity">Город</label>' +
+            '<select id="jfCity">' +
+            jobsSelectOpts(jobsFilters.hh_city, cityPairs) +
+            '</select></div>' +
+            '<div class="job-filter-field"><label for="jfFormat">Формат</label>' +
+            '<select id="jfFormat">' +
+            jobsSelectOpts(jobsFilters.work_format, formatPairs) +
+            '</select></div>' +
+            '<div class="job-filter-field"><label for="jfSalary">Зарплата</label>' +
+            '<select id="jfSalary">' +
+            jobsSelectOpts(jobsFilters.min_salary, salaryPairs) +
+            '</select></div>' +
+            '</div>' +
+            '<div class="jobs-view-modes">' +
+            '<button type="button" class="subtab' +
+            vmClassic +
+            '" data-vm="classic">Классика</button>' +
+            '<button type="button" class="subtab' +
+            vmTinder +
+            '" data-vm="tinder">Тиндер</button>' +
+            '</div>' +
+            '<p class="muted" style="margin:0 0 10px;font-size:.78rem;line-height:1.45">Фильтры применяются при выборе. Матчинг по профилю — после разбора и (если есть) чата.</p>' +
+            '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:2px">' +
+            '<button type="button" class="btn-secondary" id="jfResetFilters">Сбросить к анкете</button>' +
+            '</div></div>' +
+            '<div class="jobs-search-hint muted" id="jobsSearchHint"></div>' +
+            '<div id="jobsInner"></div>' +
+            '<button type="button" class="btn-secondary btn-more-jobs" id="jobsMoreBtn" style="display:none;margin-top:12px">Загрузить ещё</button>'
+        );
+    }
+
+    function syncJobsViewSubtabs(root) {
+        root.querySelectorAll('.jobs-view-modes .subtab[data-vm]').forEach(function (b) {
+            const vm = b.getAttribute('data-vm');
+            if (vm === jobsViewMode) b.classList.add('active');
+            else b.classList.remove('active');
+        });
+    }
+
+    function paintJobsList(root) {
+        if (jobsViewMode === 'compact') jobsViewMode = 'classic';
+        const inner = root.querySelector('#jobsInner');
+        if (!inner) return;
+        syncJobsViewSubtabs(root);
+        const list = jobsListCache;
+        if (tinderIndex >= list.length) tinderIndex = 0;
+        if (!list.length) {
+            inner.innerHTML =
+                '<div class="banner-warn">По запросу ничего не найдено. Снимите фильтры или укажите город в анкете.</div>';
+            return;
+        }
+        if (jobsViewMode === 'tinder') {
+            inner.innerHTML =
+                '<div class="tinder-stack" id="tinderStack"></div>' +
+                '<div class="tinder-actions">' +
+                '<button type="button" class="btn-secondary btn-tinder-no" id="tinderSkip">Пропуск</button>' +
+                '<button type="button" class="btn-primary" id="tinderLike" style="margin-top:0">Дальше →</button></div>';
+            wireTinderHh(list);
+        } else {
+            let html = '';
+            for (let i = 0; i < list.length; i++) html += renderOneHhJobCard(list[i]);
+            inner.innerHTML = html;
+        }
+    }
+
+    async function loadHhVacancies(root, append) {
+        readJobsFiltersFromUi(root);
+        const inner = root.querySelector('#jobsInner');
+        const hint = root.querySelector('#jobsSearchHint');
+        const moreBtn = root.querySelector('#jobsMoreBtn');
+        if (!inner) return;
+        if (!append) {
+            jobsHhPage = 0;
+            inner.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+        } else if (moreBtn) {
+            moreBtn.disabled = true;
+        }
+        if (append) {
+            jobsHhPage++;
+        }
+        let d;
+        try {
+            const res = await fetchJson(
+                '/career/jobs/hh-live/' + encodeURIComponent(userId) + jobsHhQueryString()
+            );
+            d = await res.json();
+            if (!res.ok) {
+                let det = d.detail;
+                if (typeof det === 'object') det = JSON.stringify(det);
+                throw new Error(String(det || 'Ошибка'));
+            }
+        } catch (e) {
+            inner.innerHTML =
+                '<div class="banner-warn">Не удалось загрузить вакансии: ' +
+                esc(e.message) +
+                '. Проверьте интернет и настройку HH_USER_AGENT на сервере.</div>';
+            if (hint) hint.textContent = '';
+            if (moreBtn) {
+                moreBtn.style.display = 'none';
+                moreBtn.disabled = false;
+            }
+            return;
+        }
+        const items = d.items || [];
+        if (append) {
+            jobsListCache = jobsListCache.concat(items);
+        } else {
+            jobsListCache = items;
+        }
+        const found = d.found != null ? d.found : '?';
+        const sh = d.search_hint || {};
+        if (hint) {
+            hint.innerHTML =
+                'Запрос: <strong>' +
+                esc(String(sh.text || '—')) +
+                '</strong>' +
+                (sh.city ? ' · ' + esc(String(sh.city)) : '') +
+                ' · найдено ≈ ' +
+                esc(String(found));
+        }
+        const p = d.page != null ? d.page : 0;
+        const pages = d.pages != null ? d.pages : 1;
+        jobsHhHasMore = p + 1 < pages;
+        if (moreBtn) {
+            moreBtn.style.display = jobsHhHasMore ? 'block' : 'none';
+            moreBtn.disabled = false;
+        }
+        paintJobsList(root);
+    }
+
+    function renderJobsTab() {
+        const el = document.getElementById('tabContent');
+        el.innerHTML =
+            '<h2>Вакансии</h2>' +
+            '<p class="muted" style="margin-top:4px">Матчинг — после разбора и (если есть) чата. Переключайте классику или тиндер. Список — с hh.ru; «Открыть на hh.ru» ведёт на вакансию.</p>' +
+            jobsToolbarHtml();
+        wireJobsToolbar(el);
+        loadHhVacancies(el, false);
+    }
+
+    function renderSimulatorTab() {
+        const el = document.getElementById('tabContent');
+        if (!simulatorState) {
+            el.innerHTML =
+                '<h2>День на работе</h2><p class="muted">Короткий сценарий рабочего дня: выбирайте варианты ответа.</p>' +
+                '<label>Роль</label>' +
+                '<select id="simRole"><option value="analyst">Аналитик данных</option><option value="designer">Дизайнер</option></select>' +
+                '<button type="button" class="btn-primary" id="simStart">Начать день</button>';
+            document.getElementById('simStart').onclick = async function () {
+                const role = document.getElementById('simRole').value;
+                try {
+                    const r = await fetch(apiUrl('/vibework/simulator/start'), {
+                        method: 'POST',
+                        headers: Object.assign({ 'Content-Type': 'application/json' }, apiFetchHeaders()),
+                        body: JSON.stringify({ role: role })
+                    });
+                    simulatorState = await r.json();
+                    renderSimulatorTab();
+                } catch (e) {
+                    alert(e.message);
+                }
+            };
+            return;
+        }
+        const st = simulatorState;
+        const node = st.node || {};
+        const choices = node.choices || [];
+        const stepNum = st.step_index != null ? st.step_index + 1 : 1;
+        let html =
+            '<h2>День на работе</h2><div class="sim-progress">Шаг ' + stepNum + ' — выберите действие</div>';
+        if (st.done) {
+            html += '<div class="block"><p style="color:var(--text)">' + esc(node.text || 'День завершён.') + '</p></div>';
+            html += '<button type="button" class="btn-secondary" id="simAgain">Сыграть снова</button>';
+            el.innerHTML = html;
+            document.getElementById('simAgain').onclick = function () {
+                simulatorState = null;
+                renderSimulatorTab();
+            };
+            return;
+        }
+        html += '<div class="block"><p style="color:var(--text);margin:0">' + esc(node.text || '') + '</p></div>';
+        for (let i = 0; i < choices.length; i++) {
+            const c = choices[i];
+            html += '<button type="button" class="quiz-opt" data-cid="' + esc(c.id) + '">' + esc(c.label) + '</button>';
+        }
+        html += '<div class="row-btns"><button type="button" class="btn-secondary" id="simReset">Сбросить</button></div>';
+        el.innerHTML = html;
+        el.querySelectorAll('.quiz-opt[data-cid]').forEach(function (b) {
+            b.onclick = async function () {
+                const cid = b.getAttribute('data-cid');
+                try {
+                    const r = await fetch(apiUrl('/vibework/simulator/step'), {
+                        method: 'POST',
+                        headers: Object.assign({ 'Content-Type': 'application/json' }, apiFetchHeaders()),
+                        body: JSON.stringify({
+                            role: st.role,
+                            step_index: st.step_index,
+                            career_points: st.career_points,
+                            choice_id: cid
+                        })
+                    });
+                    simulatorState = await r.json();
+                    renderSimulatorTab();
+                } catch (e) {
+                    alert(e.message);
+                }
+            };
+        });
+        document.getElementById('simReset').onclick = function () {
+            simulatorState = null;
+            renderSimulatorTab();
+        };
+    }
+
+    function renderHomeTab() {
+        const el = document.getElementById('tabContent');
+        let html = '<h2 style="margin-top:0">Разделы</h2>';
+        html +=
+            '<p class="muted">Анкета, тест, разбор, чат, вакансии и симулятор — отдельные экраны. Вернуться на эту страницу можно в любой момент кнопкой «← К разделам» в шапке.</p>';
+        html += '<div class="hub-grid">';
+        for (let i = 0; i < SECTION_TABS.length; i++) {
+            const t = SECTION_TABS[i];
+            html +=
+                '<button type="button" class="hub-card" data-hub-tab="' +
+                esc(t.id) +
+                '"><span class="hub-card-ico">' +
+                t.ico +
+                '</span><span class="hub-card-title">' +
+                esc(t.label) +
+                '</span><span class="hub-card-hint">' +
+                esc(tabTagline(t.id)) +
+                '</span></button>';
+        }
+        html += '</div>';
+        el.innerHTML = html;
+        el.querySelectorAll('.hub-card[data-hub-tab]').forEach(function (btn) {
+            btn.onclick = async function () {
+                currentTab = btn.getAttribute('data-hub-tab');
+                await renderShell();
+            };
+        });
+    }
+
+    function renderTabContent() {
+        if (currentTab === 'home') return renderHomeTab();
+        if (currentTab === 'profile') return renderProfileTab();
+        if (currentTab === 'test') return renderTestTab();
+        if (currentTab === 'analysis') return renderAnalysisTab();
+        if (currentTab === 'chat') return renderChatTab();
+        if (currentTab === 'jobs') return renderJobsTab();
+        if (currentTab === 'simulator') return renderSimulatorTab();
+    }
+
+    window.__vw = {
+        submitAuth: submitAuth,
+        logout: logout,
+        goTab: async function (id) {
+            currentTab = id;
+            await renderShell();
+        },
+    };
+
+    (async function bootstrap() {
+        const tok = localStorage.getItem(ACCESS_TOKEN_KEY);
+        if (!userId || !tok) showAuthScreen();
+        else await renderShell();
+    })();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+import json
+import re
+from typing import Any, Dict, List, Optional, Tuple
+
+from wibe_work.sqlite_db import get_db
+
+EDUCATION_RANK: Dict[str, int] = {
+    "": 0,
+    "не указано": 0,
+    "основное": 0,
+    "школьник": 1,
+    "9 классов": 1,
+    "среднее": 1,
+    "11 классов": 1,
+    "студент спо": 2,
+    "среднее специальное": 2,
+    "колледж": 2,
+    "техникум": 2,
+    "неполное высшее": 3,
+    "студент вуза (бакалавр)": 3,
+    "бакалавр": 4,
+    "студент вуза (магистр)": 4,
+    "специалист": 4,
+    "магистр": 5,
+    "выпускник": 4,
+    "аспирантура": 6,
+    "докторантура": 7,
+}
+
+
+def normalize_education(level: Optional[str]) -> str:
+    if not level:
+        return "не указано"
+    return re.sub(r"\s+", " ", str(level).strip().lower())
+
+
+def education_rank(level: Optional[str]) -> int:
+    key = normalize_education(level)
+    return EDUCATION_RANK.get(key, 2)
+
+
+def load_profile(user_id: str) -> Dict[str, Any]:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM user_profiles WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        return dict(row) if row else {}
+
+
+def load_competencies(user_id: str) -> List[Dict[str, Any]]:
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT name, level FROM user_competencies WHERE user_id = ? ORDER BY name",
+            (user_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def parse_skills_text(software_skills: Optional[str]) -> List[str]:
+    if not software_skills:
+        return []
+    parts = re.split(r"[,;\n]+", str(software_skills))
+    return [p.strip() for p in parts if p.strip()]
+
+
+def profile_skill_blob(profile: Optional[Dict[str, Any]]) -> Optional[str]:
+    if not profile:
+        return None
+    bits = [
+        profile.get("software_skills"),
+        profile.get("programming_skills"),
+        profile.get("social_media_skills"),
+    ]
+    joined = ", ".join(str(b).strip() for b in bits if b and str(b).strip())
+    return joined or None
+
+
+def parse_interest_spheres(profile: Dict[str, Any]) -> List[str]:
+    raw = profile.get("interest_spheres")
+    if not raw:
+        return []
+    s = str(raw).strip()
+    if not s:
+        return []
+    if s.startswith("["):
+        try:
+            data = json.loads(s)
+            if isinstance(data, list):
+                return [str(x).strip() for x in data if str(x).strip()]
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return [p.strip() for p in re.split(r"[,;\n]+", s) if p.strip()]
+
+
+def merge_skill_sources(
+    competencies: List[Dict[str, Any]], software_skills: Optional[str]
+) -> Tuple[List[str], Dict[str, int]]:
+    """Return display names (stable order) and map lowercase name -> level 1-5."""
+    levels: Dict[str, int] = {}
+    display_order: List[str] = []
+    seen_lower: set = set()
+
+    for c in competencies:
+        name = (c.get("name") or "").strip()
+        if not name:
+            continue
+        lv = int(c.get("level") or 3)
+        lv = max(1, min(5, lv))
+        key = name.lower()
+        levels[key] = max(levels.get(key, 0), lv)
+        if key not in seen_lower:
+            seen_lower.add(key)
+            display_order.append(name)
+
+    for raw in parse_skills_text(software_skills):
+        key = raw.lower()
+        levels.setdefault(key, 3)
+        if key not in seen_lower:
+            seen_lower.add(key)
+            display_order.append(raw.strip())
+
+    return display_order, levels
+
+
+def merge_skills_from_profile(
+    competencies: List[Dict[str, Any]], profile: Dict[str, Any]
+) -> Tuple[List[str], Dict[str, int]]:
+    blob = profile_skill_blob(profile)
+    return merge_skill_sources(competencies, blob)
+
+
+def normalize_work_format_token(pref: Optional[str]) -> Optional[str]:
+    if not pref:
+        return None
+    t = str(pref).lower()
+    if "не важно" in t or "любой" in t:
+        return None
+    if "удал" in t:
+        return "remote"
+    if "гибрид" in t:
+        return "hybrid"
+    if "офис" in t:
+        return "office"
+    return None
+
+
+def work_format_compatible(user_pref: Optional[str], job_format: Optional[str]) -> bool:
+    j = (job_format or "any").lower().strip()
+    if j in ("", "any", "не важно"):
+        return True
+    u = normalize_work_format_token(user_pref)
+    if u is None:
+        return True
+    if j == u:
+        return True
+    if j == "hybrid" and u in ("remote", "office"):
+        return True
+    return False
