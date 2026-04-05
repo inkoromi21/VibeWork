@@ -28,25 +28,51 @@ def get_public_base_url() -> str:
     return os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 
 
+def get_website_url() -> str:
+    return (os.environ.get("WEBSITE_URL") or "http://127.0.0.1:8765").rstrip("/")
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
     base = get_public_base_url()
     web_app_url = f"{base}/miniapp/"
+    website_url = get_website_url()
+    site_label = (os.environ.get("WEBSITE_BUTTON_LABEL") or "Сайт CareerCompass").strip() or "Сайт"
+
+    intro = (
+        "Привет! Это <b>VibeWork</b> — помощник в поиске своего пути и работы.\n\n"
+        "Можно пройти короткий разбор про себя, посмотреть направления и вакансии ближе к твоему профилю.\n\n"
+        "• <b>Сайт</b> — полная веб-версия (CareerCompass): диагностика, план, симулятор дня. Кнопка ниже.\n"
+        "• <b>Мини-приложение</b> — то же удобно прямо в Telegram (вторая кнопка).\n\n"
+        "Удачного старта!"
+    )
+
     # Telegram accepts only https:// for WebApp buttons; http (e.g. localhost) must use a normal link.
     if base.lower().startswith("https://"):
         keyboard = [
-            [InlineKeyboardButton("Открыть VibeWork", web_app=WebAppInfo(url=web_app_url))]
+            [InlineKeyboardButton(site_label, url=website_url)],
+            [InlineKeyboardButton("Открыть VibeWork", web_app=WebAppInfo(url=web_app_url))],
         ]
-        text = "VibeWork — нажми кнопку:"
+        text = intro
     else:
-        keyboard = [[InlineKeyboardButton("Открыть в браузере", url=web_app_url)]]
+        keyboard = [
+            [InlineKeyboardButton(site_label, url=website_url)],
+            [InlineKeyboardButton("Мини-приложение в браузере", url=web_app_url)],
+        ]
         text = (
-            "VibeWork — мини-приложение в Telegram требует HTTPS (запустите ngrok "
-            "или задайте PUBLIC_BASE_URL=https://… в .env). "
-            "Ниже — ссылка для браузера на этом компьютере (localhost)."
+            intro
+            + "\n\n"
+            + "<i>Чтобы мини-приложение открылось внутри Telegram как Web App, нужен HTTPS "
+            "(ngrok на порт API или PUBLIC_BASE_URL=https://… в .env). "
+            "Пока открой мини-приложение по ссылке в браузере — вторая кнопка.</i>"
         )
-    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+    await update.message.reply_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="HTML",
+    )
 
 
 def main():
