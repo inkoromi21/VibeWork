@@ -36,13 +36,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Telegram accepts only https:// for WebApp buttons; http (e.g. localhost) must use a normal link.
     if base.lower().startswith("https://"):
         keyboard = [
-            [InlineKeyboardButton("Открыть Wibe work", web_app=WebAppInfo(url=web_app_url))]
+            [InlineKeyboardButton("Открыть VibeWork", web_app=WebAppInfo(url=web_app_url))]
         ]
-        text = "Wibe work — нажми кнопку:"
+        text = "VibeWork — нажми кнопку:"
     else:
         keyboard = [[InlineKeyboardButton("Открыть в браузере", url=web_app_url)]]
         text = (
-            "Wibe work — мини-приложение в Telegram требует HTTPS (запустите ngrok "
+            "VibeWork — мини-приложение в Telegram требует HTTPS (запустите ngrok "
             "или задайте PUBLIC_BASE_URL=https://… в .env). "
             "Ниже — ссылка для браузера на этом компьютере (localhost)."
         )
