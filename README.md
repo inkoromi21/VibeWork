@@ -2,6 +2,8 @@
 
 Монорепозиторий из двух продуктов:
 
+Ссылка на бота:https://t.me/VibeWorks_bot
+
 1. **`miniapp/`** — карьерный помощник для **Telegram Mini App**: API, бот, фронт, **`miniapp/data/`** (SQLite, JSON), **`miniapp/requirements.txt`**, точка входа API — **`miniapp/run.py`**.
 2. **`website/`** — отдельный сайт (**CareerCompass**): **`website/app/`**, **`website/frontend/`**, **`website/data/`** (своя БД), **`website/requirements.txt`**.
 
@@ -125,7 +127,7 @@ python miniapp/run.py
 Сервер слушает `0.0.0.0:8000`. Проверка: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
 
 ### 4. Telegram-бот и ngrok
-
+Как найти бота: Просто впишите в поиск @SkillMatchs_bot
 Используйте **`bash "launch files/launch-stack.sh"`** (или **`launch files\launch-stack.bat`**): откроются окна API, ngrok, бота и сайта. Для ручной отладки бота из активированного `venv`: `python miniapp/bot/bot.py` (предварительно запустите API).
 
 Бот по `/start` открывает мини-приложение по `{PUBLIC_BASE_URL}/miniapp/`. При запущенном ngrok URL кнопки берётся из `http://127.0.0.1:4040/api/tunnels`.
