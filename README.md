@@ -2,6 +2,8 @@
 
 Монорепозиторий из двух продуктов:
 
+Ссылка на бота:https://t.me/VibeWorks_bot
+
 1. **`miniapp/`** — карьерный помощник для **Telegram Mini App**: API, бот, фронт, **`miniapp/data/`** (SQLite, JSON), **`miniapp/requirements.txt`**, точка входа API — **`miniapp/run.py`**.
 2. **`website/`** — отдельный сайт (**CareerCompass**): **`website/app/`**, **`website/frontend/`**, **`website/data/`** (своя БД), **`website/requirements.txt`**.
 
