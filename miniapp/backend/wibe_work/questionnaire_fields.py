@@ -47,7 +47,7 @@ def get_profile_schema() -> Dict[str, Any]:
                         "id": "city",
                         "type": "text",
                         "label": "Город",
-                        "placeholder": "Уточните город — для подбора и чата (например, Москва)",
+                        "placeholder": "Начните ввод — подсказки как во вкладке «Вакансии» (напр. кем → Кемерово)",
                         "required": False,
                     },
                     {

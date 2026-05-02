@@ -1738,7 +1738,7 @@ function renderResults(res) {
         <span class="badge">${esc(r.type)}</span>
         <h4 style="margin:0.5rem 0 0.35rem">${esc(r.title)}</h4>
         <p class="muted small" style="margin:0">${esc(r.description)}</p>
-        ${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:0.5rem;color:var(--primary2)">Открыть →</a>` : ""}
+        ${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" class="btn secondary">Открыть →</a>` : ""}
       </div>`
     )
     .join("");

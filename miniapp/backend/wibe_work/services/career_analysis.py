@@ -462,23 +462,58 @@ def _analysis_narrative_llm(
 def _learning_cards(interest: str, preparation: str) -> List[Dict[str, Any]]:
     base = {
         "it_dev": [
-            {"title": "Основы Python", "url": "https://stepik.org", "kind": "курс"},
-            {"title": "Git для начинающих", "url": "https://learngitbranching.js.org/?locale=ru", "kind": "симулятор"},
+            {
+                "title": "Основы Python",
+                "url": "https://stepik.org",
+                "kind": "курс",
+                "description": "Синтаксис, типы, циклы и простые задачи — база для кода, автоматизации и аналитики.",
+            },
+            {
+                "title": "Git для начинающих",
+                "url": "https://learngitbranching.js.org/?locale=ru",
+                "kind": "симулятор",
+                "description": "Ветки, merge и rebase наглядно: без установки, в игровой форме.",
+            },
         ],
         "data": [
-            {"title": "SQL интерактив", "url": "https://sql-academy.org", "kind": "практика"},
-            {"title": "Kaggle Learn", "url": "https://www.kaggle.com/learn", "kind": "курс"},
+            {
+                "title": "SQL интерактив",
+                "url": "https://sql-academy.org",
+                "kind": "практика",
+                "description": "Пишите запросы в браузере, с подсказками — удобно с нуля и для отборов в данных.",
+            },
+            {
+                "title": "Kaggle Learn",
+                "url": "https://www.kaggle.com/learn",
+                "kind": "курс",
+                "description": "Короткие треки по Python, SQL и ML; часть материалов на английском.",
+            },
         ],
         "design": [
-            {"title": "Figma Learn", "url": "https://help.figma.com", "kind": "документация"},
-            {"title": "UX-тренажёр", "url": "https://lawsofux.com", "kind": "гайд"},
+            {
+                "title": "Figma Learn",
+                "url": "https://help.figma.com",
+                "kind": "документация",
+                "description": "Официальные разделы про компоненты, автолейаут и прототипирование.",
+            },
+            {
+                "title": "UX-тренажёр",
+                "url": "https://lawsofux.com",
+                "kind": "гайд",
+                "description": "Короткие принципы UX карточками — подходит для насмотренности и языка интерфейсов.",
+            },
         ],
     }
     cards = list(base.get(interest, base["it_dev"]))
     if preparation == "weak":
         cards.insert(
             0,
-            {"title": "Якоря карьеры Шейна (обзор)", "url": "https://www.mindtools.com/pages/article/career-anchors.htm", "kind": "статья"},
+            {
+                "title": "Якоря карьеры Шейна (обзор)",
+                "url": "https://www.mindtools.com/pages/article/career-anchors.htm",
+                "kind": "статья",
+                "description": "Что для вас опора в работе — экспертиза, автономия, вызов, стабильность; помогает сузить направления.",
+            },
         )
     return cards
 
@@ -604,7 +639,7 @@ def build_analysis_result(
                 {"from": 20, "to": 40, "color": "#f97316"},
                 {"from": 40, "to": 60, "color": "#eab308"},
                 {"from": 60, "to": 80, "color": "#84cc16"},
-                {"from": 80, "to": 100, "color": "#22a954"},
+                {"from": 80, "to": 100, "color": "#22c55e"},
             ],
         },
         "style_radar": {"axes": axes},
