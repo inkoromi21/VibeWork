@@ -3,7 +3,9 @@ from datetime import timedelta
 
 HH_USER_AGENT = os.environ.get(
     "HH_USER_AGENT",
-    "WibeWork/1.0 (+https://api.hh.ru)",
+    # hh.ru просит корректный User-Agent с контактом разработчика.
+    # Замените email на ваш в .env: HH_USER_AGENT=MyApp/1.0 (you@example.com)
+    "WibeWork/1.0 (dev@localhost)",
 )
 
 HH_API_BASE = "https://api.hh.ru"

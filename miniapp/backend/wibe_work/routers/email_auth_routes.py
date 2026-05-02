@@ -61,7 +61,7 @@ async def email_login(body: EmailLoginBody):
             (email,),
         ).fetchone()
     if not row:
-        raise HTTPException(status_code=401, detail="Неверный email или пароль.")
+        raise HTTPException(status_code=401, detail="Аккаунт не найден.")
     try:
         ok = bcrypt.checkpw(
             body.password.encode("utf-8"),

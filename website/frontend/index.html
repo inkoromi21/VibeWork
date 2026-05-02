@@ -200,7 +200,7 @@
           <div class="cdek-core-row form-grid">
             <label class="field">
               <span>Возраст</span>
-              <input type="number" name="age" id="field-age" min="14" max="30" value="18" required />
+              <input type="number" name="age" id="field-age" min="14" max="30" step="1" inputmode="numeric" value="18" required />
             </label>
             <label class="field">
               <span>Главная сфера <span class="muted small">(тест)</span></span>
@@ -409,6 +409,9 @@
           <button type="button" class="btn tab-toggle active" data-view="match">Классика</button>
           <button type="button" class="btn tab-toggle" data-view="list">Компакт</button>
           <button type="button" class="btn tab-toggle" data-view="swipe">Тиндер</button>
+        </div>
+        <div id="jobs-hh-search" class="muted small" style="margin:10px 0 0" hidden>
+          hh.ru недоступен? <a id="jobs-hh-search-link" href="#" target="_blank" rel="noopener noreferrer">Открыть поиск на hh.ru →</a>
         </div>
         <div id="jobs-match" class="jobs-view active"></div>
         <div id="jobs-list" class="jobs-view"></div>

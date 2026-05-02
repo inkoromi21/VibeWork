@@ -29,7 +29,10 @@ def get_public_base_url() -> str:
 
 
 def get_website_url() -> str:
-    return (os.environ.get("WEBSITE_URL") or "http://127.0.0.1:8765").rstrip("/")
+    # В текущем стеке сайт может обслуживаться тем же backend на корне (/).
+    # Если WEBSITE_URL не задан, используем PUBLIC_BASE_URL.
+    base = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+    return (os.environ.get("WEBSITE_URL") or base).rstrip("/")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -38,6 +41,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     base = get_public_base_url()
     web_app_url = f"{base}/miniapp/"
     website_url = get_website_url()
+    if website_url == base:
+        website_url = f"{website_url}/"
     site_label = (os.environ.get("WEBSITE_BUTTON_LABEL") or "Сайт CareerCompass").strip() or "Сайт"
 
     intro = (

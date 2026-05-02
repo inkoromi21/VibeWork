@@ -18,6 +18,7 @@ from wibe_work.services.hh_filter import (
     regenerate_user_hh_bundle,
     save_user_hh_state,
 )
+from wibe_work.services.hh_web_link import build_hh_web_search_url, demo_hh_items
 from wibe_work.services.job_search import match_jobs_for_user
 from wibe_work.services.mts_match import match_mts_roles
 from wibe_work.services.user_pain_mapping import align_pains
@@ -110,12 +111,67 @@ async def get_hh_live_jobs(
             search_direction=search_direction,
         )
     except requests.exceptions.HTTPError as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Ошибка API hh.ru: {e.response.status_code if e.response else e}",
-        ) from e
+        code = e.response.status_code if e.response is not None else None
+        # Фоллбек: если hh API заблокирован/403 — показываем демо и даём web-ссылку.
+        profile = load_profile(user_id) or {}
+        text = (
+            (profile.get("target_direction") or "")
+            or (profile.get("profession") or "")
+            or (profile.get("interest") or "")
+            or "вакансии"
+        )
+        city = hh_city or profile.get("city")
+        hh_url = build_hh_web_search_url(
+            text=str(text),
+            city=str(city) if city else None,
+            only_remote=only_remote,
+            only_entry_level=only_entry_level,
+            min_salary=min_salary,
+            work_format="remote" if only_remote else None,
+            level="стажер" if only_entry_level else None,
+        )
+        items = demo_hh_items(hh_url)
+        return {
+            "source": "demo",
+            "notice": "hh.ru API недоступен (часто блокировка по сети/провайдеру). Показаны демо-вакансии — откройте поиск на hh.ru по кнопке.",
+            "hh_search_url": hh_url,
+            "search_hint": {"text": str(text), "city": str(city) if city else None},
+            "found": len(items),
+            "pages": 1,
+            "page": 0,
+            "per_page": per_page,
+            "items": items,
+        }
     except requests.RequestException as e:
-        raise HTTPException(status_code=502, detail=f"Сеть: {e}") from e
+        profile = load_profile(user_id) or {}
+        text = (
+            (profile.get("target_direction") or "")
+            or (profile.get("profession") or "")
+            or (profile.get("interest") or "")
+            or "вакансии"
+        )
+        city = hh_city or profile.get("city")
+        hh_url = build_hh_web_search_url(
+            text=str(text),
+            city=str(city) if city else None,
+            only_remote=only_remote,
+            only_entry_level=only_entry_level,
+            min_salary=min_salary,
+            work_format="remote" if only_remote else None,
+            level="стажер" if only_entry_level else None,
+        )
+        items = demo_hh_items(hh_url)
+        return {
+            "source": "demo",
+            "notice": "Сеть до hh.ru недоступна. Показаны демо-вакансии — откройте поиск на hh.ru по кнопке.",
+            "hh_search_url": hh_url,
+            "search_hint": {"text": str(text), "city": str(city) if city else None},
+            "found": len(items),
+            "pages": 1,
+            "page": 0,
+            "per_page": per_page,
+            "items": items,
+        }
 
 
 @router.get("/pains/{user_id}")
@@ -201,6 +257,16 @@ async def hh_search_vacancies(
     try:
         raw = search_vacancies(params)
     except requests.exceptions.HTTPError as e:
+        code = e.response.status_code if e.response is not None else None
+        if code == 403:
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "Ошибка API hh.ru: 403 Forbidden. "
+                    "hh.ru требует корректный заголовок User-Agent с контактом разработчика. "
+                    "Задайте в .env: HH_USER_AGENT=MyApp/1.0 (you@example.com) и перезапустите API."
+                ),
+            ) from e
         raise HTTPException(
             status_code=502,
             detail=f"Ошибка API hh.ru: {e.response.status_code if e.response else e}",

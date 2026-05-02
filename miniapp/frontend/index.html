@@ -461,7 +461,7 @@
             filter: brightness(1.06);
             border-color: #063a06;
         }
-        input, textarea, select {
+        input:not([type="range"]), textarea, select {
             width: 100%;
             padding: 10px 12px;
             min-height: 35px;
@@ -480,7 +480,7 @@
         input::placeholder, textarea::placeholder {
             color: rgba(0, 0, 0, 0.45);
         }
-        input:focus, textarea:focus, select:focus {
+        input:not([type="range"]):focus, textarea:focus, select:focus {
             outline-color: var(--accent);
             box-shadow: var(--field-glow), 0 0 0 1px var(--accent-lime);
         }
@@ -550,7 +550,61 @@
         }
         .chip.on { border-color: var(--accent-border); background: var(--accent-soft); color: var(--text); }
         .scale-row { display: flex; align-items: center; gap: 12px; margin: 8px 0 14px; }
-        .scale-row input[type="range"] { flex: 1; margin: 0; accent-color: var(--accent); }
+        /* Range без "серого хвоста": трек прозрачный, заливка только слева */
+        .scale-row input[type="range"] {
+            flex: 1;
+            margin: 0;
+            padding: 0;
+            min-height: auto;
+            height: 18px;
+            border: none;
+            box-shadow: none;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            accent-color: var(--accent);
+            background: transparent;
+            --p: 50%;
+        }
+        .scale-row input[type="range"]::-webkit-slider-runnable-track {
+            height: 6px;
+            border-radius: 999px;
+            border: none;
+            background: linear-gradient(to right, var(--accent) var(--p), transparent 0);
+            box-shadow: none;
+        }
+        .scale-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            margin-top: -6px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            background: var(--card);
+            box-shadow: none;
+        }
+        .scale-row input[type="range"]::-moz-range-track {
+            height: 6px;
+            border-radius: 999px;
+            border: none;
+            background: linear-gradient(to right, var(--accent) var(--p), transparent 0);
+            box-shadow: none;
+        }
+        .scale-row input[type="range"]::-moz-range-progress {
+            height: 6px;
+            border-radius: 999px;
+            border: none;
+            background: var(--accent);
+        }
+        .scale-row input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            background: var(--card);
+            box-shadow: none;
+        }
         .scale-val { font-family: var(--font-mono); font-size: .9rem; min-width: 1.5rem; color: var(--accent-dark); }
         .quiz-progress-figma {
             margin-bottom: 20px;
@@ -748,6 +802,12 @@
         .chat-bubble.ai { background: var(--card); margin-right: 32px; }
         .chat-bubble .who { font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 4px; font-family: var(--font-mono); }
         .chat-foot { padding: 14px; border-top: 1px solid var(--border); background: var(--card); }
+        .chat-foot textarea#chatInput {
+            pointer-events: auto;
+            user-select: text;
+            -webkit-user-select: text;
+            touch-action: manipulation;
+        }
         .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 40px 20px; color: var(--text-muted); }
         .spinner {
             width: 36px;
@@ -1567,7 +1627,7 @@
         if (field.type === 'hidden') return '';
         let input = '';
         if (field.type === 'number') {
-            input = '<input type="number" data-fid="' + id + '" min="' + esc(field.min != null ? field.min : '') + '" max="' + esc(field.max != null ? field.max : '') + '" value="' + esc(String(v)) + '" placeholder="' + esc(field.placeholder || '') + '">';
+            input = '<input type="number" data-fid="' + id + '" min="' + esc(field.min != null ? field.min : '') + '" max="' + esc(field.max != null ? field.max : '') + '" step="1" inputmode="numeric" value="' + esc(String(v)) + '" placeholder="' + esc(field.placeholder || '') + '">';
         } else if (field.type === 'text') {
             input = '<input type="text" data-fid="' + id + '" value="' + esc(String(v)) + '" placeholder="' + esc(field.placeholder || '') + '">';
         } else if (field.type === 'textarea') {
@@ -1586,7 +1646,8 @@
             const mx = field.scale_max || 5;
             const n = parseInt(String(v), 10);
             const cur = !isNaN(n) ? n : 3;
-            input = '<div class="scale-row"><input type="range" data-fid="' + id + '" min="' + mn + '" max="' + mx + '" value="' + cur + '"><span class="scale-val" data-scale-for="' + id + '">' + cur + '</span></div>';
+            const pct = Math.round(((cur - mn) * 100) / Math.max(1, (mx - mn)));
+            input = '<div class="scale-row"><input type="range" data-fid="' + id + '" min="' + mn + '" max="' + mx + '" value="' + cur + '" style="--p:' + pct + '%"><span class="scale-val" data-scale-for="' + id + '">' + cur + '</span></div>';
         } else if (field.type === 'multiselect') {
             const opts = field.options || [];
             const selected = Array.isArray(v) ? v : (typeof v === 'string' && v ? v.split(',').map(function (x) { return x.trim(); }) : []);
@@ -1605,13 +1666,24 @@
     function wireProfileForm(schema) {
         const root = document.getElementById('profileFormRoot');
         if (!root) return;
+        function syncRangeFill(el) {
+            try {
+                const mn = parseInt(el.min || '1', 10);
+                const mx = parseInt(el.max || '5', 10);
+                const v = parseInt(el.value || '0', 10);
+                const pct = Math.round(((v - mn) * 100) / Math.max(1, (mx - mn)));
+                el.style.setProperty('--p', pct + '%');
+            } catch (e) {}
+        }
         root.querySelectorAll('[data-fid]').forEach(function (el) {
             const fid = el.getAttribute('data-fid');
             const ev = el.tagName === 'SELECT' || el.type === 'number' || el.type === 'range' ? 'change' : 'input';
+            if (el.type === 'range') syncRangeFill(el);
             el.addEventListener(ev, function () {
                 if (el.type === 'range') {
                     const lab = root.querySelector('[data-scale-for="' + fid + '"]');
                     if (lab) lab.textContent = el.value;
+                    syncRangeFill(el);
                 }
                 profileDraft[fid] = el.type === 'number' && el.value === '' ? '' : el.value;
             });
@@ -2131,6 +2203,17 @@
             '<textarea id="chatInput" rows="2" placeholder="Например: привет — или вопрос по плану на месяц"></textarea>' +
             '<button type="button" class="btn-primary" style="margin-top:8px" id="btnSendChat">Отправить</button></div></div>';
         redraw();
+        try {
+            const inp = document.getElementById('chatInput');
+            if (inp) {
+                inp.disabled = false;
+                inp.removeAttribute('readonly');
+                inp.setAttribute('autocapitalize', 'sentences');
+                inp.setAttribute('autocomplete', 'off');
+                inp.setAttribute('autocorrect', 'on');
+                inp.setAttribute('spellcheck', 'true');
+            }
+        } catch (e) {}
         document.getElementById('btnSendChat').onclick = async function () {
             const inp = document.getElementById('chatInput');
             const text = (inp.value || '').trim();
@@ -2519,14 +2602,29 @@
         }
         const found = d.found != null ? d.found : '?';
         const sh = d.search_hint || {};
+        const hhUrl = d.hh_search_url || '';
+        const notice = d.notice || '';
         if (hint) {
+            let hhBtn = '';
+            if (hhUrl) {
+                hhBtn =
+                    ' <a class="btn-secondary" style="padding:6px 10px;font-size:.78rem;text-decoration:none" href="' +
+                    esc(String(hhUrl)) +
+                    '" target="_blank" rel="noopener noreferrer">Открыть поиск на hh.ru</a>';
+            }
+            let note = '';
+            if (notice) {
+                note = '<div class="banner-warn" style="margin-top:8px">' + esc(String(notice)) + '</div>';
+            }
             hint.innerHTML =
                 'Запрос: <strong>' +
                 esc(String(sh.text || '—')) +
                 '</strong>' +
                 (sh.city ? ' · ' + esc(String(sh.city)) : '') +
                 ' · найдено ≈ ' +
-                esc(String(found));
+                esc(String(found)) +
+                hhBtn +
+                note;
         }
         const p = d.page != null ? d.page : 0;
         const pages = d.pages != null ? d.pages : 1;

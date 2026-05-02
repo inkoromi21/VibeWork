@@ -1796,6 +1796,28 @@ async function fetchJobsMatch() {
   return res.json();
 }
 
+async function refreshHhSearchLink() {
+  const box = document.getElementById("jobs-hh-search");
+  const a = document.getElementById("jobs-hh-search-link");
+  if (!box || !a) return;
+  const m = collectMatchBody();
+  const qs = new URLSearchParams();
+  if (m.profession) qs.set("profession", m.profession);
+  if (m.level) qs.set("level", m.level);
+  if (m.city) qs.set("city", m.city);
+  if (m.work_format) qs.set("work_format", m.work_format);
+  if (m.salary_bracket) qs.set("salary_bracket", m.salary_bracket);
+  try {
+    const r = await fetch(`/api/hh/search-url?${qs.toString()}`);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.url) throw new Error("bad url");
+    a.href = String(d.url);
+    box.hidden = false;
+  } catch (_) {
+    box.hidden = true;
+  }
+}
+
 function renderEnrichedJobCard(e, compact) {
   const j = e.vacancy;
   const rows = e.rows
@@ -1989,6 +2011,7 @@ document.querySelectorAll(".view-toggle .tab-toggle").forEach((b) => {
 });
 
 async function loadJobsData() {
+  refreshHhSearchLink().catch(() => {});
   const data = await fetchJobsMatch();
   renderJobsMatch(data);
   renderJobsListFromEnriched(data);
