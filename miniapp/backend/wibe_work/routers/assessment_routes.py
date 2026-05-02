@@ -1,6 +1,7 @@
 """Маршруты: схема анкеты, тест, разбор, чат с ИИ, симулятор дня (префикс /vibework для фронта)."""
 
 import json
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -19,7 +20,25 @@ from wibe_work.services.aptitude_quiz_grading import (
     quiz_grade_hint,
     quiz_grade_label,
 )
-from wibe_work.services.workday_simulator import start as sim_start, step as sim_step
+from wibe_work.services.workday_simulator import (
+    list_simulator_options,
+    start as sim_start,
+    step as sim_step,
+)
+from wibe_work.services.ai_chat_sessions import (
+    get_messages as load_chat_session_messages,
+    list_sessions as list_chat_sessions,
+    upsert_session as save_chat_session,
+)
+
+_SESSION_ID_RE = re.compile(r"^[0-9A-Za-z\-]{8,64}$")
+
+
+def _validate_chat_session_id(session_id: str) -> str:
+    s = (session_id or "").strip()
+    if not s or len(s) > 64 or not _SESSION_ID_RE.match(s):
+        raise HTTPException(status_code=422, detail="Некорректный идентификатор чата")
+    return s
 
 router = APIRouter(tags=["vibework"])
 
@@ -164,6 +183,39 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage]
 
 
+class ChatHistorySave(BaseModel):
+    messages: List[ChatMessage]
+
+
+@miniapp_prefixed_router.get("/chat/history/{user_id}")
+async def chat_history_list(user_id: str, request: Request):
+    require_bearer_matches_user(request, user_id)
+    return {"sessions": list_chat_sessions(user_id)}
+
+
+@miniapp_prefixed_router.get("/chat/history/{user_id}/{session_id}")
+async def chat_history_get(user_id: str, session_id: str, request: Request):
+    require_bearer_matches_user(request, user_id)
+    sid = _validate_chat_session_id(session_id)
+    msgs = load_chat_session_messages(user_id, sid)
+    if msgs is None:
+        raise HTTPException(status_code=404, detail="Чат не найден")
+    return {"session_id": sid, "messages": msgs}
+
+
+@miniapp_prefixed_router.put("/chat/history/{user_id}/{session_id}")
+async def chat_history_save(
+    user_id: str, session_id: str, request: Request, body: ChatHistorySave
+):
+    require_bearer_matches_user(request, user_id)
+    sid = _validate_chat_session_id(session_id)
+    msgs = [{"role": m.role, "content": m.content} for m in body.messages]
+    if len(msgs) > 400:
+        raise HTTPException(status_code=422, detail="Слишком длинная история сообщений")
+    save_chat_session(user_id, sid, msgs)
+    return {"ok": True}
+
+
 @miniapp_prefixed_router.post("/chat/{user_id}")
 async def career_coach_chat(user_id: str, request: Request, body: ChatRequest):
     require_bearer_matches_user(request, user_id)
@@ -183,10 +235,15 @@ class SimulatorStartBody(BaseModel):
     role: str = "analyst"
 
 
+@miniapp_prefixed_router.get("/simulator/options")
+async def simulator_options():
+    """Сферы как в анкете (главная сфера) → сценарий «день на работе»."""
+    return {"options": list_simulator_options()}
+
+
 @miniapp_prefixed_router.post("/simulator/start")
 async def simulator_start(body: SimulatorStartBody):
-    r = body.role if body.role in ("analyst", "designer") else "analyst"
-    return sim_start(r)
+    return sim_start(body.role)
 
 
 class SimulatorStepBody(BaseModel):

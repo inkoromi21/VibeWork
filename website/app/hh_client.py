@@ -80,7 +80,7 @@ def _user_agent() -> str:
     ua = os.getenv("HH_USER_AGENT", "").strip()
     if ua:
         return ua
-    return "YouthCareerAdvisor/1.0 (career-advisor@localhost)"
+    return "VibeWork/1.0 (dev@localhost)"
 
 
 def _norm_city(s: str) -> str:

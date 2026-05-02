@@ -2,11 +2,12 @@ import uuid
 from datetime import datetime, timezone
 
 import bcrypt
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
+from wibe_work.bearer_auth import require_bearer_matches_user
 from wibe_work.jwt_service import create_access_token
 from wibe_work.sqlite_db import get_db
-from wibe_work.api_schemas import EmailLoginBody, EmailRegisterBody
+from wibe_work.api_schemas import EmailLoginBody, EmailPasswordChangeBody, EmailRegisterBody
 
 router = APIRouter(prefix="/auth/email", tags=["auth_email"])
 
@@ -79,3 +80,42 @@ async def email_login(body: EmailLoginBody):
         "user_id": user_id,
         "email": email,
     }
+
+
+@router.post("/change-password/{user_id}")
+async def email_change_password(
+    user_id: str,
+    request: Request,
+    body: EmailPasswordChangeBody,
+):
+    require_bearer_matches_user(request, user_id)
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT password_hash FROM email_users WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="Пароль можно менять только для аккаунта с входом по почте.",
+        )
+    try:
+        ok = bcrypt.checkpw(
+            body.current_password.encode("utf-8"),
+            str(row["password_hash"]).encode("ascii"),
+        )
+    except (ValueError, TypeError):
+        ok = False
+    if not ok:
+        raise HTTPException(status_code=401, detail="Текущий пароль указан неверно.")
+    new_hash = bcrypt.hashpw(
+        body.new_password.encode("utf-8"),
+        bcrypt.gensalt(),
+    ).decode("ascii")
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE email_users SET password_hash = ? WHERE user_id = ?",
+            (new_hash, user_id),
+        )
+        conn.commit()
+    return {"ok": True}

@@ -16,4 +16,4 @@ def test_website_fastapi_app_loads() -> None:
     from app.main import app
 
     assert app is not None
-    assert app.title == "Youth Career Advisor"
+    assert app.title == "VibeWork"

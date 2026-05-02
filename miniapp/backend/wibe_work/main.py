@@ -22,7 +22,7 @@ from wibe_work.routers.website_auth_compat_routes import router as website_auth_
 from wibe_work.routers.website_api_routes import router as website_api_router
 from wibe_work.services.llm_client import get_llm_settings, ollama_mode_enabled
 
-app = FastAPI(title="Wibe work", description="Карьерный помощник")
+app = FastAPI(title="VibeWork", description="Карьерный помощник")
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,7 +34,7 @@ app.add_middleware(
 
 _WEBSITE_FRONTEND_DIR = PROJECT_ROOT / "website" / "frontend"
 if _WEBSITE_FRONTEND_DIR.is_dir():
-    # website/frontend/index.html ожидает /static/style.css и /static/script.js
+    # index.html сайта тянет /static/style.css и /static/script.js
     app.mount("/static", StaticFiles(directory=str(_WEBSITE_FRONTEND_DIR)), name="website_static")
 
 
@@ -82,7 +82,7 @@ async def miniapp():
 
 @app.get("/", response_class=HTMLResponse)
 async def website_index():
-    """Главная страница сайта CareerCompass (website/frontend/index.html)."""
+    """Главная страница веб-версии (website/frontend/index.html)."""
     path = PROJECT_ROOT / "website" / "frontend" / "index.html"
     if not path.is_file():
         raise HTTPException(status_code=404, detail=f"Website index not found: {path}")

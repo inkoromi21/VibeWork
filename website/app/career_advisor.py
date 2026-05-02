@@ -5,9 +5,36 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
+from pathlib import Path
 from typing import Any, Literal
 
 import httpx
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_MINIAPP_BACKEND = _REPO_ROOT / "miniapp" / "backend"
+if _MINIAPP_BACKEND.is_dir() and str(_MINIAPP_BACKEND) not in sys.path:
+    sys.path.insert(0, str(_MINIAPP_BACKEND))
+
+try:
+    from wibe_work.services.llm_prompts import (
+        ANALYSIS_NARRATIVE_SYSTEM,
+        CAREER_COACH_CHAT_SYSTEM,
+        DEFAULT_GENERIC_SYSTEM,
+        build_chat_user_instruction_suffix,
+    )
+except ImportError:
+    CAREER_COACH_CHAT_SYSTEM = (
+        "Ты карьерный консультант для молодёжи в России. Только русский язык. "
+        "Не работодатель. Опирайся на контекст разбора. 6–12 предложений. Без HTML."
+    )
+    DEFAULT_GENERIC_SYSTEM = CAREER_COACH_CHAT_SYSTEM
+    ANALYSIS_NARRATIVE_SYSTEM = (
+        "Ты готовишь текст разбора по данным профиля. Только русский. Не противоречь переданным фактам."
+    )
+
+    def build_chat_user_instruction_suffix() -> str:
+        return ""
 
 from app.mts_tracks_catalog import load_mts_tracks
 from app.api_schemas import (
@@ -1704,19 +1731,6 @@ def mock_ai_narrative(payload: DiagnosisPayload, directions: list[CareerDirectio
     return variants[fp % len(variants)] + closer
 
 
-# Жёсткие правила под локальные 7–8B модели (Ollama), чтобы не смешивали языки и не галлюцинировали вопросы.
-_CAREER_CHAT_SYSTEM = """Ты карьерный консультант для молодёжи 16–22 в России.
-
-Ты не из компании пользователя и не работодатель. Это нейтральный справочный сервис (как статья или консультация). Запрещено писать «в нашей компании», «у нас в компании», «в нашей организации», «мы нанимаем» — такого контекста нет.
-
-Обязательно:
-- Только русский язык во всём ответе. Ни одного слова на английском, испанском и других языках (кроме имён собственных брендов, если неизбежно).
-- Отвечай строго на последнее сообщение пользователя. Не выдумывай, что он спросил про «как дела», приветствия или small talk — если этого не было в его тексте, не упоминай.
-- Опирайся на переданные блоки «Контекст разбора» и «Направления» (A, B, C). Если спрашивают про три направления — опиши именно эти три из контекста, по пунктам: что за направление и почему подходит; не придумывай четвёртое и не подменяй названия.
-- Без фраз вроде «всё в порядке», «я работаю над», «на следующий этап». Сразу полезный текст.
-- 6–12 предложений, связный текст. Без HTML и без списков из одних эмодзи."""
-
-
 def _mock_career_chat_reply(last_user: str) -> str:
     clip = last_user.strip().replace("\n", " ")[:120]
     return (
@@ -1748,6 +1762,7 @@ async def career_chat(req: ChatRequest) -> tuple[str, Literal["llm", "mock"], st
         parts
         + [f"История диалога:\n{transcript}", user_tail]
     )
+    user_prompt += build_chat_user_instruction_suffix()
     mock = _mock_career_chat_reply(last_user)
     if not llm_configured():
         return (
@@ -1759,7 +1774,7 @@ async def career_chat(req: ChatRequest) -> tuple[str, Literal["llm", "mock"], st
         user_prompt,
         max_tokens=900,
         temperature=0.35,
-        system_prompt=_CAREER_CHAT_SYSTEM,
+        system_prompt=CAREER_COACH_CHAT_SYSTEM,
     )
     if out:
         return out, "llm", None
@@ -1785,10 +1800,7 @@ async def fetch_llm_completion(
     headers: dict[str, str] = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-    sys_default = (
-        "Ты внешний карьерный консультант для молодёжи 16–22, не работодатель и не представитель компании пользователя. "
-        "Не используй «в нашей компании», «у нас», «мы нанимаем». Отвечай кратко по-русски: 3–6 предложений, конкретика, без воды. Без HTML."
-    )
+    sys_default = DEFAULT_GENERIC_SYSTEM
     body = {
         "model": model,
         "messages": [
@@ -2118,14 +2130,26 @@ async def build_analysis(payload: DiagnosisPayload) -> AnalysisResult:
     behavioral = _behavioral_hint(payload)
 
     sph = primary_interest.value.replace("_", " ")
-    prompt = (
-        f"Профиль: {profile_summary}\n"
-        f"Главная сфера (не IT-общие советы — опирайся на неё): «{sph}», типовой контекст ролей: {prof_pack.key}.\n"
-        f"Уровень подготовки: {payload.preparation_level}.\n"
-        f"Планы: {', '.join(f'{d.plan_code}={d.name}' for d in directions)}.\n"
-        "Совет: главный фокус квартала в этой сфере + один риск выгорания; без штампов «только программирование»."
+    plan_desc = ", ".join(f"{d.plan_code}={d.name} (совпадение ~{d.match_score}%)" for d in directions)
+    narrative_prompt = (
+        "Данные для экрана «ИИ-разбор» (веб-форма VibeWork). Сгенерируй один связный текст по правилам system.\n\n"
+        "=== ПРОФИЛЬ ===\n"
+        f"{profile_summary}\n\n"
+        "=== СФЕРА И КОНТЕКСТ РОЛЕЙ ===\n"
+        f"Главная сфера (ориентир советов): «{sph}». Справочный ключ профессионального пакета: {prof_pack.key}.\n"
+        f"Уровень подготовки: {payload.preparation_level}.\n\n"
+        "=== НАПРАВЛЕНИЯ A/B/C ===\n"
+        f"{plan_desc}\n\n"
+        "=== ЗАДАЧА ===\n"
+        "Фокус на ближайший квартал в указанной сфере; один риск выгорания или перегруза; избегай штампа «учи только программирование», "
+        "если сфера не сводится к разработке."
     )
-    ai_text = await fetch_deepseek_advice(prompt)
+    ai_text, _ai_err = await fetch_llm_completion(
+        narrative_prompt,
+        max_tokens=560,
+        temperature=0.42,
+        system_prompt=ANALYSIS_NARRATIVE_SYSTEM,
+    )
     if not ai_text:
         ai_text = mock_ai_narrative(payload, directions)
 

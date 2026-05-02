@@ -1,3 +1,3 @@
-"""Wibe work — мини-приложение и API карьерного помощника."""
+"""VibeWork — мини-приложение и API."""
 
-__project_name__ = "Wibe work"
+__project_name__ = "VibeWork"

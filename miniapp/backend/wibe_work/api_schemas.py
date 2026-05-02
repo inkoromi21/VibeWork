@@ -1,10 +1,11 @@
 """Pydantic-схемы тел запросов/ответов HTTP API миниаппы."""
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List
 
 
 class ProfileData(BaseModel):
+    nickname: Optional[str] = Field(None, max_length=80)
     age: Optional[int] = None
     city: Optional[str] = None
     main_sphere: Optional[str] = None
@@ -48,6 +49,16 @@ class ProfileData(BaseModel):
     monthly_focus_project: Optional[str] = None
     weekly_progress_note: Optional[str] = None
 
+    @field_validator("nickname", mode="before")
+    @classmethod
+    def strip_nickname(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            s = v.strip()
+            return s if s else None
+        return v
+
 
 class AnswerItem(BaseModel):
     question_id: int
@@ -83,3 +94,8 @@ class EmailRegisterBody(BaseModel):
 class EmailLoginBody(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=1, max_length=128)
+
+
+class EmailPasswordChangeBody(BaseModel):
+    current_password: str = Field(..., min_length=1, max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=128)

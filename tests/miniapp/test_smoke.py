@@ -16,4 +16,4 @@ def test_miniapp_fastapi_app_loads() -> None:
     import wibe_work.main as main_mod
 
     assert main_mod.app is not None
-    assert main_mod.app.title == "Wibe work"
+    assert main_mod.app.title == "VibeWork"

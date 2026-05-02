@@ -274,6 +274,35 @@ def _build_search_text(
     return text[:120] if text else "стажировка начинающий специалист"
 
 
+# Как в OpenAPI hh.ru GET /vacancies, параметр experience
+HH_EXPERIENCE_API_IDS = frozenset(
+    {"noExperience", "between1And3", "between3And6", "moreThan6"}
+)
+
+
+def apply_user_experience_filter(
+    params: Dict[str, Any],
+    *,
+    hh_experience: Optional[str] = None,
+    only_entry_level: bool = False,
+) -> None:
+    """Учитывает фильтр «Опыт» из UI миниаппа (те же значения, что на hh.ru)."""
+    if only_entry_level:
+        params["experience"] = "noExperience"
+        return
+    if hh_experience is None:
+        return
+    s = str(hh_experience).strip()
+    if not s or s.lower() == "any":
+        params.pop("experience", None)
+        return
+    if s.lower() == "entry":
+        params["experience"] = "noExperience"
+        return
+    if s in HH_EXPERIENCE_API_IDS:
+        params["experience"] = s
+
+
 def build_hh_query_params(
     profile: Dict[str, Any],
     rec: Dict[str, Any],
@@ -316,6 +345,7 @@ def fetch_live_hh_vacancies(
     *,
     only_remote: bool = False,
     only_entry_level: bool = False,
+    hh_experience: Optional[str] = None,
     min_salary: Optional[int] = None,
     strict_work_format: bool = False,
     page: int = 0,
@@ -345,8 +375,9 @@ def fetch_live_hh_vacancies(
         if sch:
             params["schedule"] = sch
 
-    if only_entry_level:
-        params["experience"] = "noExperience"
+    apply_user_experience_filter(
+        params, hh_experience=hh_experience, only_entry_level=only_entry_level
+    )
 
     if min_salary is not None and min_salary > 0:
         params["salary"] = int(min_salary)

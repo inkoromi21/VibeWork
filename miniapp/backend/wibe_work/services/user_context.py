@@ -55,13 +55,25 @@ _PRIORITY_RU = {
 
 
 def coach_profile_snippet(profile: Dict[str, Any]) -> str:
-    """Краткий текст для ИИ-чата: город, формат, приоритет, фокус месяца, недельный прогресс."""
+    """Краткий текст для ИИ-чата: базовые поля анкеты + город, формат, приоритет, фокус месяца, прогресс."""
     if not profile:
         return ""
     lines: List[str] = []
+    age = profile.get("age")
+    if age is not None and str(age).strip() != "":
+        lines.append(f"Возраст: {age}")
     city = (profile.get("city") or "").strip()
     if city:
         lines.append(f"Город: {city}")
+    ms = (profile.get("main_sphere") or "").strip()
+    if ms:
+        lines.append(f"Главная сфера (анкета): {ms}")
+    edu = (profile.get("education_detail") or profile.get("education_level") or "").strip()
+    if edu:
+        lines.append(f"Образование: {edu}")
+    prep_prof = (profile.get("preparation_level") or "").strip()
+    if prep_prof:
+        lines.append(f"Подготовка (самооценка): {prep_prof}")
     wf = (profile.get("work_format_preference") or profile.get("work_format_pref") or "").strip()
     if wf:
         lines.append(f"Формат работы: {wf}")

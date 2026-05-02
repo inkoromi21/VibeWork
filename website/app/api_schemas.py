@@ -1,4 +1,4 @@
-"""Pydantic-схемы запросов и ответов HTTP API сайта CareerCompass."""
+"""Pydantic-схемы запросов и ответов HTTP API VibeWork (веб)."""
 
 from enum import Enum
 from typing import Literal

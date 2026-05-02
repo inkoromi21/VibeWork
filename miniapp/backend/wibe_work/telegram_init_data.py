@@ -25,7 +25,7 @@ def check_telegram_auth(auth_data: Dict[str, Any], bot_token: str) -> bool:
 
 
 def parse_init_data_user_id(init_data: str) -> Optional[int]:
-    """Достаёт id из строки init_data WebApp (без проверки подписи — для совместимости)."""
+    """Telegram user id из строки init_data; подпись здесь не проверяем."""
     if not init_data:
         return None
     try:

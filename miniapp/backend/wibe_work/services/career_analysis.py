@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from wibe_work.miniapp_paths import data_file
 from wibe_work.services.llm_client import fetch_llm_completion, llm_configured
+from wibe_work.services.llm_prompts import ANALYSIS_NARRATIVE_SYSTEM, build_analysis_user_prompt
 from wibe_work.services.aptitude_quiz import get_pro_weights_matrix_for_interest, letter_to_index
 
 _MTS_PATH = data_file("mts_role_matrix.json")
@@ -405,22 +406,54 @@ def _mock_ai_narrative(
     return variants[fp % len(variants)]
 
 
+def _format_axes_for_llm(axes: List[Dict[str, Any]]) -> str:
+    parts: List[str] = []
+    for a in axes[:8]:
+        lab = str(a.get("label") or a.get("key") or "?")
+        pct = a.get("value_percent")
+        if pct is not None:
+            parts.append(f"{lab}: {pct}%")
+    return "; ".join(parts) if parts else "—"
+
+
 def _analysis_narrative_llm(
     profile_summary: str,
     scenarios: Dict[str, Any],
+    *,
+    axes: List[Dict[str, Any]],
+    readiness_percent: int,
+    answers_count: int,
 ) -> Tuple[str, str, Optional[str]]:
     """(текст, источник llm|mock, notice)."""
     plans = scenarios.get("plans") or []
-    plan_line = ", ".join(f"{p.get('id')}={p.get('name', '')}" for p in plans[:3])
-    prompt = (
-        f"{profile_summary}\n"
-        f"Планы развития: {plan_line}.\n"
-        "Дай связный совет по-русски: главный фокус на ближайший квартал и один риск выгорания или перегруза. "
-        "4–8 предложений, без HTML и без списков только из эмодзи."
+    plan_line = ", ".join(
+        f"{p.get('id')}={p.get('name', '')} (~{p.get('score_percent', '?')}%)"
+        for p in plans[:3]
+    )
+    axes_line = _format_axes_for_llm(axes)
+    short_quiz = answers_count < 15
+    caveat = ""
+    if short_quiz:
+        caveat = (
+            f"Опрос неполный: только {answers_count} ответов из 15 по полной методике. "
+            "Не утверждай высокую точность профиля; используй формулировки «по текущим данным», «предварительно»."
+        )
+    prompt = build_analysis_user_prompt(
+        profile_summary=profile_summary,
+        readiness_percent=readiness_percent,
+        axes_line=axes_line,
+        plan_line=plan_line,
+        answers_count=answers_count,
+        short_quiz_caveat=caveat,
     )
     if not llm_configured():
         return "", "mock", None
-    text, notice = fetch_llm_completion(prompt, max_tokens=500, temperature=0.55)
+    text, notice = fetch_llm_completion(
+        prompt,
+        max_tokens=560,
+        temperature=0.42,
+        system_prompt=ANALYSIS_NARRATIVE_SYSTEM,
+    )
     if text:
         return text, "llm", None
     return "", "mock", notice
@@ -541,7 +574,13 @@ def build_analysis_result(
         f"{p['id']}: {p.get('name', '')} (~{p['score_percent']}%)"
         for p in scenarios.get("plans", [])
     )
-    llm_text, narr_src, narr_notice = _analysis_narrative_llm(profile_summary, scenarios)
+    llm_text, narr_src, narr_notice = _analysis_narrative_llm(
+        profile_summary,
+        scenarios,
+        axes=axes,
+        readiness_percent=readiness,
+        answers_count=len(answers),
+    )
     if llm_text.strip():
         narrative = llm_text.strip()
         ai_narrative_source = "llm"

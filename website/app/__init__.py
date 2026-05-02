@@ -1,1 +1,1 @@
-# Career counseling API package
+# VibeWork — веб API (пакет app).

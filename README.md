@@ -1,200 +1,254 @@
-# Wibe work
+# VibeWork
 
-Монорепозиторий из двух продуктов:
+Карьерная платформа для молодых специалистов: анкета, диагностика, разбор компетенций, ИИ-чат, подбор вакансий и ролевой симулятор. Доступны **веб-интерфейс**, **Telegram Mini App** и **REST API** на одном сервере FastAPI.
 
-Ссылка на бота:https://t.me/VibeWorks_bot
+**Telegram-бот:** [@VibeWorks_bot](https://t.me/VibeWorks_bot)
 
-1. **`miniapp/`** — карьерный помощник для **Telegram Mini App**: API, бот, фронт, **`miniapp/data/`** (SQLite, JSON), **`miniapp/requirements.txt`**, точка входа API — **`miniapp/run.py`**.
-2. **`website/`** — отдельный сайт (**CareerCompass**): **`website/app/`**, **`website/frontend/`**, **`website/data/`** (своя БД), **`website/requirements.txt`**.
+---
 
-Корень репозитория — общий **`venv`** и файл **`.env`** для миниаппы. Сайт живёт в **`website/`** со своим **`.venv`**.
+## Содержание
 
-### Запуск из корня (коротко)
+- [Возможности](#возможности)
+- [Архитектура репозитория](#архитектура-репозитория)
+- [Требования](#требования)
+- [Быстрый старт](#быстрый-старт)
+- [Конфигурация](#конфигурация)
+- [Запуск для разработки](#запуск-для-разработки)
+- [Модели LLM (Ollama и облако)](#модели-llm-ollama-и-облако)
+- [Проверка качества и тесты](#проверка-качества-и-тесты)
+- [Отдельный веб-сервер (каталог website)](#отдельный-веб-сервер-каталог-website)
+- [Эксплуатация в продакшене](#эксплуатация-в-продакшене)
+- [Документация по подпроектам](#документация-по-подпроектам)
+- [Лицензия и безопасность](#лицензия-и-безопасность)
 
-| Действие | macOS / Linux | Windows |
-|----------|----------------|---------|
-| **Весь стек** (API :8000, ngrok, бот, сайт :8765) | `bash "launch files/launch-stack.sh"` | `launch files\launch-stack.bat` |
-| Только API (ручной отладочный запуск) | `python miniapp/run.py` | то же |
-
-Отдельные окна поднимает только **`launch files/launch-stack`**. Вспомогательные сценарии лежат в **`launch files/stack/`** и не предназначены для ручного запуска.
-
-Подробности: [miniapp/README.md](miniapp/README.md), [miniapp/bot/README.md](miniapp/bot/README.md), [website/README.md](website/README.md).
-
-## Разработка и CI
-
-- **Локально (как на GitHub Actions):** из корня выполните `./scripts/verify.sh` — во временных venv ставятся зависимости миниаппы и сайта по отдельности, прогоняются `compileall` и дымовые тесты.
-- **Вручную:** в активированном venv миниаппы — `pip install -r miniapp/requirements.txt "pytest>=8,<9"`, затем `pytest tests/miniapp -q`. Для сайта — отдельный venv в `website/`, `pip install -r website/requirements.txt "pytest>=8,<9"`, `pytest tests/website -q`.
-- После пуша в GitHub срабатывает workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Обновления зависимостей предлагает [Dependabot](.github/dependabot.yml).
-- Сообщения об уязвимостях: [SECURITY.md](SECURITY.md).
+---
 
 ## Возможности
 
-- Профиль, опросы, интеграция с **HeadHunter** (API `api.hh.ru`)
-- Авторизация по email и через Telegram
-- Мини-приложение: `GET /miniapp/`
-- Интерактивная документация API: `/docs` (Swagger)
+| Область | Описание |
+|--------|----------|
+| Профиль | Динамическая анкета, сохранение в SQLite |
+| Диагностика | Тесты и метрики для последующего разбора |
+| Разбор и план | Аналитика и рекомендации на основе данных профиля |
+| ИИ-чат | Локально (Ollama) или облачные провайдеры при наличии ключей |
+| Вакансии | Интеграция с API hh.ru; при недоступности — демо-данные и ссылки |
+| Симулятор | Сценарий «день на работе» с ветвлением |
+| Аутентификация | Вход по e-mail/паролю и сценарии для Telegram |
+
+Интерактивная спецификация API: **`/docs`** (Swagger UI) и **`/openapi.json`**.
+
+---
+
+## Архитектура репозитория
+
+Монорепозиторий: **бэкенд** (`wibe_work` + при необходимости пакет `website/app`), **статика** веб-UI и **мини-приложение** в `miniapp/frontend/`, **данные** — один файл **SQLite** (путь задаётся переменной окружения).
+
+**Рекомендуемый режим:** один процесс **`python miniapp/run.py`** (порт **8000**). Он обслуживает корень сайта, мини-приложение и все API в едином контексте БД.
+
+| URL (локально) | Назначение |
+|----------------|------------|
+| `http://127.0.0.1:8000/` | Веб-интерфейс VibeWork (`website/frontend/index.html`) |
+| `http://127.0.0.1:8000/miniapp/` | Telegram Mini App |
+| `http://127.0.0.1:8000/docs` | OpenAPI (Swagger) |
+| `http://127.0.0.1:8000/api/health` | Быстрая проверка: сервис отвечает |
+| `http://127.0.0.1:8000/api/health/llm` | Конфигурация LLM (JSON: `llm_configured`, `ollama_mode`, `model`) |
+
+Статика веб-версии: каталог **`website/frontend/`**. Код веб-API в **`website/app/`** подключается к общему приложению через `sys.path` (см. `miniapp/run.py`).
+
+---
 
 ## Требования
 
-- **Python 3.10+**
-- Для Telegram Mini App с телефона — публичный HTTPS URL (часто используют [ngrok](https://ngrok.com/) или свой домен)
+- **Python 3.10+** для основного стека (`miniapp/requirements.txt`).
+- Для **изолированного** запуска только пакета `website/` — отдельное окружение и `website/requirements.txt` (см. [website/README.md](website/README.md)).
+- Для Mini App в Telegram с устройства — **HTTPS** (ngrok, туннель или обратный прокси).
+
+---
 
 ## Быстрый старт
 
-### 1. Клонирование и окружение
+### 1. Клонирование и виртуальное окружение
 
 ```bash
-cd wibe-work
+git clone <repository-url>
+cd VibeWork
 python3 -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate.bat
+# Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r miniapp/requirements.txt
 ```
 
 ### 2. Переменные окружения
 
-Скопируйте шаблон в **корень** репозитория и заполните секреты:
+Из корня репозитория:
 
 ```bash
-cp miniapp/.env.example .env
+cp miniapp/.env.example .env   # Linux/macOS
+# Windows (CMD):  copy miniapp\.env.example .env
 ```
 
-| Переменная | Описание |
-|------------|----------|
+Отредактируйте `.env`. Ключевые параметры:
+
+| Переменная | Назначение |
+|------------|------------|
 | `TELEGRAM_BOT_TOKEN` | Токен бота от [@BotFather](https://t.me/BotFather) |
-| `PUBLIC_BASE_URL` | Базовый URL API (локально: `http://127.0.0.1:8000`; с туннелем — URL ngrok) |
-| `JWT_SECRET` | Секрет для подписи JWT (**обязательно смените в продакшене**) |
-| `DATABASE_PATH` | Необязательно: полный путь к файлу SQLite (по умолчанию `miniapp/data/career.db`) |
-| `HH_USER_AGENT` | User-Agent для запросов к HH (по умолчанию задан в коде) |
-| `HH_FINALIZE_MIN_COMPLETENESS` | Порог «завершённости» профиля для HH (по умолчанию `0.55`) |
-| `HH_MIN_POLL_ANSWERS` | Минимум ответов опроса (по умолчанию `0`) |
-| `JWT_EXPIRE_DAYS` | Срок жизни JWT в днях (по умолчанию `30`) |
+| `PUBLIC_BASE_URL` | Базовый URL API для ссылок бота; локально `http://127.0.0.1:8000`, для Telegram — ваш HTTPS |
+| `WEBSITE_URL` | URL кнопки «Сайт» в боте (часто совпадает с `PUBLIC_BASE_URL`) |
+| `JWT_SECRET` | Секрет подписи JWT; в продакшене обязательно уникальное значение |
+| `DATABASE_PATH` | Путь к файлу SQLite (необязательно; иначе используется путь по умолчанию в коде) |
+| `HH_USER_AGENT` | Идентификатор клиента для API hh.ru в формате из их документации |
 
-### Локальная нейросеть: Ollama
+### 3. Запуск API
 
-Чат и блок «Краткий вывод» в разборе ходят в **OpenAI-совместимый** эндпоинт `/v1/chat/completions`. [Ollama](https://ollama.com) поднимает такой API на вашей машине **без облачного ключа**.
+```bash
+python miniapp/run.py
+```
 
-1. **Установите Ollama** с сайта [ollama.com](https://ollama.com) и убедитесь, что демон запущен (в трее на macOS / как сервис на Linux; на Windows — после установки из меню Пуск).
+Откройте в браузере `http://127.0.0.1:8000/docs`.
 
-2. **Скачайте модель** (имя должно совпасть с `OLLAMA_MODEL`):
+---
 
-   ```bash
-   ollama pull llama3.2
-   ```
+## Конфигурация
 
-   Для более устойчивого русского языка можно взять, например, `qwen2.5:7b` или `mistral` — тогда в `.env` укажите то же имя.
+Подробности по окружению для веб-пакета изолированно — в [website/README.md](website/README.md).  
+Шаблон переменных мини-приложения — **`miniapp/.env.example`** (копируется в корневой `.env`).
 
-3. **Проверьте, что Ollama отвечает:**
+---
 
-   ```bash
-   curl -s http://127.0.0.1:11434/api/tags
-   ```
+## Запуск для разработки
 
-4. **В корне проекта в файле `.env` добавьте:**
+| Задача | Команда |
+|--------|---------|
+| Только API и статика (порт 8000) | `python miniapp/run.py` |
+| Полный стек | macOS/Linux: `bash "launch files/launch-stack.sh"` · Windows: `launch files\launch-stack.bat` — открывает отдельные окна: API **:8000**, ngrok→8000, Telegram-бот, веб **:8765** (`website/main.py`) |
+| Только Telegram-бот (при уже запущенном API) | `python miniapp/bot/bot.py` |
 
-   ```env
-   USE_OLLAMA=1
-   OLLAMA_HOST=http://127.0.0.1:11434
-   OLLAMA_MODEL=llama3.2
-   ```
+Вспомогательные сценарии лежат в **`launch files/stack/`**. Документация по боту: [miniapp/bot/README.md](miniapp/bot/README.md).
 
-   Если Ollama на другой машине в сети — подставьте её хост в `OLLAMA_HOST` (должен быть доступен с компьютера, где крутится `python miniapp/run.py`).
+---
 
-5. **Перезапустите API** (`python miniapp/run.py`). Проверка:
+## Модели LLM (Ollama и облако)
 
-   - [http://127.0.0.1:8000/api/health/llm](http://127.0.0.1:8000/api/health/llm) — должно быть `"llm_configured": true`, `"ollama_mode": true`, в `model` — выбранная модель.
+Чат использует совместимый с OpenAI эндпоинт **`/v1/chat/completions`**. Локально удобно поднимать **[Ollama](https://ollama.com)**.
 
-6. **Если ответы долго не приходят** (первая генерация грузит модель в RAM), увеличьте таймаут:
+1. Установите Ollama и при необходимости запустите сервис (`ollama serve` или системный трей на Windows).
+2. Загрузите модель, например: `ollama pull llama3.2`.
+3. Проверка: `curl -s http://127.0.0.1:11434/api/tags`.
 
-   ```env
-   LLM_LOCAL_TIMEOUT=180
-   ```
+Пример фрагмента `.env`:
 
-**Без `USE_OLLAMA=1`** можно вручную задать только URL (ключ не нужен):
+```env
+USE_OLLAMA=1
+OLLAMA_HOST=http://127.0.0.1:11434
+OLLAMA_MODEL=llama3.2
+```
+
+Диагностика: `GET http://127.0.0.1:8000/api/health/llm` — поля `llm_configured`, `ollama_mode`, `model`.
+
+При долгом первом ответе можно увеличить таймаут, например `LLM_LOCAL_TIMEOUT=180`.
+
+Если Ollama включена в `.env`, сценарии **`launch-stack`** могут вызывать скрипты проверки/запуска из **`miniapp/scripts/`**; образ модели нужно подтянуть вручную (`ollama pull`).
+
+Без `USE_OLLAMA` можно задать прямой URL совместимого API, например:
 
 ```env
 CHAT_API_URL=http://127.0.0.1:11434/v1/chat/completions
 CHAT_MODEL=llama3.2
 ```
 
-### 3. Запуск API
+Облачные ключи (`DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `CHAT_API_KEY` и др.) и выбор эндпоинта — в **`miniapp/backend/wibe_work/services/llm_client.py`**.
 
-Из корня репозитория:
+Системные промпты (чат, разбор, заголовки сессий) собраны в одном месте: **`miniapp/backend/wibe_work/services/llm_prompts.py`** — правки формулировок ИИ удобно делать там.
 
-```bash
-python miniapp/run.py
-```
+---
 
-Сервер слушает `0.0.0.0:8000`. Проверка: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
+## Проверка качества и тесты
 
-### 4. Telegram-бот и ngrok
-Как найти бота: Просто впишите в поиск @SkillMatchs_bot
-Используйте **`bash "launch files/launch-stack.sh"`** (или **`launch files\launch-stack.bat`**): откроются окна API, ngrok, бота и сайта. Для ручной отладки бота из активированного `venv`: `python miniapp/bot/bot.py` (предварительно запустите API).
-
-Бот по `/start` открывает мини-приложение по `{PUBLIC_BASE_URL}/miniapp/`. При запущенном ngrok URL кнопки берётся из `http://127.0.0.1:4040/api/tunnels`.
-
-- **Ollama** (если в `.env`): скрипт стека вызывает `miniapp/scripts/ensure-ollama.sh` / `miniapp\scripts\windows\ensure-ollama.bat`.
-
-## Запуск сайта (`website/`)
-
-Через полный стек — см. выше. Вручную для разработки:
+Единый скрипт верификации (изоляция зависимостей в временных venv):
 
 ```bash
-cd website
-python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env        # при необходимости (файл в каталоге website/)
-python main.py
+./scripts/verify.sh
 ```
 
-Браузер: [http://127.0.0.1:8765](http://127.0.0.1:8765) — подробности в [website/README.md](website/README.md).
+Он устанавливает зависимости мини-приложения и сайта, выполняет `compileall` и pytest:
 
-## Структура проекта
+- `tests/miniapp` — смоук-тесты бэкенда мини-приложения  
+- `tests/website` — смоук-тесты изолированного пакета `website/app`
+
+Вручную:
+
+```bash
+pip install -r miniapp/requirements.txt "pytest>=8,<9"
+pytest tests/miniapp -q
+```
+
+Для пакета сайта — отдельное окружение и `pip install -r website/requirements.txt`, затем `pytest tests/website -q`.
+
+Политика уязвимостей и контакты: **[SECURITY.md](SECURITY.md)**.
+
+---
+
+## Отдельный веб-сервер (каталог website)
+
+Для отладки только веб-пакета без общего `miniapp` можно запустить **`python main.py`** из каталога **`website/`** (порт по умолчанию **8765**). База и сессии в этом режиме отделены от unified-стека — см. [website/README.md](website/README.md).
+
+В повседневной разработке обычно достаточно **`miniapp/run.py`** на порту **8000**.
+
+---
+
+## Эксплуатация в продакшене
+
+- Надёжный **`JWT_SECRET`**, файл **`.env`** не попадает в систему контроля версий.
+- Транспорт **HTTPS** (nginx, Caddy, облачный балансировщик).
+- Ограничьте **CORS** доверенными источниками.
+- Задайте корректный **`HH_USER_AGENT`** для соответствия требованиям hh.ru.
+
+---
+
+## Документация по подпроектам
+
+| Документ | Содержание |
+|----------|------------|
+| [miniapp/README.md](miniapp/README.md) | Структура мини-приложения, фронт, `wibe_work`, данные |
+| [miniapp/bot/README.md](miniapp/bot/README.md) | Telegram-бот и Web App |
+| [website/README.md](website/README.md) | Изолированный веб-сервер, переменные, API |
+
+---
+
+## Структура каталогов (обзор)
 
 ```
-wibe-work/
-├── tests/                      # дымовые тесты (miniapp / website отдельно)
-├── scripts/verify.sh           # локальная проверка как в CI
-├── .github/workflows/ci.yml    # GitHub Actions
-├── launch files/
-│   ├── launch-stack.sh / .bat  # единственная точка входа: весь стек
-│   └── stack/                  # внутренние шаги (ngrok, бот, сайт) — не вызывать вручную
+VibeWork/
+├── README.md
+├── LICENSE
+├── SECURITY.md
+├── scripts/
+│   └── verify.sh          # локальная верификация (venv + pytest)
+├── launch files/          # сценарии запуска стека
+├── tests/
+│   ├── miniapp/
+│   └── website/
 ├── miniapp/
-│   ├── README.md
-│   ├── run.py                  # запуск API миниаппы
-│   ├── requirements.txt        # зависимости API и бота
-│   ├── .env.example            # шаблон переменных (копировать в корень .env)
-│   ├── backend/wibe_work/      # пакет FastAPI
-│   ├── frontend/               # статика мини-приложения
-│   ├── data/                   # SQLite и JSON миниаппы
+│   ├── run.py             # точка входа API :8000
+│   ├── terminal_theme.py # цветной вывод в терминал (run.py, bot.py)
+│   ├── requirements.txt
+│   ├── backend/wibe_work/ # основной пакет FastAPI
+│   │   └── services/
+│   │       ├── llm_client.py   # вызовы chat/completions
+│   │       └── llm_prompts.py  # системные промпты ИИ
+│   ├── frontend/          # Mini App
 │   ├── bot/
-│   │   ├── README.md
-│   │   └── bot.py
-│   └── scripts/                # ensure-ollama, extract-frontend-rar, windows/
+│   ├── data/
+│   └── scripts/
 └── website/
-    ├── README.md
-    ├── main.py
-    ├── requirements.txt
-    ├── app/                    # FastAPI (CareerCompass)
-    ├── frontend/
-    └── data/                   # SQLite сайта (vibework.db)
+    ├── main.py            # опционально :8765
+    ├── app/
+    └── frontend/
 ```
 
-## Полезные URL (локально)
+---
 
-| URL | Назначение |
-|-----|------------|
-| http://127.0.0.1:8000/miniapp/ | Мини-приложение |
-| http://127.0.0.1:8000/docs | Swagger |
-| http://127.0.0.1:8000/openapi.json | OpenAPI-схема |
-| http://127.0.0.1:8000/api/health/llm | Настроен ли LLM (в т.ч. Ollama) |
+## Лицензия и безопасность
 
-## Продакшен
-
-- Задайте надёжный `JWT_SECRET` и не коммитьте `.env`.
-- Раздавайте приложение за reverse proxy (nginx, Caddy) с HTTPS.
-- Ограничьте CORS под ваши домены (сейчас в коде разрешены все источники — удобно для разработки, для прода это нужно сузить).
-
-## Лицензия
-
-См. файл [LICENSE](LICENSE) (MIT). При необходимости замените год и формулировку правообладателя.
+- Лицензия: **[LICENSE](LICENSE)** (MIT).
+- Сообщения об уязвимостях: см. **[SECURITY.md](SECURITY.md)**.

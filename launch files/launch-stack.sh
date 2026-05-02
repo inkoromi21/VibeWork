@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # Единая точка входа: весь стек на macOS (четыре окна Terminal — API, ngrok, бот, сайт).
-# Бот и миниаппа — корневой venv; сайт — website/.venv (создаётся при первом запуске).
 set -e
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STACK_DIR="$REPO_ROOT/launch files/stack"
 cd "$REPO_ROOT"
+
+c_grn='\033[92;1m'
+c_cya='\033[96;1m'
+c_dim='\033[2m'
+c_red='\033[91;1m'
+c_rst='\033[0m'
 
 if [ ! -d venv ]; then
   python3 -m venv venv
@@ -13,19 +18,18 @@ fi
 
 WEB_ROOT="$REPO_ROOT/website"
 if [ -d "$WEB_ROOT" ] && [ ! -x "$WEB_ROOT/.venv/bin/python" ] && [ ! -x "$WEB_ROOT/venv/bin/python" ]; then
-  echo "Готовлю website/.venv (первый запуск)…"
+  echo -e "${c_cya}▶ Первый запуск: создаю website/.venv…${c_rst}"
   python3 -m venv "$WEB_ROOT/.venv"
   "$WEB_ROOT/.venv/bin/pip" install -q -r "$WEB_ROOT/requirements.txt"
 fi
 
 bash "$REPO_ROOT/miniapp/scripts/ensure-ollama.sh" "$REPO_ROOT" || true
-export HH_USER_AGENT="${HH_USER_AGENT:-WibeWork/1.0 (+https://api.hh.ru)}"
+export HH_USER_AGENT="${HH_USER_AGENT:-VibeWork/1.0 (+https://api.hh.ru)}"
 
-# Снять старый uvicorn / другой процесс на :8000 (иначе «address already in use»).
 if command -v lsof >/dev/null 2>&1; then
   pids=$(lsof -ti tcp:8000 -sTCP:LISTEN 2>/dev/null || true)
   if [ -n "$pids" ]; then
-    echo "Порт 8000 занят — завершаю процесс(ы): $pids"
+    echo -e "${c_cya}▶ Порт 8000 занят — завершаю PID: $pids${c_rst}"
     kill $pids 2>/dev/null || true
     sleep 0.5
     pids=$(lsof -ti tcp:8000 -sTCP:LISTEN 2>/dev/null || true)
@@ -35,8 +39,9 @@ if command -v lsof >/dev/null 2>&1; then
   fi
 fi
 
-# Один блок AppleScript: несколько do script — отдельные окна (API → ngrok → бот → сайт).
-echo "🚀 Открываю четыре окна Terminal (API :8000, ngrok→8000, бот, сайт :${PORT:-8765})…"
+echo -e "${c_cya}▶ Открываю четыре окна Terminal…${c_rst}"
+echo -e "${c_dim}  API :8000 · ngrok →8000 · Telegram-бот · сайт :${PORT:-8765}${c_rst}"
+
 if ! osascript <<EOF
 tell application "Terminal"
     activate
@@ -50,16 +55,13 @@ tell application "Terminal"
 end tell
 EOF
 then
-  echo ""
-  echo "Не удалось открыть окна через Терминал.app."
-  echo "Частые причины на macOS:"
-  echo "  • Запуск из Cursor/другого терминала: Системные настройки → Конфиденциальность и безопасность → Автоматизация — разрешите этому приложению управлять «Терминалом»."
-  echo "  • В Терминале: Настройки → Обычные → снимите «Во вкладках предпочтительнее», если нужны именно отдельные окна, а не вкладки в одном окне."
+  echo -e "${c_red}✗ Не удалось открыть окна через Терминал.app${c_rst}" >&2
+  echo -e "${c_dim}  macOS: Системные настройки → Автоматизация — разрешите управление «Терминалом».${c_rst}" >&2
   exit 1
 fi
 
 echo ""
-echo "Готово. Проверьте четыре окна Terminal."
-echo "  API:     http://127.0.0.1:8000/miniapp/"
-echo "  ngrok:   веб-интерфейс туннелей http://127.0.0.1:4040 (бот берёт HTTPS-URL отсюда)"
-echo "  Сайт:    http://127.0.0.1:${PORT:-8765}"
+echo -e "${c_grn}✓ Готово${c_rst}"
+echo -e "${c_dim}  API    http://127.0.0.1:8000/miniapp/${c_rst}"
+echo -e "${c_dim}  ngrok  http://127.0.0.1:4040${c_rst}"
+echo -e "${c_dim}  Сайт   http://127.0.0.1:${PORT:-8765}${c_rst}"

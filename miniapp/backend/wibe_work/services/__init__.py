@@ -1,1 +1,1 @@
-# Career agent services: diagnostics, recommendations, navigator, job matching.
+# Сервисы wibe_work: диагностика, рекомендации, навигатор, подбор вакансий.

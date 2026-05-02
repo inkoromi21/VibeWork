@@ -1,4 +1,4 @@
-"""FastAPI: карьерный консультант для молодежи 16–22."""
+"""VibeWork: веб-часть (FastAPI), карьерный навигатор 16–22."""
 
 from __future__ import annotations
 
@@ -65,7 +65,7 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
-app = FastAPI(title="Youth Career Advisor", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="VibeWork", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

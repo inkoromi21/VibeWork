@@ -1,30 +1,39 @@
-# Telegram-бот
+# Telegram-бот VibeWork
 
-Polling-бот для кнопки **Web App**: открывает мини-приложение VibeWork по URL `{PUBLIC_BASE_URL}/miniapp/`.
+Бот открывает **Telegram Mini App** по адресу **`{PUBLIC_BASE_URL}/miniapp/`** (кнопка Web App). Для работы должен быть доступен HTTP(S) API того же проекта.
 
-## Требования
+## Предварительные условия
 
-- Запущенный **API** из корня репозитория (`python miniapp/run.py`, порт **8000**), если поднимаете бота отдельно.
-- В корне репозитория файл **`.env`** с `TELEGRAM_BOT_TOKEN` (и при необходимости `PUBLIC_BASE_URL`).
+1. **Запущенный backend** — как правило **`python miniapp/run.py`** из корня репозитория (порт **8000**), если бот не поднимается единым скриптом стека.
+2. **Файл `.env` в корне репозитория** с минимум:
+   - `TELEGRAM_BOT_TOKEN` — токен от [@BotFather](https://t.me/BotFather);
+   - `PUBLIC_BASE_URL` — публичный базовый URL API (для Telegram на устройстве — **HTTPS**, например через ngrok).
 
-Пакет `wibe_work` подхватывается из `miniapp/backend/` через `sys.path`.
+Пакет **`wibe_work`** подключается из `miniapp/backend/` через изменение `sys.path` в **`bot.py`**.
+
+---
 
 ## Запуск
 
-Обычно бот поднимается вместе со всем стеком из корня репозитория:
+В консоли при старте выводятся помеченные строки: **▶ Запуск** → при успехе **✓ Бот запущен** с URL и маской токена; при ошибке — **✗** и подсказка (см. `miniapp/terminal_theme.py`).
 
-```bash
-bash "launch files/launch-stack.sh"
-```
+**Вместе со стеком** (API, при необходимости туннель и бот):
 
-Windows: `launch files\launch-stack.bat`
+- Linux/macOS: `bash "launch files/launch-stack.sh"`
+- Windows: `launch files\launch-stack.bat`
 
-Для отладки вручную (из корня, активированный `venv`):
+**Только бот** (при уже работающем API), из корня с активированным `venv`:
 
 ```bash
 python miniapp/bot/bot.py
 ```
 
+Полная инструкция по окружению и ngrok: **[README в корне репозитория](../../README.md)**.
+
+---
+
 ## Файлы
 
-- `bot.py` — точка входа. Полный запуск — только через **`launch files/launch-stack`**.
+| Файл | Назначение |
+|------|------------|
+| `bot.py` | Точка входа, long polling |

@@ -54,6 +54,7 @@ def get_db():
 
 
 _PROFILE_EXTRA_COLS = [
+    ("nickname", "TEXT"),
     ("main_sphere", "TEXT"),
     ("education_detail", "TEXT"),
     ("preparation_level", "TEXT"),
@@ -324,5 +325,18 @@ def init_db():
             payload_json TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )"""
+        )
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+            session_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            title TEXT NOT NULL DEFAULT '',
+            messages_json TEXT NOT NULL DEFAULT '[]',
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        )"""
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ai_chat_sessions_user ON ai_chat_sessions(user_id, updated_at DESC)"
         )
         conn.commit()

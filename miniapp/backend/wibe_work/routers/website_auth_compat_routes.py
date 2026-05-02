@@ -1,14 +1,6 @@
-"""Совместимость с website/frontend: /api/auth/* + cookie-сессия + JSON-снапшот.
+"""Вход и снимок профиля для веб-фронта: те же URL, что ожидает `website/frontend`.
 
-Сайт (website/frontend/script.js) ожидает:
-- POST /api/auth/register {email,password} -> ok
-- POST /api/auth/login    {email,password} -> ok
-- POST /api/auth/logout
-- GET  /api/auth/me -> {authenticated,email,snapshot}
-- PUT  /api/auth/snapshot -> merge JSON в снапшот
-
-Хранилище: таблицы miniapp SQLite: email_users, vibework_sessions, vibework_snapshots.
-"""
+Данные в SQLite миниаппы: email_users, vibework_sessions, vibework_snapshots."""
 
 from __future__ import annotations
 

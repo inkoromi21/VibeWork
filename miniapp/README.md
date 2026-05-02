@@ -1,21 +1,50 @@
-# Мини-приложение Telegram (VibeWork)
+# Мини-приложение VibeWork
 
-Карьерный навигатор в Telegram: **REST API** (`wibe_work`), **Web App** (статика) и **бот** (long polling). Всё, что относится к миниаппе, лежит в этой папке.
+Каталог содержит **основной backend-пакет** (`wibe_work`), **фронтенд Telegram Mini App**, **Telegram-бота**, служебные **скрипты** и каталог **данных**. Это ядро продукта в составе монорепозитория VibeWork.
 
-## Структура
+## Роль в монорепозитории
+
+Точка входа HTTP — **`python miniapp/run.py`** из **корня репозитория** (порт **8000**). Один процесс отдаёт:
+
+- веб-интерфейс с корня (`website/frontend/`);
+- Mini App по пути **`/miniapp/`**;
+- единый REST API и OpenAPI (**`/docs`**).
+
+Файл конфигурации — **`.env` в корне репозитория** (шаблон: `miniapp/.env.example`). Зависимости Python: **`miniapp/requirements.txt`**.
+
+Полная картина запуска, переменных окружения и продакшена: **[README в корне](../README.md)**.
+
+---
+
+## Структура каталога
 
 | Путь | Назначение |
 |------|------------|
-| `backend/wibe_work/` | Пакет FastAPI: маршруты, БД, интеграции (HH, LLM и т.д.) |
-| `frontend/` | Мини-приложение (`index.html` и ресурсы), отдаётся с `GET /miniapp/` |
-| `data/` | SQLite и JSON-данные миниаппы (создаётся при работе; старый `data/` в корне репо подхватывается при миграции) |
-| `bot/` | Telegram-бот — [bot/README.md](bot/README.md) |
-| `scripts/` | Ollama, распаковка RAR, Windows-обёртки |
+| `backend/wibe_work/` | Пакет FastAPI: профиль, авторизация, интеграции (hh.ru, LLM), маршруты для фронта |
+| `backend/wibe_work/services/llm_prompts.py` | Единый файл системных промптов для ИИ (чат, разбор, заголовки сессий) |
+| `terminal_theme.py` | Цветной вывод в терминал для `run.py` и `bot/bot.py` |
+| `frontend/` | Статика Mini App (маршрут `GET /miniapp/`) |
+| `data/` | Рабочие данные по умолчанию (SQLite и прочее — см. код и `.env`) |
+| `bot/` | Long polling Telegram; см. [bot/README.md](bot/README.md) |
+| `scripts/` | Вспомогательные сценарии (например, Ollama на Windows/Linux) |
+| `run.py` | Запуск uvicorn на `0.0.0.0:8000` |
 
-Файл **`.env`** для API и бота — в **корне монорепозитория**. Шаблон: из корня выполните **`cp miniapp/.env.example .env`**.
-
-Зависимости: **`miniapp/requirements.txt`** (`pip install -r miniapp/requirements.txt` из корня при активном корневом `venv`).
+---
 
 ## Запуск
 
-Из **корня**: полный стек — `bash "launch files/launch-stack.sh"` (Windows: `launch files\launch-stack.bat`); только API для отладки — `python miniapp/run.py`. Подробнее — [README.md](../README.md).
+Из корня репозитория (с активированным виртуальным окружением):
+
+```bash
+python miniapp/run.py
+```
+
+Полный стек (API, при необходимости туннель и бот) — скрипты в **`launch files/`** в корне репозитория.
+
+---
+
+## Связанная документация
+
+- [Корневой README](../README.md) — архитектура, быстрый старт, LLM, тесты  
+- [Telegram-бот](bot/README.md) — токены и запуск бота  
+- [Веб-пакет изолированно](../website/README.md) — режим `website/main.py` на отдельном порту

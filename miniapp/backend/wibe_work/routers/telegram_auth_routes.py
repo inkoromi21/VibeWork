@@ -42,11 +42,7 @@ def _get_or_create_user_id_for_telegram_id(tid: int, first_name: str, username: 
 
 
 def _upsert_tg_user(telegram_id: int, first_name: str, username: str, user_key: str) -> None:
-    """
-    Legacy helper (оставлен для совместимости импорта).
-
-    В новых запросах используем `_get_or_create_user_id_for_telegram_id`.
-    """
+    """Старый хелпер; живёт для старых импортов — новый код через `_get_or_create_user_id_for_telegram_id`."""
     now = datetime.now(timezone.utc).isoformat()
     with get_db() as conn:
         conn.execute(

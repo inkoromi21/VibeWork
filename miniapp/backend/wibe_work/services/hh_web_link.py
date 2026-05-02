@@ -1,9 +1,11 @@
+"""Ссылка на поиск веб-интерфейса hh.ru и демо-вакансии, если API hh недоступен."""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Dict, Optional
 from urllib.parse import urlencode
 
+from wibe_work.services.hh_filter import HH_EXPERIENCE_API_IDS
 
 _CITY_TO_AREA_ID: dict[str, int] = {
     "москва": 1,
@@ -81,14 +83,12 @@ def build_hh_web_search_url(
     city: Optional[str] = None,
     only_remote: bool = False,
     only_entry_level: bool = False,
+    hh_experience: Optional[str] = None,
     min_salary: Optional[int] = None,
     work_format: Optional[str] = None,
     level: Optional[str] = None,
 ) -> str:
-    """
-    Генерит ссылку на web-поиск hh.ru без обращений к API hh.ru (важно при блокировках).
-    Параметры "могут" быть проигнорированы hh.ru, но ссылка остаётся полезной.
-    """
+    """Собирает URL поиска на hh.ru (без запросов к API — только query string)."""
     q: Dict[str, Any] = {}
     if text:
         q["text"] = str(text).strip()
@@ -110,6 +110,12 @@ def build_hh_web_search_url(
 
     if only_entry_level:
         q["experience"] = "noExperience"
+    elif hh_experience is not None:
+        hx = str(hh_experience).strip()
+        if hx.lower() == "entry":
+            q["experience"] = "noExperience"
+        elif hx and hx.lower() != "any" and hx in HH_EXPERIENCE_API_IDS:
+            q["experience"] = hx
     else:
         exp = _experience_for_level(level)
         if exp:
@@ -123,7 +129,7 @@ def build_hh_web_search_url(
 
 
 def demo_hh_items(hh_search_url: str) -> list[dict[str, Any]]:
-    """Небольшой демо-лист, если hh API недоступен."""
+    """Три фейковые карточки под тот же формат, что ждёт фронт."""
     return [
         {
             "id": "demo_1",

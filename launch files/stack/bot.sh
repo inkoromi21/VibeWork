@@ -3,29 +3,33 @@
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
+
+c_red='\033[91;1m'
+c_dim='\033[2m'
+c_rst='\033[0m'
+
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "Нужен python3 в PATH"
+  echo -e "${c_red}✗ Нужен python3 в PATH${c_rst}"
   exit 1
 fi
 if [ ! -d venv ]; then
   python3 -m venv venv
 fi
 ./venv/bin/python -m pip install -q -r miniapp/requirements.txt
-export HH_USER_AGENT="${HH_USER_AGENT:-WibeWork/1.0 (+https://api.hh.ru)}"
+export HH_USER_AGENT="${HH_USER_AGENT:-VibeWork/1.0 (+https://api.hh.ru)}"
 
 if [ ! -f "$REPO_ROOT/.env" ]; then
-  echo ""
-  echo "Нет файла .env в корне репозитория ($REPO_ROOT)."
-  echo "Создайте:  cp miniapp/.env.example .env"
-  echo "Откройте .env и укажите TELEGRAM_BOT_TOKEN (токен от @BotFather в Telegram)."
-  echo ""
+  echo -e "${c_red}✗ Нет .env в корне ($REPO_ROOT)${c_rst}"
+  echo -e "${c_dim}  cp miniapp/.env.example .env — затем TELEGRAM_BOT_TOKEN от @BotFather${c_rst}"
   exit 1
 fi
 if ! grep -qE '^[[:space:]]*TELEGRAM_BOT_TOKEN=[^[:space:]]' "$REPO_ROOT/.env"; then
-  echo ""
-  echo "В $REPO_ROOT/.env не задан TELEGRAM_BOT_TOKEN (строка не должна быть пустой после =)."
-  echo ""
+  echo -e "${c_red}✗ В .env не задан TELEGRAM_BOT_TOKEN${c_rst}"
   exit 1
 fi
 
-exec ./venv/bin/python miniapp/bot/bot.py
+./venv/bin/python miniapp/bot/bot.py || {
+  ec=$?
+  echo -e "${c_red}✗ Ошибка запуска бота (код $ec)${c_rst}"
+  exit "$ec"
+}

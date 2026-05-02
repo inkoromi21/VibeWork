@@ -1,9 +1,6 @@
-"""API для website/frontend (CareerCompass) внутри единого backend.
+"""HTTP API веб-части: /api/analyze, /api/chat, … (тот же процесс, что и миниаппа).
 
-Роуты копируют контракт website/app/main.py, чтобы сайт продолжил работать без правок фронта.
-Реализация импортирует логику из пакета website/app (модуль `app.*`), который добавляется в sys.path
-в `miniapp/run.py`.
-"""
+Код в `website/app` (в `miniapp/run.py` папка `website/` в sys.path как пакет `app`)."""
 
 from __future__ import annotations
 
@@ -12,7 +9,6 @@ from fastapi import APIRouter, HTTPException, Query
 from wibe_work.services.hh_web_link import build_hh_web_search_url
 
 try:
-    # website/ package provides "app" module
     from app.api_schemas import (  # type: ignore
         AnalysisResult,
         ChatRequest,
@@ -40,7 +36,7 @@ try:
     from app.mts_tracks_catalog import MtsTrack, load_mts_tracks  # type: ignore
     from app.questionnaire_fields import get_profile_schema  # type: ignore
 except Exception as e:  # pragma: no cover
-    # Если сайт не установлен в sys.path, роутер всё равно импортируется, но отдаёт 500 на вызовах.
+    # Нет папки website/ или не ставили зависимости — роутер есть, но вызовы упадут.
     _IMPORT_ERROR = e
 else:
     _IMPORT_ERROR = None

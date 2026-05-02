@@ -1,7 +1,7 @@
 from typing import Optional
 
 import requests
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from wibe_work.bearer_auth import require_bearer_matches_user
 from wibe_work.sqlite_db import get_db
@@ -9,7 +9,7 @@ from wibe_work.api_schemas import CompetencyBulkRequest
 from wibe_work.services.agent_orchestrator import build_full_report
 from wibe_work.services.career_navigator import build_navigator
 from wibe_work.services.diagnostics import run_diagnostics
-from wibe_work.services.hh_client import search_vacancies, slim_vacancy_items
+from wibe_work.services.hh_client import search_vacancies, slim_vacancy_items, suggest_areas
 from wibe_work.services.hh_filter import (
     build_filter_bundle,
     can_finalize_hh_filter,
@@ -26,6 +26,12 @@ from wibe_work.services.recommendations import run_recommendations
 from wibe_work.services.user_context import load_competencies, load_profile
 
 router = APIRouter(prefix="/career", tags=["career_agent"])
+
+
+@router.get("/hh/area-suggest")
+async def hh_area_suggest(q: str = Query("", max_length=120)):
+    """Подсказки городов и регионов РФ через API hh.ru (префиксный поиск как на hh.ru)."""
+    return {"items": suggest_areas(q.strip(), limit=15)}
 
 
 def _v(request: Request, user_id: str) -> None:
@@ -91,6 +97,7 @@ async def get_hh_live_jobs(
     per_page: int = 15,
     only_remote: bool = False,
     only_entry_level: bool = False,
+    hh_experience: Optional[str] = None,
     min_salary: Optional[int] = None,
     strict_work_format: bool = False,
     hh_city: Optional[str] = None,
@@ -103,6 +110,7 @@ async def get_hh_live_jobs(
             user_id,
             only_remote=only_remote,
             only_entry_level=only_entry_level,
+            hh_experience=hh_experience,
             min_salary=min_salary,
             strict_work_format=strict_work_format,
             page=page,
@@ -112,7 +120,7 @@ async def get_hh_live_jobs(
         )
     except requests.exceptions.HTTPError as e:
         code = e.response.status_code if e.response is not None else None
-        # Фоллбек: если hh API заблокирован/403 — показываем демо и даём web-ссылку.
+        # hh не ответил — отдаём демо-карточки и ссылку на поиск на hh.ru
         profile = load_profile(user_id) or {}
         text = (
             (profile.get("target_direction") or "")
@@ -126,6 +134,7 @@ async def get_hh_live_jobs(
             city=str(city) if city else None,
             only_remote=only_remote,
             only_entry_level=only_entry_level,
+            hh_experience=hh_experience,
             min_salary=min_salary,
             work_format="remote" if only_remote else None,
             level="стажер" if only_entry_level else None,
@@ -156,6 +165,7 @@ async def get_hh_live_jobs(
             city=str(city) if city else None,
             only_remote=only_remote,
             only_entry_level=only_entry_level,
+            hh_experience=hh_experience,
             min_salary=min_salary,
             work_format="remote" if only_remote else None,
             level="стажер" if only_entry_level else None,
