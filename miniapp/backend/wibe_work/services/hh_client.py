@@ -1,15 +1,75 @@
-from typing import Any, Dict, List, Optional
+import threading
+import time
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
-from wibe_work.config import HH_API_BASE, HH_USER_AGENT
+from wibe_work.config import (
+    HH_API_BASE,
+    HH_APP_ACCESS_TOKEN,
+    HH_CLIENT_ID,
+    HH_CLIENT_SECRET,
+    HH_USER_AGENT,
+)
+
+_token_lock = threading.Lock()
+_cached_bearer: Optional[str] = None
+_cached_bearer_expires_at: float = 0.0
 
 
-def _headers() -> Dict[str, str]:
+def _base_headers() -> Dict[str, str]:
     return {
         "User-Agent": HH_USER_AGENT,
         "Accept": "application/json",
+        "Accept-Language": "ru-RU",
     }
+
+
+def _fetch_client_credentials_token() -> Tuple[str, int]:
+    """POST /token — application/x-www-form-urlencoded (OpenAPI hh.ru)."""
+    r = requests.post(
+        f"{HH_API_BASE}/token",
+        data={
+            "grant_type": "client_credentials",
+            "client_id": HH_CLIENT_ID,
+            "client_secret": HH_CLIENT_SECRET,
+        },
+        headers=_base_headers(),
+        timeout=20,
+    )
+    r.raise_for_status()
+    data = r.json()
+    token = data.get("access_token")
+    if not token:
+        raise ValueError("hh.ru /token: missing access_token in response")
+    expires_in = int(data.get("expires_in") or 0)
+    return str(token), expires_in
+
+
+def _resolve_bearer() -> Optional[str]:
+    if HH_APP_ACCESS_TOKEN:
+        return HH_APP_ACCESS_TOKEN
+    if not HH_CLIENT_ID or not HH_CLIENT_SECRET:
+        return None
+    global _cached_bearer, _cached_bearer_expires_at
+    now = time.time()
+    with _token_lock:
+        if _cached_bearer and now < _cached_bearer_expires_at:
+            return _cached_bearer
+        token, expires_in = _fetch_client_credentials_token()
+        _cached_bearer = token
+        # небольшой запас до истечения
+        ttl = max(60, expires_in - 300) if expires_in > 0 else 3600
+        _cached_bearer_expires_at = now + ttl
+        return _cached_bearer
+
+
+def _headers() -> Dict[str, str]:
+    h = dict(_base_headers())
+    bearer = _resolve_bearer()
+    if bearer:
+        h["Authorization"] = f"Bearer {bearer}"
+    return h
 
 
 def suggest_area_id(city: str) -> Optional[str]:

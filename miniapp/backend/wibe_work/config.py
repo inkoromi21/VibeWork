@@ -10,6 +10,12 @@ HH_USER_AGENT = os.environ.get(
 
 HH_API_BASE = "https://api.hh.ru"
 
+# Опционально: токен приложения (https://dev.hh.ru/admin) или client_id/client_secret
+# для POST https://api.hh.ru/token (grant_type=client_credentials). См. docs в репозитории hhru/api.
+HH_APP_ACCESS_TOKEN = os.environ.get("HH_APP_ACCESS_TOKEN", "").strip()
+HH_CLIENT_ID = os.environ.get("HH_CLIENT_ID", "").strip()
+HH_CLIENT_SECRET = os.environ.get("HH_CLIENT_SECRET", "").strip()
+
 HH_FINALIZE_MIN_COMPLETENESS = float(os.environ.get("HH_FINALIZE_MIN_COMPLETENESS", "0.55"))
 
 HH_MIN_POLL_ANSWERS = int(os.environ.get("HH_MIN_POLL_ANSWERS", "0"))
