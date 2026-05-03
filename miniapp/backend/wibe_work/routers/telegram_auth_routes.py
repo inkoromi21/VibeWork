@@ -77,7 +77,14 @@ async def auth_telegram(data: dict):
             raise HTTPException(400, detail="init_data должен быть строкой")
         if bot_token:
             if not validate_webapp_init_data(init_data, bot_token):
-                raise HTTPException(status_code=403, detail="Неверная подпись init_data")
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        "Неверная подпись Mini App (init_data). Проверьте в .env TELEGRAM_BOT_TOKEN "
+                        "— он должен быть от того же бота, через которого открыто приложение; "
+                        "после смены токена перезапустите API."
+                    ),
+                )
         tid, fn, un = parse_init_data_user_fields(init_data)
         if tid is None:
             raise HTTPException(400, detail="Не удалось разобрать init_data")

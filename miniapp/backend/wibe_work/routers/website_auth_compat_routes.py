@@ -14,6 +14,7 @@ import bcrypt
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, field_validator
 
+from wibe_work.password_input import sanitize_password_input
 from wibe_work.sqlite_db import get_db
 from wibe_work.telegram_init_data import parse_init_data_user_id
 
@@ -177,7 +178,13 @@ def require_user_id(vw_session: str | None = Cookie(default=None)) -> str:
 async def register(body: RegisterBody, response: Response):
     user_id = "u_" + uuid.uuid4().hex
     now = datetime.now(timezone.utc).isoformat()
-    pw = _hash_password(body.password)
+    raw_pw = sanitize_password_input(body.password)
+    if len(raw_pw) < 8:
+        raise HTTPException(
+            status_code=422,
+            detail="Пароль не короче 8 символов.",
+        )
+    pw = _hash_password(raw_pw)
     with get_db() as conn:
         dup = conn.execute(
             "SELECT user_id FROM email_users WHERE email = ?",
@@ -203,6 +210,7 @@ async def register(body: RegisterBody, response: Response):
 
 @router.post("/login")
 async def login(body: LoginBody, response: Response):
+    raw_pw = sanitize_password_input(body.password)
     with get_db() as conn:
         row = conn.execute(
             "SELECT user_id, password_hash FROM email_users WHERE email = ?",
@@ -210,7 +218,7 @@ async def login(body: LoginBody, response: Response):
         ).fetchone()
     if not row:
         raise HTTPException(status_code=401, detail="Аккаунт не найден")
-    if not _verify_password(body.password, str(row["password_hash"])):
+    if not _verify_password(raw_pw, str(row["password_hash"])):
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
     user_id = str(row["user_id"])
     token, _exp_iso = _create_cookie_session(user_id)
