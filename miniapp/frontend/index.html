@@ -12,19 +12,50 @@
             tg.ready();
             tg.expand();
             document.documentElement.setAttribute('data-tg-webapp', '1');
-            var tp = tg.themeParams || {};
-            var root = document.documentElement;
-            if (tp.bg_color) root.style.setProperty('--bg-page', tp.bg_color);
-            if (tp.text_color) root.style.setProperty('--text', tp.text_color);
-            if (tp.hint_color) root.style.setProperty('--text-muted', tp.hint_color);
-            if (tp.secondary_bg_color) root.style.setProperty('--card', tp.secondary_bg_color);
-            if (tp.section_bg_color) root.style.setProperty('--border', tp.section_bg_color);
-            if (tp.link_color) {
-                root.style.setProperty('--accent', tp.link_color);
-                root.style.setProperty('--neon', tp.link_color);
-                root.style.setProperty('--field-outline', tp.link_color);
+
+            /** Всегда светлая тема: Telegram при тёмном клиенте выставляет --tg-theme-* и фон WebView. */
+            function forceLightTelegramUi() {
+                var root = document.documentElement;
+                if (typeof tg.setBackgroundColor === 'function') {
+                    tg.setBackgroundColor('#ffffff');
+                }
+                if (typeof tg.setHeaderColor === 'function') {
+                    tg.setHeaderColor('#ffffff');
+                }
+                var tgVars = [
+                    ['--tg-theme-bg-color', '#ffffff'],
+                    ['--tg-theme-text-color', '#000000'],
+                    ['--tg-theme-hint-color', '#707579'],
+                    ['--tg-theme-link-color', '#2481cc'],
+                    ['--tg-theme-button-color', '#22c55e'],
+                    ['--tg-theme-button-text-color', '#ffffff'],
+                    ['--tg-theme-secondary-bg-color', '#f4f4f5'],
+                    ['--tg-theme-header-bg-color', '#ffffff'],
+                    ['--tg-theme-bottom-bar-bg-color', '#ffffff'],
+                    ['--tg-theme-accent-text-color', '#15803d'],
+                    ['--tg-theme-section-bg-color', '#ffffff'],
+                    ['--tg-theme-section-header-text-color', '#000000'],
+                    ['--tg-theme-section-separator-color', '#dbdada'],
+                    ['--tg-theme-subtitle-text-color', '#707579'],
+                    ['--tg-theme-destructive-text-color', '#ac3e46']
+                ];
+                for (var i = 0; i < tgVars.length; i++) {
+                    root.style.setProperty(tgVars[i][0], tgVars[i][1]);
+                }
+                root.style.setProperty('--bg-page', '#ffffff');
+                root.style.setProperty('--card', '#ffffff');
+                root.style.setProperty('--text', '#000000');
+                root.style.setProperty('--text-muted', '#4a4a4a');
+                root.style.setProperty('--border', '#dbdada');
+                root.style.setProperty('--btn-anketa-bg', '#ecfdf5');
+                root.style.setProperty('--btn-anketa-bg-hover', '#d1fae5');
+                root.style.setProperty('--btn-anketa-bg-selected', '#d1fae5');
+                root.style.setProperty('--accent-soft', 'rgba(34, 197, 94, 0.14)');
             }
-            if (tp.button_color) root.style.setProperty('--btn-primary-border', tp.button_color);
+            forceLightTelegramUi();
+            if (typeof tg.onEvent === 'function') {
+                tg.onEvent('themeChanged', forceLightTelegramUi);
+            }
         } catch (e) {}
     })();
     </script>
@@ -79,6 +110,9 @@
             --btn-anketa-radius: 999px;
         }
         * { box-sizing: border-box; }
+        html {
+            color-scheme: light;
+        }
         html, body { margin: 0; min-height: 100%; }
         body {
             font-family: var(--font);
