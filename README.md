@@ -200,7 +200,7 @@ pytest tests/miniapp -q
 ## Эксплуатация в продакшене
 
 - Надёжный **`JWT_SECRET`**, файл **`.env`** не попадает в систему контроля версий.
-- Транспорт **HTTPS** (nginx, Caddy, облачный балансировщик).
+- Транспорт **HTTPS** — готовый пример nginx и certbot: **[deploy/VPS-HTTPS.md](deploy/VPS-HTTPS.md)** (скрипт `deploy/setup-https.sh`, конфиг `deploy/nginx/vibework.conf`).
 - Ограничьте **CORS** доверенными источниками.
 - Задайте корректный **`HH_USER_AGENT`** для соответствия требованиям hh.ru.
 
