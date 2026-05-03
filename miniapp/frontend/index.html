@@ -498,6 +498,16 @@
             padding: 22px 22px 40px;
             overflow-x: hidden;
         }
+        /* Главная «Разделы»: на ПК шире колонка и крупнее карточки */
+        .shell.shell--hub {
+            max-width: min(1240px, 100%);
+            margin-left: auto;
+            margin-right: auto;
+            width: 100%;
+            padding-left: clamp(20px, 4vw, 56px);
+            padding-right: clamp(20px, 4vw, 56px);
+            padding-bottom: clamp(40px, 6vh, 72px);
+        }
         .vw-scroll-top {
             position: fixed;
             right: max(16px, env(safe-area-inset-right));
@@ -1459,38 +1469,106 @@
             font-size: .78rem;
             margin: 0;
         }
+        .hub-page {
+            width: 100%;
+        }
+        .hub-heading {
+            margin: 0 0 4px;
+            font-size: clamp(1.15rem, 2.2vw, 1.4rem);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--text);
+        }
+        .hub-lead {
+            margin: 0 0 16px;
+            font-size: clamp(0.82rem, 1.5vw, 0.9rem);
+            color: var(--text-muted);
+            line-height: 1.45;
+            max-width: 52ch;
+        }
         .hub-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
             gap: 14px;
-            margin-top: 8px;
+            margin-top: 4px;
         }
         .hub-card {
             display: flex;
             flex-direction: column;
             align-items: flex-start;
-            gap: 8px;
+            justify-content: flex-start;
+            gap: 10px;
             padding: 18px 16px;
-            /* Как у карточек контента (.profile-card), не «стадион» на всю ширину */
+            min-height: 0;
             border-radius: var(--radius-lg);
             border: 2px solid var(--btn-anketa-border-strong);
             background: var(--btn-anketa-bg);
             cursor: pointer;
             text-align: left;
             font-family: var(--font);
-            transition: border-color 0.18s, background 0.18s;
+            transition: border-color 0.18s, background 0.18s, transform 0.2s ease;
             box-shadow: none;
             appearance: none;
             -webkit-appearance: none;
         }
         .hub-card:hover {
-            border-color: var(--btn-anketa-border-strong);
+            border-color: var(--btn-primary-border);
             background: var(--btn-anketa-bg-hover);
-            box-shadow: none;
+            box-shadow: 0 8px 28px rgba(var(--neon-rgb), 0.12);
+            transform: translateY(-2px);
         }
         .hub-card-ico { font-size: 1.5rem; line-height: 1; }
         .hub-card-title { font-size: 1rem; font-weight: 700; color: var(--text); }
         .hub-card-hint { font-size: .78rem; color: var(--text-muted); line-height: 1.35; }
+        @media (min-width: 720px) {
+            .hub-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 18px;
+            }
+            .hub-card {
+                min-height: 132px;
+                padding: 20px 18px;
+            }
+            .hub-card-ico { font-size: 1.75rem; }
+            .hub-card-title { font-size: 1.05rem; }
+            .hub-card-hint { font-size: 0.8rem; }
+        }
+        @media (min-width: 1024px) {
+            .hub-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 22px 26px;
+            }
+            .hub-card {
+                min-height: 158px;
+                padding: 24px 22px;
+                gap: 12px;
+                border-radius: var(--radius-lg);
+            }
+            .hub-card-ico {
+                font-size: 2rem;
+                margin-bottom: 2px;
+            }
+            .hub-card-title { font-size: 1.1rem; }
+            .hub-card-hint {
+                font-size: 0.84rem;
+                line-height: 1.45;
+            }
+        }
+        @media (min-width: 1320px) {
+            .hub-grid {
+                gap: 26px 32px;
+            }
+            .hub-card {
+                min-height: 172px;
+                padding: 28px 26px;
+            }
+            .hub-card-ico { font-size: 2.125rem; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .hub-card:hover {
+                transform: none;
+            }
+        }
         /* Встроенные сообщения вместо alert() — полноэкранный слой в стиле приложения */
         .vw-msg-overlay {
             position: fixed;
@@ -2071,7 +2149,9 @@
             '<button type="button" class="btn-auth btn-auth-ghost" onclick="window.__vw.logout()">Выйти</button>' +
             '</div>' +
             '</header>' +
-            '<main class="shell" id="tabContent"></main>' +
+            '<main class="shell' +
+            (isHome ? ' shell--hub' : '') +
+            '" id="tabContent"></main>' +
             scrollTopBtnHtml +
             '</div></div>';
         refreshAnalysisFlag();
@@ -3999,8 +4079,11 @@
 
     function renderHomeTab() {
         const el = document.getElementById('tabContent');
-        let html = '<h2 style="margin-top:0">Разделы</h2>';
-        html += '<div class="hub-grid">';
+        let html =
+            '<div class="hub-page">' +
+            '<h2 class="hub-heading">Разделы</h2>' +
+            '<p class="hub-lead">Выберите блок — анкета, тесты, разбор, чат, вакансии или симулятор дня.</p>' +
+            '<div class="hub-grid">';
         for (let i = 0; i < SECTION_TABS.length; i++) {
             const t = SECTION_TABS[i];
             html +=
@@ -4014,7 +4097,7 @@
                 esc(tabTagline(t.id)) +
                 '</span></button>';
         }
-        html += '</div>';
+        html += '</div></div>';
         el.innerHTML = html;
         el.querySelectorAll('.hub-card[data-hub-tab]').forEach(function (btn) {
             btn.onclick = async function () {
