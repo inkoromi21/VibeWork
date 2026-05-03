@@ -3,7 +3,12 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 
-from wibe_work.telegram_init_data import check_telegram_auth, parse_init_data_user_id
+from wibe_work.jwt_service import create_access_token
+from wibe_work.telegram_init_data import (
+    check_telegram_auth,
+    parse_init_data_user_fields,
+    validate_webapp_init_data,
+)
 from wibe_work.sqlite_db import get_db
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -60,17 +65,24 @@ def _upsert_tg_user(telegram_id: int, first_name: str, username: str, user_key: 
 @router.post("/telegram/")
 async def auth_telegram(data: dict):
     """
-    Старая авторизация для мини-аппа: тело с полями Telegram Login или { "init_data": "..." }.
-    Возвращает фиктивный токен (как раньше).
+    Мини-апп Telegram: { "init_data": "<строка из Telegram.WebApp.initData>" } —
+    проверка подписи и JWT как у входа по почте.
+
+    Виджет Login в теле запроса (поля id, hash, …) — прежняя схема с проверкой hash.
     """
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     init_data = data.get("init_data")
     if init_data:
-        tid = parse_init_data_user_id(init_data)
+        if not isinstance(init_data, str):
+            raise HTTPException(400, detail="init_data должен быть строкой")
+        if bot_token:
+            if not validate_webapp_init_data(init_data, bot_token):
+                raise HTTPException(status_code=403, detail="Неверная подпись init_data")
+        tid, fn, un = parse_init_data_user_fields(init_data)
         if tid is None:
             raise HTTPException(400, detail="Не удалось разобрать init_data")
-        user_id = _get_or_create_user_id_for_telegram_id(tid, "", "")
-        return {"access_token": "fake_token", "user_id": user_id}
+        user_id = _get_or_create_user_id_for_telegram_id(tid, fn, un)
+        return {"access_token": create_access_token(user_id), "user_id": user_id}
 
     if not check_telegram_auth(data, bot_token):
         raise HTTPException(status_code=403, detail="Неверная подпись Telegram")
@@ -81,4 +93,4 @@ async def auth_telegram(data: dict):
     fn = str(data.get("first_name") or "")
     un = str(data.get("username") or "")
     user_id = _get_or_create_user_id_for_telegram_id(tid, fn, un)
-    return {"access_token": "fake_token", "user_id": user_id}
+    return {"access_token": create_access_token(user_id), "user_id": user_id}

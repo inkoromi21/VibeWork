@@ -12,6 +12,19 @@
             tg.ready();
             tg.expand();
             document.documentElement.setAttribute('data-tg-webapp', '1');
+            var tp = tg.themeParams || {};
+            var root = document.documentElement;
+            if (tp.bg_color) root.style.setProperty('--bg-page', tp.bg_color);
+            if (tp.text_color) root.style.setProperty('--text', tp.text_color);
+            if (tp.hint_color) root.style.setProperty('--text-muted', tp.hint_color);
+            if (tp.secondary_bg_color) root.style.setProperty('--card', tp.secondary_bg_color);
+            if (tp.section_bg_color) root.style.setProperty('--border', tp.section_bg_color);
+            if (tp.link_color) {
+                root.style.setProperty('--accent', tp.link_color);
+                root.style.setProperty('--neon', tp.link_color);
+                root.style.setProperty('--field-outline', tp.link_color);
+            }
+            if (tp.button_color) root.style.setProperty('--btn-primary-border', tp.button_color);
         } catch (e) {}
     })();
     </script>
@@ -3595,9 +3608,20 @@
         void (async function () {
             try {
                 await refreshCachedProfile();
+                let accountStatus = null;
+                try {
+                    const sr = await fetch(apiUrl('/auth/account/status'), {
+                        headers: apiFetchHeaders(),
+                    });
+                    if (sr.ok) accountStatus = await sr.json();
+                } catch (eSt) {}
+                const isTgApp = document.documentElement.getAttribute('data-tg-webapp') === '1';
                 const schema = await ensureSchema();
                 const p = cachedProfile || {};
-                const emailDisp = localStorage.getItem(USER_EMAIL_KEY) || '';
+                const emailDisp =
+                    (accountStatus && accountStatus.email) ||
+                    localStorage.getItem(USER_EMAIL_KEY) ||
+                    '';
                 const nickForInput = p.nickname != null && p.nickname !== '' ? String(p.nickname) : '';
                 const sphereLbl = labelMainSphere(schema, p.main_sphere) || '—';
                 let eduLbl = labelEducationDetail(schema, p.education_detail);
@@ -3615,9 +3639,50 @@
                 }
                 const ageStr = p.age != null && p.age !== '' ? String(p.age) : '—';
                 const cityStr = (p.city && String(p.city).trim()) || '—';
+                let syncCardHtml = '';
+                if (accountStatus && isTgApp && !accountStatus.email) {
+                    syncCardHtml +=
+                        '<div class="profile-card">' +
+                        '<div class="section-title">Сайт и Telegram — один аккаунт</div>' +
+                        '<p class="muted" style="margin:0 0 12px">Укажите почту и пароль — по ним можно войти с браузера; анкета и разбор останутся теми же.</p>' +
+                        '<label for="vwSyncEmail">Email</label>' +
+                        '<input type="email" id="vwSyncEmail" autocomplete="email" placeholder="you@example.com" style="width:100%;max-width:420px">' +
+                        '<label for="vwSyncPass" style="margin-top:10px">Пароль (не короче 8 символов)</label>' +
+                        '<input type="password" id="vwSyncPass" autocomplete="new-password" class="pwd-input" style="width:100%;max-width:420px">' +
+                        '<label for="vwSyncPass2" style="margin-top:10px">Пароль ещё раз</label>' +
+                        '<input type="password" id="vwSyncPass2" autocomplete="new-password" class="pwd-input" style="width:100%;max-width:420px">' +
+                        '<p id="vwSyncRegErr" style="display:none;margin-top:8px;color:#c62828;font-size:0.875rem"></p>' +
+                        '<button type="button" class="btn-primary" style="margin-top:12px" id="vwSyncRegBtn">Сохранить почту для входа на сайте</button>' +
+                        '<div class="nav-sep" style="margin:18px 0"></div>' +
+                        '<p class="muted" style="margin:0 0 8px;font-size:0.85rem">Уже есть аккаунт на сайте?</p>' +
+                        '<label for="vwBindEmail">Email</label>' +
+                        '<input type="email" id="vwBindEmail" autocomplete="email" style="width:100%;max-width:420px">' +
+                        '<label for="vwBindPass" style="margin-top:10px">Пароль</label>' +
+                        '<input type="password" id="vwBindPass" autocomplete="current-password" class="pwd-input" style="width:100%;max-width:420px">' +
+                        '<p id="vwSyncBindErr" style="display:none;margin-top:8px;color:#c62828;font-size:0.875rem"></p>' +
+                        '<button type="button" class="btn-secondary" style="margin-top:12px" id="vwSyncBindBtn">Войти в существующий аккаунт и объединить</button>' +
+                        '</div>';
+                }
+                if (accountStatus && !isTgApp && accountStatus.email && !accountStatus.telegram_linked) {
+                    if (accountStatus.telegram_login_bot_username) {
+                        syncCardHtml +=
+                            '<div class="profile-card" style="margin-top:16px">' +
+                            '<div class="section-title">Привязать Telegram</div>' +
+                            '<p class="muted" style="margin:0 0 12px">Нажмите кнопку Telegram — данные мини-приложения и сайта объединятся.</p>' +
+                            '<div id="vwTgWidgetMount"></div>' +
+                            '</div>';
+                    } else {
+                        syncCardHtml +=
+                            '<div class="profile-card" style="margin-top:16px">' +
+                            '<div class="section-title">Telegram</div>' +
+                            '<p class="muted" style="margin:0">Для кнопки входа Telegram задайте на сервере TELEGRAM_BOT_USERNAME (имя бота без @).</p>' +
+                            '</div>';
+                    }
+                }
                 let html =
                     '<h2>Аккаунт</h2>' +
                     '<div class="profile-shell">' +
+                    syncCardHtml +
                     '<div class="profile-card">' +
                     '<div class="section-title">Никнейм</div>' +
                     '<label>Имя в интерфейсе</label>' +
@@ -3663,6 +3728,132 @@
                     '<button type="button" class="btn-primary" style="margin-top:14px" id="vwAccChangePwd">Сохранить новый пароль</button>' +
                     '</div></div>';
                 el.innerHTML = html;
+                if (
+                    accountStatus &&
+                    !isTgApp &&
+                    accountStatus.email &&
+                    !accountStatus.telegram_linked &&
+                    accountStatus.telegram_login_bot_username
+                ) {
+                    mountTelegramLoginWidget(accountStatus.telegram_login_bot_username);
+                }
+                const syncReg = document.getElementById('vwSyncRegBtn');
+                if (syncReg) {
+                    syncReg.onclick = async function () {
+                        const err = document.getElementById('vwSyncRegErr');
+                        err.style.display = 'none';
+                        const em = (document.getElementById('vwSyncEmail').value || '').trim();
+                        const p1 = document.getElementById('vwSyncPass').value;
+                        const p2 = document.getElementById('vwSyncPass2').value;
+                        if (!isValidEmailAddress(em)) {
+                            err.textContent = 'Введите корректный email';
+                            err.style.display = 'block';
+                            return;
+                        }
+                        if (p1.length < 8) {
+                            err.textContent = 'Пароль — не короче 8 символов';
+                            err.style.display = 'block';
+                            return;
+                        }
+                        if (p1 !== p2) {
+                            err.textContent = 'Пароли не совпадают';
+                            err.style.display = 'block';
+                            return;
+                        }
+                        syncReg.disabled = true;
+                        try {
+                            const res = await fetch(apiUrl('/auth/account/email/register'), {
+                                method: 'POST',
+                                headers: Object.assign(
+                                    { 'Content-Type': 'application/json' },
+                                    apiFetchHeaders()
+                                ),
+                                body: JSON.stringify({ email: em, password: p1 }),
+                            });
+                            const data = await res.json().catch(function () {
+                                return {};
+                            });
+                            if (!res.ok) {
+                                err.textContent =
+                                    typeof data.detail === 'string'
+                                        ? data.detail
+                                        : 'Ошибка ' + res.status;
+                                err.style.display = 'block';
+                                syncReg.disabled = false;
+                                return;
+                            }
+                            localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
+                            localStorage.setItem('userId', data.user_id);
+                            localStorage.setItem(USER_EMAIL_KEY, data.email || em);
+                            userId = data.user_id;
+                            profileFetchDone = false;
+                            showAppAlert('Почта сохранена — можно входить с сайта с тем же паролем.', 'Готово');
+                            await renderShell();
+                        } catch (e) {
+                            err.textContent = String(e.message || e);
+                            err.style.display = 'block';
+                        }
+                        syncReg.disabled = false;
+                    };
+                }
+                const syncBind = document.getElementById('vwSyncBindBtn');
+                if (syncBind) {
+                    syncBind.onclick = async function () {
+                        const err = document.getElementById('vwSyncBindErr');
+                        err.style.display = 'none';
+                        const em = (document.getElementById('vwBindEmail').value || '').trim();
+                        const pw = document.getElementById('vwBindPass').value;
+                        if (!isValidEmailAddress(em)) {
+                            err.textContent = 'Введите корректный email';
+                            err.style.display = 'block';
+                            return;
+                        }
+                        if (!pw) {
+                            err.textContent = 'Введите пароль';
+                            err.style.display = 'block';
+                            return;
+                        }
+                        syncBind.disabled = true;
+                        try {
+                            const res = await fetch(apiUrl('/auth/account/email/bind'), {
+                                method: 'POST',
+                                headers: Object.assign(
+                                    { 'Content-Type': 'application/json' },
+                                    apiFetchHeaders()
+                                ),
+                                body: JSON.stringify({ email: em, password: pw }),
+                            });
+                            const data = await res.json().catch(function () {
+                                return {};
+                            });
+                            if (!res.ok) {
+                                err.textContent =
+                                    typeof data.detail === 'string'
+                                        ? data.detail
+                                        : 'Ошибка ' + res.status;
+                                err.style.display = 'block';
+                                syncBind.disabled = false;
+                                return;
+                            }
+                            localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
+                            localStorage.setItem('userId', data.user_id);
+                            localStorage.setItem(USER_EMAIL_KEY, data.email || em);
+                            userId = data.user_id;
+                            profileFetchDone = false;
+                            showAppAlert(
+                                data.merged
+                                    ? 'Аккаунты объединены. Дальше входите по этой почте на сайте.'
+                                    : 'Готово.',
+                                'Готово'
+                            );
+                            await renderShell();
+                        } catch (e) {
+                            err.textContent = String(e.message || e);
+                            err.style.display = 'block';
+                        }
+                        syncBind.disabled = false;
+                    };
+                }
                 document.getElementById('vwAccSaveNick').onclick = async function () {
                     const errEl = document.getElementById('vwAccNickErr');
                     errEl.style.display = 'none';
@@ -3810,6 +4001,20 @@
         if (currentTab === 'simulator') return renderSimulatorTab();
     }
 
+    function mountTelegramLoginWidget(botUsername) {
+        var mount = document.getElementById('vwTgWidgetMount');
+        if (!mount || !botUsername) return;
+        mount.innerHTML = '';
+        var scr = document.createElement('script');
+        scr.async = true;
+        scr.src = 'https://telegram.org/js/telegram-widget.js?22';
+        scr.setAttribute('data-telegram-login', botUsername);
+        scr.setAttribute('data-size', 'large');
+        scr.setAttribute('data-onauth', 'onTelegramAuth(user)');
+        scr.setAttribute('data-request-access', 'write');
+        mount.appendChild(scr);
+    }
+
     window.__vw = {
         submitAuth: submitAuth,
         logout: logout,
@@ -3817,12 +4022,74 @@
             currentTab = id;
             await renderShell();
         },
+        onTelegramWidget: async function (user) {
+            if (!user || user.id == null) return;
+            try {
+                var res = await fetch(apiUrl('/auth/account/telegram/widget'), {
+                    method: 'POST',
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, apiFetchHeaders()),
+                    body: JSON.stringify(user),
+                });
+                var data = await res.json().catch(function () {
+                    return {};
+                });
+                if (!res.ok) {
+                    var m = data.detail;
+                    if (typeof m !== 'string') m = 'Ошибка ' + res.status;
+                    showAppAlert(m, 'Не удалось привязать');
+                    return;
+                }
+                showAppAlert(
+                    data.merged ? 'Telegram привязан, данные объединены.' : 'Telegram уже был привязан.',
+                    'Готово'
+                );
+                await renderShell();
+            } catch (e) {
+                showAppAlert(String(e.message || e), 'Ошибка');
+            }
+        },
+    };
+    window.onTelegramAuth = function (user) {
+        if (window.__vw && window.__vw.onTelegramWidget) {
+            window.__vw.onTelegramWidget(user);
+        }
     };
 
+    async function tryTelegramWebAppAuth() {
+        var tg = window.Telegram && window.Telegram.WebApp;
+        if (!tg) return false;
+        var raw = tg.initData;
+        if (!raw || typeof raw !== 'string' || !raw.length) return false;
+        try {
+            var res = await fetch(apiUrl('/auth/telegram/'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ init_data: raw }),
+            });
+            if (!res.ok) return false;
+            var data = await res.json().catch(function () {
+                return {};
+            });
+            if (!data.access_token || !data.user_id) return false;
+            localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
+            localStorage.setItem('userId', data.user_id);
+            userId = data.user_id;
+            profileFetchDone = false;
+            currentTab = 'home';
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
     (async function bootstrap() {
+        if (await tryTelegramWebAppAuth()) {
+            await renderShell();
+            return;
+        }
         const tok = localStorage.getItem(ACCESS_TOKEN_KEY);
-        if (!userId || !tok) showAuthScreen();
-        else await renderShell();
+        if (userId && tok) await renderShell();
+        else showAuthScreen();
     })();
 })();
 </script>

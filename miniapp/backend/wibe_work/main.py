@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from wibe_work.sqlite_db import init_db
 from wibe_work.routers import (
+    account_link_routes,
     assessment_routes,
     career_routes,
     email_auth_routes,
@@ -38,6 +39,7 @@ if _WEBSITE_FRONTEND_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=str(_WEBSITE_FRONTEND_DIR)), name="website_static")
 
 
+app.include_router(account_link_routes.router)
 app.include_router(email_auth_routes.router)
 app.include_router(profile_routes.router)
 app.include_router(telegram_auth_routes.router)
