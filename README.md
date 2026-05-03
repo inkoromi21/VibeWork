@@ -61,7 +61,7 @@
 
 - **Python 3.10+** для основного стека (`miniapp/requirements.txt`). На **Python 3.14** (Windows) для изолированного пакета `website/` см. примечание в [website/README.md](website/README.md) — там обновлены версии **pydantic**, чтобы ставились готовые колёса без сборки Rust.
 - Для **изолированного** запуска только пакета `website/` — отдельное окружение и `website/requirements.txt` (см. [website/README.md](website/README.md)).
-- Для Mini App в Telegram с устройства — **HTTPS** (ngrok, туннель или обратный прокси).
+- Для Mini App в Telegram с устройства — **HTTPS** (Cloudflare Tunnel, свой домен или обратный прокси).
 
 ---
 
@@ -92,8 +92,9 @@ cp miniapp/.env.example .env   # Linux/macOS
 | Переменная | Назначение |
 |------------|------------|
 | `TELEGRAM_BOT_TOKEN` | Токен бота от [@BotFather](https://t.me/BotFather) |
-| `PUBLIC_BASE_URL` | Базовый URL API для ссылок бота; локально `http://127.0.0.1:8000`, для Telegram — ваш HTTPS |
-| `WEBSITE_URL` | URL кнопки «Сайт» в боте (часто совпадает с `PUBLIC_BASE_URL`) |
+| `PUBLIC_BASE_URL` | Базовый URL API; локально `http://127.0.0.1:8000` |
+| `TELEGRAM_PUBLIC_BASE_URL` | HTTPS-туннель для Web App; при запуске **`launch-stack.bat`** скрипт cloudflared **сам дописывает** это поле в `.env`, после чего в боте нажмите **`/start`** |
+| `WEBSITE_URL` | URL кнопки «Сайт» в боте (часто совпадает с туннелем или `PUBLIC_BASE_URL`) |
 | `JWT_SECRET` | Секрет подписи JWT; в продакшене обязательно уникальное значение |
 | `DATABASE_PATH` | Путь к файлу SQLite (необязательно; иначе используется путь по умолчанию в коде) |
 | `HH_USER_AGENT` | Идентификатор клиента для API hh.ru в формате из их документации |
@@ -120,7 +121,7 @@ python miniapp/run.py
 | Задача | Команда |
 |--------|---------|
 | Только API и статика (порт 8000) | `python miniapp/run.py` |
-| Полный стек | macOS/Linux: `bash "launch files/launch-stack.sh"` · Windows: `launch files\launch-stack.bat` — открывает отдельные окна: API **:8000**, ngrok→8000, Telegram-бот, веб **:8765** (`website/main.py`) |
+| Полный стек | macOS/Linux: `bash "launch files/launch-stack.sh"` · Windows: `launch files\launch-stack.bat` — открывает отдельные окна: API **:8000**, Cloudflare Tunnel→8000, Telegram-бот, веб **:8765** (`website/main.py`) |
 | Только Telegram-бот (при уже запущенном API) | `python miniapp/bot/bot.py` |
 
 Вспомогательные сценарии лежат в **`launch files/stack/`**. Документация по боту: [miniapp/bot/README.md](miniapp/bot/README.md).

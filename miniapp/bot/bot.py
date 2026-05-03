@@ -4,9 +4,7 @@ import sys
 
 from pathlib import Path
 
-
-
-import requests
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -42,23 +40,53 @@ from terminal_theme import fail, launch, mask_secret, ok  # noqa: E402
 
 def get_public_base_url() -> str:
 
+    return os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+
+
+
+
+
+def get_telegram_effective_base() -> str:
+
+    """Базовый URL для кнопок бота (HTTPS-туннель). Если не задан — PUBLIC_BASE_URL."""
+
+    override = (os.environ.get("TELEGRAM_PUBLIC_BASE_URL") or "").strip().rstrip("/")
+
+    if override:
+
+        try:
+
+            host = (urlparse(override).hostname or "").lower()
+
+            # В логе cloudflared встречается api.trycloudflare.com — не путать с quick tunnel.
+
+            if host in ("api.trycloudflare.com", "www.trycloudflare.com"):
+
+                override = ""
+
+        except Exception:
+
+            pass
+
+    if override:
+
+        return override
+
+    return get_public_base_url()
+
+
+
+
+
+def _is_https(url: str) -> bool:
+
     try:
 
-        r = requests.get("http://127.0.0.1:4040/api/tunnels", timeout=2)
+        return urlparse(url).scheme.lower() == "https"
 
-        if r.status_code == 200:
+    except Exception:
 
-            tunnels = r.json().get("tunnels") or []
-
-            if tunnels:
-
-                return tunnels[0].get("public_url", "").rstrip("/")
-
-    except OSError:
-
-        pass
-
-    return os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+        return False
 
 
 
@@ -66,9 +94,19 @@ def get_public_base_url() -> str:
 
 def get_website_url() -> str:
 
-    base = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+    eff = get_telegram_effective_base()
 
-    return (os.environ.get("WEBSITE_URL") or base).rstrip("/")
+    raw = (os.environ.get("WEBSITE_URL") or "").strip().rstrip("/")
+
+    url = raw if raw else eff
+
+    # Кнопка «Сайт» — корень веб-версии (/), не миниапп (/miniapp/)
+
+    if "/miniapp" in url.lower():
+
+        url = eff
+
+    return url.rstrip("/")
 
 
 
@@ -80,17 +118,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         return
 
-    base = get_public_base_url()
+    load_dotenv(ROOT / ".env", override=True)
 
-    web_app_url = f"{base}/miniapp/"
+    tg_base = get_telegram_effective_base()
+
+    web_app_url = f"{tg_base}/miniapp/"
 
     website_url = get_website_url()
 
-    if website_url == base:
+    if website_url == tg_base:
 
         website_url = f"{website_url}/"
 
-    site_label = (os.environ.get("WEBSITE_BUTTON_LABEL") or "Временно недоступен").strip() or "Сайт"
+    site_label = (os.environ.get("WEBSITE_BUTTON_LABEL") or "Сайт").strip() or "Сайт"
+
+    mini_label = (os.environ.get("MINIAPP_BUTTON_LABEL") or "Мини-приложение").strip() or "Мини-приложение"
 
 
 
@@ -100,9 +142,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         "Можно пройти короткий разбор про себя, посмотреть направления и вакансии ближе к твоему профилю.\n\n"
 
-        "• <b>Сайт</b> — полная веб-версия (сейчас <b>временно недоступна</b>). Кнопка со ссылкой и предупреждением ниже.\n"
+        "• Первая кнопка — <b>сайт</b> в браузере.\n"
 
-        "• <b>Мини-приложение</b> — то же удобно прямо в Telegram (вторая кнопка).\n\n"
+        "• Вторая — <b>мини-приложение</b> в Telegram.\n\n"
 
         "Удачного старта!"
 
@@ -110,13 +152,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-    if base.lower().startswith("https://"):
+    if _is_https(tg_base):
 
         keyboard = [
 
             [InlineKeyboardButton(site_label, url=website_url)],
 
-            [InlineKeyboardButton("Открыть VibeWork", web_app=WebAppInfo(url=web_app_url))],
+            [InlineKeyboardButton(mini_label, web_app=WebAppInfo(url=web_app_url))],
 
         ]
 
@@ -128,7 +170,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             [InlineKeyboardButton(site_label, url=website_url)],
 
-            [InlineKeyboardButton("Мини-приложение в браузере", url=web_app_url)],
+            [InlineKeyboardButton(mini_label, url=web_app_url)],
 
         ]
 
@@ -138,11 +180,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             + "\n\n"
 
-            + "<i>Чтобы мини-приложение открылось внутри Telegram как Web App, нужен HTTPS "
+            + "<i>Нет HTTPS для кнопок: запустите туннель из <code>launch-stack.bat</code> (он запишет "
 
-            "(ngrok на порт API или PUBLIC_BASE_URL=https://… в .env). "
-
-            "Пока открой мини-приложение по ссылке в браузере — вторая кнопка.</i>"
+            "<code>TELEGRAM_PUBLIC_BASE_URL</code> в <code>.env</code>) и снова нажмите /start.</i>"
 
         )
 
@@ -163,6 +203,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
+
+    load_dotenv(ROOT / ".env", override=True)
 
     launch("Telegram-бота", subtitle=f"long polling · проект: {ROOT}")
 
@@ -190,11 +232,11 @@ def main():
 
 
 
-    base = get_public_base_url()
+    pub = get_public_base_url()
+
+    tg_base = get_telegram_effective_base()
 
     website = get_website_url()
-
-    ngrok_ui = "http://127.0.0.1:4040 — HTTPS для Web App, если ngrok запущен"
 
     ok(
 
@@ -202,15 +244,17 @@ def main():
 
         Режим="Telegram long polling",
 
-        **{"Публичный base (кнопки)": base},
+        **{"PUBLIC_BASE_URL": pub},
 
-        **{"Миниапп URL": f"{base}/miniapp/"},
+        **{"Telegram (кнопки)": tg_base},
+
+        **{"Миниапп URL": f"{tg_base}/miniapp/"},
 
         **{"Сайт (кнопка)": website},
 
-        **{"Токен": mask_secret(token)},
+        **{"Web App": "да" if _is_https(tg_base) else "нет (нужен HTTPS в TELEGRAM_PUBLIC_BASE_URL или PUBLIC_BASE_URL)"},
 
-        **{"ngrok UI": ngrok_ui},
+        **{"Токен": mask_secret(token)},
 
     )
 

@@ -38,13 +38,6 @@ if _WEBSITE_FRONTEND_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=str(_WEBSITE_FRONTEND_DIR)), name="website_static")
 
 
-@app.middleware("http")
-async def add_ngrok_header(request, call_next):
-    response = await call_next(request)
-    response.headers["ngrok-skip-browser-warning"] = "true"
-    return response
-
-
 app.include_router(email_auth_routes.router)
 app.include_router(profile_routes.router)
 app.include_router(telegram_auth_routes.router)

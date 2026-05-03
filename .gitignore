@@ -53,7 +53,3 @@ build/
 # Logs & temp
 *.log
 *.tmp
-
-# Downloaded dev binaries (install separately)
-miniapp/scripts/bin/ngrok
-miniapp/scripts/bin/ngrok.exe
