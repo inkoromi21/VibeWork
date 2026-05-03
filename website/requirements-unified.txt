@@ -1,0 +1,4 @@
+# Дополнительные зависимости для режима VIBEWORK_FULL_STACK=1 (тот же API, что miniapp/run.py).
+# Установка:
+#   pip install -r requirements.txt -r requirements-unified.txt
+-r ../miniapp/requirements.txt

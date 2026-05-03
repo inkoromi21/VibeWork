@@ -227,48 +227,63 @@
             flex: 1 1 200px;
             min-width: 0;
         }
-        /* Аккаунт: звезда — светлая оправа и иконка (не «лесная» тень) */
-        .account-star-btn {
-            flex-shrink: 0;
-            width: 44px;
-            height: 44px;
-            padding: 0;
+        /* Аккаунт: одна капсула — иконка + имя (одна кнопка) */
+        .account-chip-btn {
+            flex-shrink: 1;
             display: inline-flex;
             align-items: center;
-            justify-content: center;
+            gap: 8px;
+            min-height: 44px;
+            max-width: min(100%, 280px);
+            padding: 6px 14px 6px 10px;
             border-radius: var(--btn-anketa-radius);
             border: 2px solid var(--btn-anketa-border-strong);
             background: var(--btn-anketa-bg);
             box-shadow: none;
             color: var(--neon-deep);
             cursor: pointer;
-            transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+            transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+            font-family: var(--font);
+            text-align: left;
         }
-        .account-star-btn svg {
-            width: 23px;
-            height: 23px;
-            display: block;
-            flex-shrink: 0;
-            transform: translate(-0.5px, 0);
-        }
-        .account-star-btn:hover {
-            transform: scale(1.05);
+        .account-chip-btn:hover {
             border-color: var(--btn-anketa-border-strong);
             background: var(--btn-anketa-bg-hover);
             box-shadow: none;
         }
-        .account-star-btn:focus-visible {
+        .account-chip-btn:focus-visible {
             outline: 2px solid var(--neon);
             outline-offset: 2px;
         }
-        .account-star-btn.is-active {
+        .account-chip-btn.is-active {
             border-color: var(--btn-primary-border);
             background: var(--btn-anketa-bg-selected);
             color: #064e3b;
             box-shadow: none;
         }
-        .account-star-btn.is-active svg {
-            filter: none;
+        .account-chip-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+        }
+        .account-chip-icon svg {
+            width: 22px;
+            height: 22px;
+            display: block;
+        }
+        .account-chip-name {
+            font-size: 0.72rem;
+            font-family: var(--font-mono);
+            font-weight: 500;
+            color: inherit;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+            flex: 1;
         }
         .account-dl {
             margin: 0;
@@ -414,6 +429,10 @@
         .btn-auth-ghost:focus-visible {
             outline: 2px solid var(--accent);
             outline-offset: 2px;
+        }
+        /* Выйти ниже по высоте аккаунт-капсулы — лёгкое выравнивание по нижнему краю */
+        .topbar .btn-auth.btn-auth-ghost {
+            margin-top: 4px;
         }
         .shell {
             flex: 1;
@@ -1979,16 +1998,20 @@
             profileQuickChips() +
             '</div>' +
             '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%">' +
-            '<button type="button" class="account-star-btn' +
+            '<button type="button" class="account-chip-btn' +
             (currentTab === 'account' ? ' is-active' : '') +
-            '" onclick="window.__vw.goTab(\'account\')" title="Аккаунт" aria-label="Аккаунт">' +
-            '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M12 2.5 14 10 21.5 12 14 14 12 21.5 10 14 2.5 12 10 10z"/></svg>' +
-            '</button>' +
-            '<span class="pill" title="' +
+            '" onclick="window.__vw.goTab(\'account\')" title="' +
             esc(pillHoverTitle()) +
+            '" aria-label="' +
+            esc('Аккаунт: ' + disp) +
             '">' +
+            '<span class="account-chip-icon" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M12 2.5 14 10 21.5 12 14 14 12 21.5 10 14 2.5 12 10 10z"/></svg>' +
+            '</span>' +
+            '<span class="account-chip-name">' +
             esc(disp) +
             '</span>' +
+            '</button>' +
             '<button type="button" class="btn-auth btn-auth-ghost" onclick="window.__vw.logout()">Выйти</button>' +
             '</div>' +
             '</header>' +

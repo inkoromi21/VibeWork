@@ -59,7 +59,7 @@
 
 ## Требования
 
-- **Python 3.10+** для основного стека (`miniapp/requirements.txt`).
+- **Python 3.10+** для основного стека (`miniapp/requirements.txt`). На **Python 3.14** (Windows) для изолированного пакета `website/` см. примечание в [website/README.md](website/README.md) — там обновлены версии **pydantic**, чтобы ставились готовые колёса без сборки Rust.
 - Для **изолированного** запуска только пакета `website/` — отдельное окружение и `website/requirements.txt` (см. [website/README.md](website/README.md)).
 - Для Mini App в Telegram с устройства — **HTTPS** (ngrok, туннель или обратный прокси).
 

@@ -12,7 +12,21 @@
 
 ### 2. Изолированный сервер (`website/main.py`)
 
-Отдельный процесс на порту **8765** (по умолчанию) — для отладки только веб-пакета без поднятия полного `miniapp`. В этом режиме своя БД и механизм сессий (см. код в `app/`).
+Отдельный процесс на порту **8765** (по умолчанию) — для отладки только веб-пакета без поднятия полного `miniapp`. В этом режиме **нет URL `/miniapp/`** и API `/vibework/...` — для Telegram Mini App это выглядит как «открывается только сайт».
+
+**Полный стек из каталога `website/`** (как `miniapp/run.py`: корень `/`, мини-приложение `/miniapp/`, общая БД):
+
+```bash
+cd website
+pip install -r requirements.txt -r requirements-unified.txt
+set VIBEWORK_FULL_STACK=1          # Windows CMD
+set PORT=8000                      # по желанию; иначе 8765
+python main.py
+```
+
+В `.env` для бота задайте **`PUBLIC_BASE_URL=http://127.0.0.1:8000`** (или ваш порт), **`WEBSITE_URL`** на тот же хост. В [@BotFather](https://t.me/BotFather) у Web App / меню бота URL должен оканчиваться на **`/miniapp/`**, а не на `/`.
+
+Изолированный режим (по умолчанию без переменной) — своя БД и механизм сессий (см. код в `app/`).
 
 ```bash
 cd website
@@ -22,6 +36,8 @@ pip install -r requirements.txt
 cp .env.example .env               # при необходимости
 python main.py
 ```
+
+**Python 3.14 на Windows:** в `requirements.txt` заданы `pydantic>=2.11` и совместимый `pydantic-core`, чтобы ставились **готовые колёса** и не требовалась сборка Rust. Если установка всё же падает, используйте **Python 3.12 или 3.11**.
 
 Браузер: **http://127.0.0.1:8765**
 

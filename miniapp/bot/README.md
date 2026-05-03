@@ -4,8 +4,9 @@
 
 ## Предварительные условия
 
-1. **Запущенный backend** — как правило **`python miniapp/run.py`** из корня репозитория (порт **8000**), если бот не поднимается единым скриптом стека.
-2. **Файл `.env` в корне репозитория** с минимум:
+1. **Запущенный backend с маршрутом `/miniapp/`** — приложение **`wibe_work.main`**: обычно **`python miniapp/run.py`** (порт **8000**). Изолированный **`python website/main.py`** без переменной **`VIBEWORK_FULL_STACK=1`** отдаёт только веб-клиент из `website/app` — **Mini App и API мини-приложения не работают** (в Telegram может открываться только «полный сайт» или 404). Альтернатива: `cd website`, установите зависимости из **`requirements-unified.txt`**, затем **`set VIBEWORK_FULL_STACK=1`** и **`python main.py`** (см. [website/README.md](../../website/README.md)).
+2. В **[@BotFather](https://t.me/BotFather)** для кнопки меню / Web App укажите URL с суффиксом **`/miniapp/`**, не корень домена **`/`**.
+3. **Файл `.env` в корне репозитория** с минимум:
    - `TELEGRAM_BOT_TOKEN` — токен от [@BotFather](https://t.me/BotFather);
    - `PUBLIC_BASE_URL` — публичный базовый URL API (для Telegram на устройстве — **HTTPS**, например через ngrok).
 
