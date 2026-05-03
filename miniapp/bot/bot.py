@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
 
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, ContextTypes, TypeHandler
 
 
 
@@ -180,9 +180,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             + "\n\n"
 
-            + "<i>Нет HTTPS для кнопок: запустите туннель из <code>launch-stack.bat</code> (он запишет "
+            + "<i>Нет HTTPS для Web App: дождитесь окна Cloudflare (запись в <code>.env</code>) или "
 
-            "<code>TELEGRAM_PUBLIC_BASE_URL</code> в <code>.env</code>) и снова нажмите /start.</i>"
+            "нажмите /start ещё раз через несколько секунд.</i>"
 
         )
 
@@ -227,6 +227,13 @@ def main():
 
 
     app = Application.builder().token(token).build()
+
+    async def _reload_env_on_update(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+
+        load_dotenv(ROOT / ".env", override=True)
+
+    # Раньше команд: туннель дописывает .env после старта — без этого первый /start видит старый URL.
+    app.add_handler(TypeHandler(Update, _reload_env_on_update), group=-1)
 
     app.add_handler(CommandHandler("start", start))
 

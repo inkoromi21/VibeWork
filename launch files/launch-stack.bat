@@ -64,6 +64,8 @@ start "VibeWork — Cloudflare →8000" cmd /k call "%~dp0stack\cloudflared.bat"
 
 timeout /t 2 /nobreak >nul
 
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0stack\wait-tunnel-env.ps1"
+
 start "VibeWork — Telegram-бот" cmd /k cd /d "%CD%" ^&^& call "%~dp0stack\bot.bat"
 
 timeout /t 1 /nobreak >nul
@@ -72,7 +74,7 @@ start "VibeWork — сайт :8765" cmd /k cd /d "%CD%" ^&^& set WIBE_NO_PAUSE=1
 
 
 
-powershell -NoProfile -Command "& { Write-Host ''; Write-Host '✓ Окна запущены' -ForegroundColor Green; Write-Host '  API http://127.0.0.1:8000/ (миниапп /miniapp/), сайт http://127.0.0.1:8765' -ForegroundColor DarkGray; Write-Host '  Cloudflare: скопируйте из окна туннеля полный URL (https://*.trycloudflare.com) в .env -> PUBLIC_BASE_URL и WEBSITE_URL, перезапустите окно API' -ForegroundColor DarkGray; Write-Host '  BotFather: Web App URL заканчивается на /miniapp/' -ForegroundColor DarkGray }"
+powershell -NoProfile -Command "& { Write-Host ''; Write-Host '✓ Окна запущены' -ForegroundColor Green; Write-Host '  API http://127.0.0.1:8000/ (миниапп /miniapp/), сайт http://127.0.0.1:8765' -ForegroundColor DarkGray; Write-Host '  TELEGRAM_PUBLIC_BASE_URL подставляется из окна Cloudflare в .env; бот ждёт URL перед стартом' -ForegroundColor DarkGray; Write-Host '  В Telegram: /start — кнопки сразу с HTTPS (перезапуск API не нужен)' -ForegroundColor DarkGray }"
 
 pause
 

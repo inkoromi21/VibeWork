@@ -4,6 +4,20 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
+
+
+def _reject_bad_telegram_public_url(key: str, value: str) -> None:
+    if key != "TELEGRAM_PUBLIC_BASE_URL":
+        return
+    host = (urlparse(value).hostname or "").lower()
+    blocked = {"api.trycloudflare.com", "www.trycloudflare.com"}
+    if host in blocked or not host:
+        print(
+            f"upsert_env: refuse {key}={value!r} (not a tunnel hostname)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 def main() -> None:
@@ -13,6 +27,7 @@ def main() -> None:
     path = Path(sys.argv[1])
     key = sys.argv[2]
     value = sys.argv[3]
+    _reject_bad_telegram_public_url(key, value)
     lines: list[str] = []
     if path.is_file():
         lines = path.read_text(encoding="utf-8").splitlines()

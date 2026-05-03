@@ -92,9 +92,9 @@ cp miniapp/.env.example .env   # Linux/macOS
 | Переменная | Назначение |
 |------------|------------|
 | `TELEGRAM_BOT_TOKEN` | Токен бота от [@BotFather](https://t.me/BotFather) |
-| `PUBLIC_BASE_URL` | Базовый URL API; локально `http://127.0.0.1:8000` |
-| `TELEGRAM_PUBLIC_BASE_URL` | HTTPS-туннель для Web App; при запуске **`launch-stack.bat`** скрипт cloudflared **сам дописывает** это поле в `.env`, после чего в боте нажмите **`/start`** |
-| `WEBSITE_URL` | URL кнопки «Сайт» в боте (часто совпадает с туннелем или `PUBLIC_BASE_URL`) |
+| `PUBLIC_BASE_URL` | Базовый URL API; локально `http://127.0.0.1:8000`; на проде **`https://ваш-домен`** (тот же хост, что открывает nginx → приложение) |
+| `TELEGRAM_PUBLIC_BASE_URL` | HTTPS для кнопок Web App в Telegram; локально quick tunnel (`launch-stack.bat` дописывает в `.env`); на проде тот же **`https://ваш-домен`**, что и `PUBLIC_BASE_URL` |
+| `WEBSITE_URL` | Кнопка «Сайт»: корень сайта (`/`). Пусто — берётся та же база, что и для миниаппа; не задавайте `/miniapp/` |
 | `JWT_SECRET` | Секрет подписи JWT; в продакшене обязательно уникальное значение |
 | `DATABASE_PATH` | Путь к файлу SQLite (необязательно; иначе используется путь по умолчанию в коде) |
 | `HH_USER_AGENT` | Идентификатор клиента для API hh.ru в формате из их документации |
