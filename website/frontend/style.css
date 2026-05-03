@@ -25,6 +25,8 @@
   --border: #e2e5eb;
   --radius: 16px;
   --radius-lg: 22px;
+  --shell-max: min(1400px, 100%);
+  --sidebar-w: 260px;
   --shadow: 0 8px 32px rgba(26, 29, 33, 0.08);
   --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.06);
   /* Open Sans — как в miniapp; Inter остаётся запасным начертанием */
@@ -84,6 +86,12 @@ body {
   color: var(--text);
   background: var(--bg-page);
   overflow-x: hidden;
+}
+
+@media (min-width: 1024px) {
+  body {
+    font-size: 15.5px;
+  }
 }
 
 .mono {
@@ -345,7 +353,7 @@ body.app-ready .auth-gate {
 
 /* ——— Sidebar ——— */
 .sidebar {
-  width: 240px;
+  width: var(--sidebar-w);
   flex-shrink: 0;
   background: color-mix(in srgb, var(--bg-card) 86%, transparent);
   backdrop-filter: saturate(160%) blur(18px);
@@ -353,7 +361,7 @@ body.app-ready .auth-gate {
   border-right: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
   display: flex;
   flex-direction: column;
-  padding: 1.25rem 0.85rem;
+  padding: 1.35rem 1rem;
   box-shadow: 4px 0 32px rgba(0, 0, 0, 0.04);
 }
 
@@ -377,16 +385,16 @@ body.app-ready .auth-gate {
 .side-nav-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.55rem;
   width: 100%;
   text-align: left;
   border: 2px solid transparent;
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   font-weight: 500;
-  padding: 0.6rem 0.75rem;
+  padding: 0.65rem 0.85rem;
   border-radius: 12px;
   cursor: pointer;
   transition: background 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
@@ -485,7 +493,7 @@ body.app-ready .auth-gate {
 
 .topbar-title {
   margin: 0;
-  font-size: 1.02rem;
+  font-size: clamp(1.02rem, 1.1vw, 1.15rem);
   font-weight: 700;
   letter-spacing: -0.02em;
   text-transform: none;
@@ -494,21 +502,21 @@ body.app-ready .auth-gate {
 
 .topbar-quote {
   margin: 0.35rem 0 0;
-  font-size: 0.78rem;
+  font-size: clamp(0.78rem, 1vw, 0.88rem);
   line-height: 1.5;
   font-style: italic;
   color: color-mix(in srgb, var(--muted) 92%, var(--green-dark));
-  max-width: 46ch;
+  max-width: min(62ch, 100%);
   padding-left: 0.55rem;
   border-left: 2px solid color-mix(in srgb, var(--green) 28%, transparent);
 }
 
 .profile-tagline {
   margin: 0.4rem 0 0;
-  font-size: 0.84rem;
+  font-size: clamp(0.84rem, 1.05vw, 0.92rem);
   line-height: 1.45;
   color: var(--muted);
-  max-width: 52ch;
+  max-width: min(58ch, 100%);
 }
 
 .topbar-tools {
@@ -721,33 +729,43 @@ body.app-ready .auth-gate {
   padding: 0.25rem 0.45rem;
 }
 
-/* ——— Main shell ——— */
+/* ——— Main shell ——— (контент слева, широкая колонка на ПК) */
 .shell {
   flex: 1;
-  max-width: min(920px, 100%);
   width: 100%;
-  margin: 0 auto;
-  padding: 1.25rem 1.5rem 2.5rem;
+  max-width: var(--shell-max);
+  margin-left: 0;
+  margin-right: auto;
+  padding: 1.35rem 1.75rem 2.75rem;
   padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
-  padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
-  padding-bottom: max(2.5rem, env(safe-area-inset-bottom, 0px));
+  padding-right: max(1.75rem, env(safe-area-inset-right, 0px));
+  padding-bottom: max(2.75rem, env(safe-area-inset-bottom, 0px));
 }
 
-/* Широкий экран: чуть шире колонка контента, всё приложение не «растягивается» бесконечно */
-@media (min-width: 1100px) {
+@media (min-width: 900px) {
+  :root {
+    --shell-max: min(1520px, 100%);
+  }
+
   .shell {
-    max-width: min(1000px, 100%);
+    padding-top: 1.5rem;
+    padding-left: max(1.75rem, env(safe-area-inset-left, 0px));
+    padding-right: max(2rem, env(safe-area-inset-right, 0px));
   }
 }
 
+@media (min-width: 1200px) {
+  :root {
+    --shell-max: min(1680px, 100%);
+    --sidebar-w: 276px;
+  }
+}
+
+/* На очень широких экранах — без искусственного сужения всего лейаута по центру */
 @media (min-width: 1320px) {
-  .shell {
-    max-width: min(1040px, 100%);
-  }
-
   .app-layout {
-    max-width: min(1480px, 100%);
-    margin-inline: auto;
+    max-width: none;
+    margin-inline: 0;
   }
 }
 
@@ -776,6 +794,21 @@ body.app-ready .auth-gate {
   box-shadow: var(--shadow-card);
 }
 
+@media (min-width: 900px) {
+  .card {
+    padding: 1.55rem 1.75rem;
+    margin-bottom: 1.15rem;
+    border-radius: calc(var(--radius-lg) + 2px);
+  }
+}
+
+@media (min-width: 1200px) {
+  .card {
+    padding: 1.85rem 2.1rem;
+    margin-bottom: 1.25rem;
+  }
+}
+
 .card.float-in {
   animation: card-in 0.45s var(--ease);
 }
@@ -790,7 +823,7 @@ body.app-ready .auth-gate {
 .card-head h1,
 .card-head h2 {
   margin: 0 0 0.5rem;
-  font-size: 1.35rem;
+  font-size: clamp(1.35rem, 1.5vw, 1.6rem);
   font-weight: 700;
   color: var(--text);
 }
