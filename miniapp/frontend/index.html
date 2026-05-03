@@ -13,35 +13,13 @@
             tg.expand();
             document.documentElement.setAttribute('data-tg-webapp', '1');
 
-            /** Всегда светлая тема: Telegram при тёмном клиенте выставляет --tg-theme-* и фон WebView. */
-            function forceLightTelegramUi() {
+            /**
+             * Рамка Telegram (шапка/подложка WebView) — не трогаем: setBackgroundColor / setHeaderColor не вызываем,
+             * --tg-theme-* не переопределяем, чтобы совпадало с темой клиента (в т.ч. тёмной).
+             * Светлый только контент VibeWork — наши CSS-переменные поверх переменных Telegram.
+             */
+            function forceLightMiniAppContentOnly() {
                 var root = document.documentElement;
-                if (typeof tg.setBackgroundColor === 'function') {
-                    tg.setBackgroundColor('#ffffff');
-                }
-                if (typeof tg.setHeaderColor === 'function') {
-                    tg.setHeaderColor('#ffffff');
-                }
-                var tgVars = [
-                    ['--tg-theme-bg-color', '#ffffff'],
-                    ['--tg-theme-text-color', '#000000'],
-                    ['--tg-theme-hint-color', '#707579'],
-                    ['--tg-theme-link-color', '#2481cc'],
-                    ['--tg-theme-button-color', '#22c55e'],
-                    ['--tg-theme-button-text-color', '#ffffff'],
-                    ['--tg-theme-secondary-bg-color', '#f4f4f5'],
-                    ['--tg-theme-header-bg-color', '#ffffff'],
-                    ['--tg-theme-bottom-bar-bg-color', '#ffffff'],
-                    ['--tg-theme-accent-text-color', '#15803d'],
-                    ['--tg-theme-section-bg-color', '#ffffff'],
-                    ['--tg-theme-section-header-text-color', '#000000'],
-                    ['--tg-theme-section-separator-color', '#dbdada'],
-                    ['--tg-theme-subtitle-text-color', '#707579'],
-                    ['--tg-theme-destructive-text-color', '#ac3e46']
-                ];
-                for (var i = 0; i < tgVars.length; i++) {
-                    root.style.setProperty(tgVars[i][0], tgVars[i][1]);
-                }
                 root.style.setProperty('--bg-page', '#ffffff');
                 root.style.setProperty('--card', '#ffffff');
                 root.style.setProperty('--text', '#000000');
@@ -52,9 +30,9 @@
                 root.style.setProperty('--btn-anketa-bg-selected', '#d1fae5');
                 root.style.setProperty('--accent-soft', 'rgba(34, 197, 94, 0.14)');
             }
-            forceLightTelegramUi();
+            forceLightMiniAppContentOnly();
             if (typeof tg.onEvent === 'function') {
-                tg.onEvent('themeChanged', forceLightTelegramUi);
+                tg.onEvent('themeChanged', forceLightMiniAppContentOnly);
             }
         } catch (e) {}
     })();
