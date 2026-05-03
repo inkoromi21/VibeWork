@@ -6,8 +6,7 @@
 
 Точка входа HTTP — **`python miniapp/run.py`** из **корня репозитория** (порт **8000**). Один процесс отдаёт:
 
-- веб-интерфейс с корня (`website/frontend/`);
-- Mini App по пути **`/miniapp/`**;
+- веб-интерфейс с корня и Mini App — **один и тот же** UI (`frontend/index.html`, дубликат по **`/miniapp/`**);
 - единый REST API и OpenAPI (**`/docs`**).
 
 Файл конфигурации — **`.env` в корне репозитория** (шаблон: `miniapp/.env.example`). Зависимости Python: **`miniapp/requirements.txt`**.

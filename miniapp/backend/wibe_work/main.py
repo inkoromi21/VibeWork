@@ -34,7 +34,7 @@ app.add_middleware(
 
 _WEBSITE_FRONTEND_DIR = PROJECT_ROOT / "website" / "frontend"
 if _WEBSITE_FRONTEND_DIR.is_dir():
-    # index.html сайта тянет /static/style.css и /static/script.js
+    # Старая веб-статика (style.css, script.js) — на случай прямых ссылок; корень отдаёт тот же UI, что миниапп
     app.mount("/static", StaticFiles(directory=str(_WEBSITE_FRONTEND_DIR)), name="website_static")
 
 
@@ -49,6 +49,14 @@ app.include_router(website_auth_compat_router)
 app.include_router(website_api_router)
 
 init_db()
+
+
+def _read_miniapp_html() -> str:
+    path = MINIAPP_HTML
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail=f"Miniapp HTML not found: {path}")
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
 
 
 @app.get("/api/health/llm")
@@ -66,21 +74,13 @@ async def health_llm():
 
 @app.get("/miniapp/", response_class=HTMLResponse)
 async def miniapp():
-    path = MINIAPP_HTML
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail=f"Miniapp HTML not found: {path}")
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
+    return _read_miniapp_html()
 
 
 @app.get("/", response_class=HTMLResponse)
 async def website_index():
-    """Главная страница веб-версии (website/frontend/index.html)."""
-    path = PROJECT_ROOT / "website" / "frontend" / "index.html"
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail=f"Website index not found: {path}")
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
+    """Главная сайта — тот же UI, что мини-приложение в Telegram (miniapp/frontend/index.html)."""
+    return _read_miniapp_html()
 
 
 if __name__ == "__main__":

@@ -47,13 +47,13 @@
 
 | URL (локально) | Назначение |
 |----------------|------------|
-| `http://127.0.0.1:8000/` | Веб-интерфейс VibeWork (`website/frontend/index.html`) |
-| `http://127.0.0.1:8000/miniapp/` | Telegram Mini App |
+| `http://127.0.0.1:8000/` | Веб-интерфейс — тот же UI, что в Telegram Mini App (`miniapp/frontend/index.html`) |
+| `http://127.0.0.1:8000/miniapp/` | Тот же интерфейс (удобно как URL для бота) |
 | `http://127.0.0.1:8000/docs` | OpenAPI (Swagger) |
 | `http://127.0.0.1:8000/api/health` | Быстрая проверка: сервис отвечает |
 | `http://127.0.0.1:8000/api/health/llm` | Конфигурация LLM (JSON: `llm_configured`, `ollama_mode`, `model`) |
 
-Статика веб-версии: каталог **`website/frontend/`**. Код веб-API в **`website/app/`** подключается к общему приложению через `sys.path` (см. `miniapp/run.py`).
+Интерфейс в браузере совпадает с мини-приложением; исходник — **`miniapp/frontend/`**. Каталог **`website/frontend/`** — прежняя статика (по-прежнему доступна как `/static/...`). Код веб-API в **`website/app/`** подключается к общему приложению через `sys.path` (см. `miniapp/run.py`).
 
 ---
 
