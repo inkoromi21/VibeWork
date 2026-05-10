@@ -1,0 +1,2 @@
+# Shell on Linux must use LF (avoid "No such file" on shebang with CRLF).
+*.sh text eol=lf

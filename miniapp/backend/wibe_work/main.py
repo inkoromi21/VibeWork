@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 
 from wibe_work.miniapp_paths import MINIAPP_HTML, PROJECT_ROOT, RESET_PASSWORD_HTML
 
@@ -94,6 +94,20 @@ def _read_reset_password_html() -> str:
         return f.read()
 
 
+def _smtp_nonempty_from_env_file(path: Path) -> dict[str, bool] | None:
+    """Как dotenv читает файл с диска (без секретов — только флаг «не пусто»)."""
+    if not path.is_file():
+        return None
+    raw = dotenv_values(path, encoding="utf-8")
+    keys = (
+        "EMAIL_FROM",
+        "EMAIL_SMTP_HOST",
+        "EMAIL_SMTP_USER",
+        "EMAIL_SMTP_PASSWORD",
+    )
+    return {k: bool(str(raw.get(k) or "").strip()) for k in keys}
+
+
 @app.get("/api/health/email")
 async def health_email():
     """Диагностика сброса пароля: что видит процесс (без секретов)."""
@@ -103,6 +117,7 @@ async def health_email():
     from wibe_work.services.transactional_email import transactional_email_configured
 
     root_env = PROJECT_ROOT / ".env"
+    in_file = _smtp_nonempty_from_env_file(root_env)
     return {
         "transactional_ok": transactional_email_configured(),
         "smtp_ready": smtp_configured(),
@@ -113,9 +128,14 @@ async def health_email():
             "EMAIL_SMTP_USER": bool(cfg.EMAIL_SMTP_USER),
             "EMAIL_SMTP_PASSWORD": bool(cfg.EMAIL_SMTP_PASSWORD),
         },
+        "smtp_nonempty_in_dotenv_file": in_file,
         "dotenv_project_root": str(PROJECT_ROOT),
         "dotenv_file_exists": root_env.is_file(),
         "vibework_env_file": os.environ.get("VIBEWORK_ENV_FILE", "") or None,
+        "hint": (
+            "Если smtp_nonempty_in_dotenv_file показывает HOST/USER=false — в .env на сервере нет этих строк или они пустые (добавьте EMAIL_SMTP_HOST=smtp.gmail.com и EMAIL_SMTP_USER=...). "
+            "Если в файле true, а smtp_fields_set false — перезапустите API после правок .env."
+        ),
     }
 
 
