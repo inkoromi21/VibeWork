@@ -92,31 +92,21 @@ def get_profile_schema() -> Dict[str, Any]:
                     {
                         "id": "motivation_ai",
                         "type": "textarea",
-                        "label": "Мотивация / комментарий для ИИ",
-                        "placeholder": "Коротко: что важно в карьере (до 500 символов)",
+                        "label": "Почему выбрали это направление",
+                        "placeholder": "Коротко: что вас к этому привело (до 500 символов)",
                         "max_length": 500,
                         "required": False,
                     },
                 ],
             },
             {
-                "id": "study_work",
-                "title": "УЧЁБА И ФОРМАТ РАБОТЫ",
+                "id": "desired_work_format",
+                "title": "ФОРМАТ ЖЕЛАЕМОЙ РАБОТЫ",
                 "fields": [
-                    {
-                        "id": "study_form",
-                        "type": "select",
-                        "label": "Форма обучения",
-                        "options": [
-                            {"id": "fulltime", "label": "Очная"},
-                            {"id": "parttime", "label": "Очно-заочная / заочная"},
-                            {"id": "not_studying", "label": "Не учусь"},
-                        ],
-                    },
                     {
                         "id": "work_format_pref",
                         "type": "multiselect",
-                        "label": "Формат работы (офис / удалёнка / гибрид)",
+                        "label": "Формат работы",
                         "max_select": 3,
                         "options": [
                             {"id": "office", "label": "Офис"},
@@ -127,7 +117,7 @@ def get_profile_schema() -> Dict[str, Any]:
                     {
                         "id": "hours_per_week",
                         "type": "number",
-                        "label": "Часов в неделю готовы уделять развитию",
+                        "label": "Часов в неделю на развитие",
                         "placeholder": "например, 10",
                         "min": 0,
                         "max": 60,
@@ -135,8 +125,8 @@ def get_profile_schema() -> Dict[str, Any]:
                 ],
             },
             {
-                "id": "focus_month",
-                "title": "ФОКУС НА МЕСЯЦ И ЧАТ «ПРИВЕТ»",
+                "id": "priority_now",
+                "title": "ПРИОРИТЕТ СЕЙЧАС",
                 "fields": [
                     {
                         "id": "career_priority",
@@ -149,26 +139,6 @@ def get_profile_schema() -> Dict[str, Any]:
                             {"id": "balance", "label": "Баланс жизни и работы"},
                         ],
                     },
-                    {
-                        "id": "monthly_focus_skill",
-                        "type": "text",
-                        "label": "Один навык на этот месяц",
-                        "placeholder": "Например: уверенный SQL, презентации в Figma…",
-                    },
-                    {
-                        "id": "monthly_focus_project",
-                        "type": "textarea",
-                        "label": "Маленький проект на месяц",
-                        "placeholder": "Что сделаете до конца месяца (одно предложение или список)",
-                        "max_length": 600,
-                    },
-                    {
-                        "id": "weekly_progress_note",
-                        "type": "textarea",
-                        "label": "Прогресс за неделю",
-                        "placeholder": "Раз в неделю: что сделали по фокусу и проекту (обновляйте поле)",
-                        "max_length": 800,
-                    },
                 ],
             },
             {
@@ -180,12 +150,6 @@ def get_profile_schema() -> Dict[str, Any]:
                         "type": "text",
                         "label": "Языки",
                         "placeholder": "Русский, English — уровни",
-                    },
-                    {
-                        "id": "software_skills",
-                        "type": "textarea",
-                        "label": "Программы и инструменты",
-                        "placeholder": "Figma, Excel, Python…",
                     },
                     {
                         "id": "soft_communication",

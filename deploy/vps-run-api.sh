@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Запуск API на ВМ: обновление кода, зависимости, освобождение :8000, uvicorn.
+# Запуск API на ВМ: зависимости, освобождение :8000, uvicorn.
+# Код репозитория скрипт НЕ тянет — сделайте git pull отдельно (иначе при pull с PAT в URL
+# и повторном git pull внутри скрипта Git снова запрашивает логин для origin).
+#
 # Использование (из каталога репозитория, например /opt/vibework):
-#   bash deploy/vps-run-api.sh
-# или:
+#   git pull origin main && bash deploy/vps-run-api.sh
+# или после настройки credential.helper / SSH на origin:
 #   cd /opt/vibework && bash deploy/vps-run-api.sh
+#   (и перед этим при необходимости: git pull origin main)
 #
 # chmod +x deploy/vps-run-api.sh   # по желанию, чтобы вызывать ./deploy/vps-run-api.sh
 
@@ -12,7 +16,6 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-git pull origin main
 # shellcheck disable=SC1091
 source venv/bin/activate
 pip install -r miniapp/requirements.txt -q

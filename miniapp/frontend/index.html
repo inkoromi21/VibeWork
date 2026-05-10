@@ -3,6 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+    <script>
+    (function () {
+        try {
+            if (localStorage.getItem('vw_theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+        } catch (e) {}
+    })();
+    </script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
     (function () {
@@ -19,6 +26,9 @@
              * Светлый только контент VibeWork — наши CSS-переменные поверх переменных Telegram.
              */
             function forceLightMiniAppContentOnly() {
+                try {
+                    if (localStorage.getItem('vw_theme') === 'dark') return;
+                } catch (e) {}
                 var root = document.documentElement;
                 root.style.setProperty('--bg-page', '#ffffff');
                 root.style.setProperty('--card', '#ffffff');
@@ -86,7 +96,90 @@
             --btn-anketa-border: rgba(var(--neon-rgb), 0.48);
             --btn-anketa-border-strong: #22c55e;
             --btn-anketa-radius: 999px;
+            --wave-strip-bg: #ffffff;
+            --chat-log-bg: #fafbfc;
+            --chip-pill-bg: #ecfdf5;
+            --plan-bar-bg: #eef0f4;
+            --account-chip-active-color: #064e3b;
+            --pill-fg: #133526;
+            --banner-warn-bg: #fff7ed;
+            --banner-warn-border: #fdba74;
+            --banner-warn-text: #9a3412;
+            --auth-error-bg: #fff1f2;
+            --auth-error-border: #fecdd3;
+            --chat-history-frame-bg: #f0fdf4;
+            --chat-history-details-border: rgba(20, 82, 20, 0.35);
+            --chat-history-inner-bg: rgba(255, 255, 255, 0.88);
+            --chat-history-list-bg: rgba(255, 255, 255, 0.55);
+            --vw-overlay-bg: rgba(255, 255, 255, 0.94);
+            --placeholder-color: rgba(0, 0, 0, 0.45);
         }
+
+        html[data-theme="dark"] {
+            color-scheme: dark;
+            --neon: #4ade80;
+            --neon-deep: #4ade80;
+            --accent-dark: #86efac;
+            --accent-lime: #bbf7d0;
+            --accent-wave: #22c55e;
+            --neon-rgb: 74, 222, 128;
+            --accent: #4ade80;
+            --field-outline: #4ade80;
+            --bg-page: #0f1419;
+            --card: #1a222d;
+            --text: #e8eaed;
+            --text-muted: #94a3b8;
+            --border: #2d3d52;
+            --danger: #f87171;
+            --shadow: 0 2px 20px rgba(0, 0, 0, 0.45);
+            --shadow-card: 0 4px 28px rgba(0, 0, 0, 0.5);
+            --accent-soft: rgba(74, 222, 128, 0.14);
+            --accent-border: rgba(74, 222, 128, 0.38);
+            --btn-anketa-bg: rgba(34, 197, 94, 0.12);
+            --btn-anketa-bg-hover: rgba(34, 197, 94, 0.22);
+            --btn-anketa-bg-selected: rgba(34, 197, 94, 0.26);
+            --btn-primary-border: #4ade80;
+            --btn-anketa-border: rgba(74, 222, 128, 0.45);
+            --btn-anketa-border-strong: #4ade80;
+            --wave-strip-bg: #1a222d;
+            --chat-log-bg: #121820;
+            --chip-pill-bg: rgba(34, 197, 94, 0.16);
+            --plan-bar-bg: #243044;
+            --account-chip-active-color: #bbf7d0;
+            --pill-fg: #dcfce7;
+            --banner-warn-bg: #3d2e1a;
+            --banner-warn-border: #d97706;
+            --banner-warn-text: #fcd34d;
+            --auth-error-bg: #3d1a22;
+            --auth-error-border: #fb7185;
+            --chat-history-frame-bg: rgba(34, 197, 94, 0.1);
+            --chat-history-details-border: rgba(74, 222, 128, 0.35);
+            --chat-history-inner-bg: rgba(26, 34, 45, 0.92);
+            --chat-history-list-bg: rgba(15, 20, 28, 0.75);
+            --vw-overlay-bg: rgba(15, 20, 25, 0.92);
+            --placeholder-color: rgba(232, 234, 237, 0.42);
+        }
+
+        html[data-theme="dark"] body::before {
+            background: radial-gradient(ellipse 55% 42% at 100% 100%, rgba(74, 222, 128, 0.07), transparent 52%);
+        }
+
+        html[data-theme="dark"] .topbar-profile-hint {
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+        }
+
+        html[data-theme="dark"] select:not([multiple]) {
+            background-image:
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"),
+                linear-gradient(var(--accent-soft), var(--accent-soft));
+        }
+
+        html[data-theme="dark"] select:not([multiple]):focus {
+            background-image:
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"),
+                linear-gradient(var(--accent-soft), var(--accent-soft));
+        }
+
         * { box-sizing: border-box; }
         html {
             color-scheme: light;
@@ -226,8 +319,8 @@
             flex-shrink: 0;
             overflow: hidden;
             isolation: isolate;
-            /* Под прозрачный низ SVG — ровный белый (не второй слой мяты) */
-            background: #ffffff;
+            /* Под прозрачный низ SVG — цвет полосы совпадает с темой */
+            background: var(--wave-strip-bg);
         }
         .vw-wave-strip-inner {
             position: absolute;
@@ -295,7 +388,7 @@
         .account-chip-btn.is-active {
             border-color: var(--btn-primary-border);
             background: var(--btn-anketa-bg-selected);
-            color: #064e3b;
+            color: var(--account-chip-active-color);
             box-shadow: none;
         }
         .account-chip-icon {
@@ -398,7 +491,7 @@
             font-weight: 600;
             padding: 5px 10px;
             border-radius: 999px;
-            background: #ecfdf5;
+            background: var(--chip-pill-bg);
             color: var(--accent-dark);
             border: 2px solid var(--btn-anketa-border-strong);
             box-shadow: none;
@@ -541,7 +634,7 @@
             border-radius: 999px;
             background: var(--accent-soft);
             border: 1px solid var(--accent-border);
-            color: #133526;
+            color: var(--pill-fg);
             max-width: 200px;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -582,15 +675,15 @@
             gap: 10px;
             padding: 12px 14px;
             border-radius: var(--radius);
-            background: #fff7ed;
-            border: 1px solid #fdba74;
-            color: #9a3412;
+            background: var(--banner-warn-bg);
+            border: 1px solid var(--banner-warn-border);
+            color: var(--banner-warn-text);
             margin-bottom: 16px;
             font-size: .85rem;
         }
         .status { padding: 10px 14px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 16px; font-size: .85rem; background: var(--card); }
         .status.ok { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent-dark); }
-        .status.warn { border-color: #fdba74; background: #fff7ed; color: #9a3412; }
+        .status.warn { border-color: var(--banner-warn-border); background: var(--banner-warn-bg); color: var(--banner-warn-text); }
         button.btn-primary {
             padding: 12px 18px;
             margin-top: 8px;
@@ -697,7 +790,7 @@
                 linear-gradient(var(--accent-soft), var(--accent-soft));
         }
         input::placeholder, textarea::placeholder {
-            color: rgba(0, 0, 0, 0.45);
+            color: var(--placeholder-color);
         }
         input:not([type="range"]):focus, textarea:focus, select:focus {
             border-color: var(--btn-anketa-border-strong);
@@ -966,7 +1059,7 @@
         .scenario-hero .plan-name { font-weight: 600; margin-top: 8px; font-size: .9rem; }
         .scenario-lane { margin-bottom: 12px; }
         .scenario-lane .lane-label { font-size: .78rem; font-weight: 600; margin-bottom: 4px; display: flex; justify-content: space-between; }
-        .plan-bar-outer { height: 10px; background: #eef0f4; border-radius: 5px; overflow: hidden; }
+        .plan-bar-outer { height: 10px; background: var(--plan-bar-bg); border-radius: 5px; overflow: hidden; }
         .plan-bar-inner { height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--accent-dark), var(--accent)); }
         .mts-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
         .mts-row .mts-name { flex: 0 0 38%; font-size: .8rem; font-weight: 500; }
@@ -1011,7 +1104,7 @@
             max-height: 420px;
             overflow-y: auto;
             padding: 14px;
-            background: #fafbfc;
+            background: var(--chat-log-bg);
         }
         .chat-bubble { margin-bottom: 10px; padding: 10px 12px; border-radius: var(--radius-sm); font-size: .88rem; line-height: 1.45; border: 1px solid var(--border); }
         .chat-bubble.user { background: var(--card); margin-left: 32px; border-color: var(--accent-border); }
@@ -1035,7 +1128,7 @@
             padding: 14px 12px 14px;
             border-radius: var(--radius-lg);
             border: 2px solid var(--btn-anketa-border-strong);
-            background: #f0fdf4;
+            background: var(--chat-history-frame-bg);
             box-shadow: var(--shadow-card);
         }
         .chat-history-frame-kicker {
@@ -1050,8 +1143,8 @@
         .chat-history-details {
             margin: 0;
             border-radius: var(--radius);
-            border: 1px solid rgba(20, 82, 20, 0.35);
-            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid var(--chat-history-details-border);
+            background: var(--chat-history-inner-bg);
             box-shadow: none;
             overflow: hidden;
         }
@@ -1107,7 +1200,7 @@
             overflow-y: auto;
             padding: 8px;
             margin: 0;
-            background: rgba(255, 255, 255, 0.55);
+            background: var(--chat-history-list-bg);
         }
         .chat-history-item {
             text-align: left;
@@ -1165,8 +1258,8 @@
             margin-bottom: 12px;
             padding: 10px 12px;
             border-radius: var(--radius-sm);
-            background: #fff1f2;
-            border: 1px solid #fecdd3;
+            background: var(--auth-error-bg);
+            border: 1px solid var(--auth-error-border);
         }
         .auth-card {
             background: var(--card);
@@ -1177,6 +1270,9 @@
         }
         .auth-switch { margin-top: 18px; text-align: center; font-size: .88rem; color: var(--text-muted); }
         .auth-switch a { cursor: pointer; color: var(--accent-dark); font-weight: 600; }
+        .auth-forgot { margin-top: 14px; text-align: center; font-size: .85rem; }
+        .auth-forgot a { color: var(--accent-dark); font-weight: 600; text-decoration: none; }
+        .auth-forgot a:hover { text-decoration: underline; }
         .pwd-input { margin-bottom: 6px; }
         .pwd-reveal { display: flex; flex-direction: row; align-items: center; gap: 10px; margin: 0 0 14px; }
         .pwd-square {
@@ -1552,7 +1648,7 @@
             position: fixed;
             inset: 0;
             z-index: 100000;
-            background: rgba(255, 255, 255, 0.94);
+            background: var(--vw-overlay-bg);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             display: none;
@@ -1593,6 +1689,40 @@
             width: 100%;
             margin-top: 0 !important;
         }
+
+        .theme-toggle {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            margin-top: 4px;
+            padding: 0;
+            border-radius: var(--btn-anketa-radius);
+            border: 2px solid var(--btn-anketa-border-strong);
+            background: var(--btn-anketa-bg);
+            cursor: pointer;
+            font-size: 1.2rem;
+            line-height: 1;
+            transition: background 0.18s, border-color 0.18s, transform 0.15s ease;
+            box-shadow: none;
+        }
+        .theme-toggle:hover {
+            background: var(--btn-anketa-bg-hover);
+            border-color: var(--btn-primary-border);
+        }
+        .theme-toggle:focus-visible {
+            outline: 2px solid var(--neon);
+            outline-offset: 2px;
+        }
+        .theme-toggle--auth {
+            position: fixed;
+            top: max(14px, env(safe-area-inset-top));
+            right: max(14px, env(safe-area-inset-right));
+            z-index: 100;
+            margin-top: 0;
+        }
     </style>
 </head>
 <body>
@@ -1601,6 +1731,84 @@
 (function () {
     const ACCESS_TOKEN_KEY = 'career_access_token';
     const USER_EMAIL_KEY = 'userEmail';
+    const THEME_STORAGE_KEY = 'vw_theme';
+
+    function isDarkTheme() {
+        return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+
+    function applyTheme(dark) {
+        var root = document.documentElement;
+        if (dark) {
+            root.setAttribute('data-theme', 'dark');
+            try {
+                localStorage.setItem(THEME_STORAGE_KEY, 'dark');
+            } catch (e) {}
+        } else {
+            root.removeAttribute('data-theme');
+            try {
+                localStorage.setItem(THEME_STORAGE_KEY, 'light');
+            } catch (e) {}
+        }
+        syncThemeToggleButtons();
+    }
+
+    function toggleAppTheme() {
+        applyTheme(!isDarkTheme());
+    }
+
+    function themeToggleTopbarHtml() {
+        var dark = isDarkTheme();
+        var label = dark ? 'Светлая тема' : 'Тёмная тема';
+        var icon = dark ? '☀️' : '🌙';
+        return (
+            '<button type="button" class="theme-toggle" id="vwThemeToggle" title="' +
+            label +
+            '" aria-label="' +
+            label +
+            '">' +
+            icon +
+            '</button>'
+        );
+    }
+
+    function themeToggleAuthHtml() {
+        var dark = isDarkTheme();
+        var label = dark ? 'Светлая тема' : 'Тёмная тема';
+        var icon = dark ? '☀️' : '🌙';
+        return (
+            '<button type="button" class="theme-toggle theme-toggle--auth" id="vwThemeToggleAuth" title="' +
+            label +
+            '" aria-label="' +
+            label +
+            '">' +
+            icon +
+            '</button>'
+        );
+    }
+
+    function syncThemeToggleButtons() {
+        var dark = isDarkTheme();
+        var label = dark ? 'Светлая тема' : 'Тёмная тема';
+        var icon = dark ? '☀️' : '🌙';
+        ['vwThemeToggle', 'vwThemeToggleAuth'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = icon;
+            el.setAttribute('title', label);
+            el.setAttribute('aria-label', label);
+        });
+    }
+
+    function wireThemeToggleClicks() {
+        ['vwThemeToggle', 'vwThemeToggleAuth'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.onclick = function () {
+                toggleAppTheme();
+            };
+        });
+    }
 
     const HOME_TAB = { id: 'home', label: 'Разделы', ico: '☰' };
     const ACCOUNT_TAB = { id: 'account', label: 'Аккаунт', ico: '✦' };
@@ -1737,7 +1945,7 @@
     function tabTagline(tabId) {
         const map = {
             home: 'Главная страница приложения: выбор раздела.',
-            profile: 'Анкета: база, формат работы, блок «Фокус на месяц» (навык, проект, прогресс раз в неделю) — для чата и плана.',
+            profile: 'Анкета: база, желаемый формат работы, что сейчас важнее — для чата и плана.',
             test: 'Ответьте честно: так точнее разбор по сфере.',
             analysis: 'Метрики, сценарии и план роста в одном месте.',
             chat: 'ИИ опирается на ваш сохранённый разбор.',
@@ -1943,6 +2151,7 @@
         const isReg = authMode === 'register';
         document.getElementById('app').innerHTML =
             '<div class="layout layout--auth">' +
+            themeToggleAuthHtml() +
             '<div style="text-align:center;margin-bottom:8px"><span class="brand-mono">{ VibeWork }</span></div>' +
             '<p class="tagline" style="text-align:center;margin:0 0 8px">Карьерный навигатор 14–30</p>' +
             '<div class="auth-card">' +
@@ -1964,6 +2173,9 @@
                   '<span class="pwd-reveal-caption">Показать пароль</span></div>'
                 : '') +
             '<button type="button" class="btn-primary" style="width:100%;margin-top:4px" onclick="window.__vw.submitAuth()">' + (isReg ? 'Зарегистрироваться' : 'Войти') + '</button>' +
+            (!isReg
+                ? '<p class="auth-forgot"><a href="/reset-password">Забыли пароль?</a></p>'
+                : '') +
             '<p class="auth-switch">' +
             (isReg
                 ? 'Уже есть аккаунт? <a role="button" id="swLogin">Войти</a>'
@@ -1975,6 +2187,7 @@
         if (swReg) swReg.onclick = function (e) { e.preventDefault(); authMode = 'register'; renderAuthForm(); };
         wirePasswordToggle('toggleAuthPass', 'authPass');
         wirePasswordToggle('toggleAuthPass2', 'authPass2');
+        wireThemeToggleClicks();
     }
 
     async function submitAuth() {
@@ -2106,7 +2319,7 @@
             '<stop offset="100%" stop-color="#6ee7b7"/>' +
             '</linearGradient>' +
             '</defs>' +
-            '<rect width="393" height="151" fill="#ffffff"/>' +
+            '<rect width="393" height="151" fill="var(--wave-strip-bg)"/>' +
             '<path fill="url(#vwWaveFill)" fill-rule="evenodd" clip-rule="evenodd" d="M393 151L376.625 132.125C360.25 113.25 327.5 75.5 294.75 72.3542C262 69.2083 229.25 100.667 196.5 122.688C163.75 144.708 131 157.292 98.25 141.563C65.5 125.833 32.75 81.7917 16.375 59.7708L0 37.75V0H393V151Z"/>' +
             '</svg></div></div>';
         document.getElementById('app').innerHTML =
@@ -2133,6 +2346,7 @@
             esc(disp) +
             '</span>' +
             '</button>' +
+            themeToggleTopbarHtml() +
             '<button type="button" class="btn-auth btn-auth-ghost" onclick="window.__vw.logout()">Выйти</button>' +
             '</div>' +
             '</header>' +
@@ -2144,6 +2358,7 @@
         refreshAnalysisFlag();
         renderTabContent();
         wireScrollTopBtn();
+        wireThemeToggleClicks();
     }
 
     let scrollTopVisibilityHandler = null;
@@ -4122,6 +4337,7 @@
     window.__vw = {
         submitAuth: submitAuth,
         logout: logout,
+        toggleTheme: toggleAppTheme,
         goTab: async function (id) {
             currentTab = id;
             await renderShell();

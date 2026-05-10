@@ -1,18 +1,36 @@
+import hashlib
+import secrets
 import sqlite3
+import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import bcrypt
 from fastapi import APIRouter, HTTPException, Request
 
 from wibe_work.bearer_auth import require_bearer_matches_user
+from wibe_work.config import PUBLIC_BASE_URL
 from wibe_work.jwt_service import create_access_token
 from wibe_work.miniapp_paths import PROJECT_ROOT
 from wibe_work.sqlite_db import get_db
-from wibe_work.api_schemas import EmailLoginBody, EmailPasswordChangeBody, EmailRegisterBody
+from wibe_work.api_schemas import (
+    EmailForgotPasswordBody,
+    EmailLoginBody,
+    EmailPasswordChangeBody,
+    EmailRegisterBody,
+    EmailResetPasswordBody,
+)
 from wibe_work.password_input import sanitize_password_input
+from wibe_work.services.mailgun_send import mailgun_configured, send_mailgun_message
 
 router = APIRouter(prefix="/auth/email", tags=["auth_email"])
+
+_FORGOT_COOLDOWN_SEC = 90
+_forgot_last_by_email: dict[str, float] = {}
+
+_FORGOT_PUBLIC_MESSAGE = (
+    "Если этот адрес зарегистрирован, мы отправили письмо со ссылкой для сброса пароля."
+)
 
 # Изолированный `website/main.py` (порт 8765) писал сюда; миниаппа — в miniapp/data/*.db
 _LEGACY_ISOLATED_WEB_DB = PROJECT_ROOT / "website" / "data" / "vibework.db"
@@ -20,6 +38,15 @@ _LEGACY_ISOLATED_WEB_DB = PROJECT_ROOT / "website" / "data" / "vibework.db"
 
 def _norm_email(email: str) -> str:
     return email.strip().lower()
+
+
+def _forgot_rate_allow(email: str) -> bool:
+    now = time.time()
+    last = _forgot_last_by_email.get(email, 0.0)
+    if now - last < _FORGOT_COOLDOWN_SEC:
+        return False
+    _forgot_last_by_email[email] = now
+    return True
 
 
 def _verify_bcrypt_password(raw: str, stored_hash: str) -> bool:
@@ -165,6 +192,143 @@ async def email_register(body: EmailRegisterBody):
         "user_id": user_id,
         "email": email,
     }
+
+
+@router.post("/forgot-password")
+async def email_forgot_password(body: EmailForgotPasswordBody):
+    """Запрос сброса: одно письмо на Mailgun; ответ одинаковый, если email не в базе."""
+    email = _norm_email(str(body.email))
+    if not _forgot_rate_allow(email):
+        raise HTTPException(
+            status_code=429,
+            detail="Подождите около минуты перед повторной отправкой.",
+        )
+
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT user_id FROM email_users WHERE email = ?",
+            (email,),
+        ).fetchone()
+
+    if not row:
+        return {"ok": True, "message": _FORGOT_PUBLIC_MESSAGE}
+
+    if not mailgun_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Отправка почты временно недоступна. Обратитесь в поддержку.",
+        )
+
+    user_id = str(row["user_id"])
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+    now = datetime.now(timezone.utc)
+    expires = now + timedelta(hours=1)
+
+    with get_db() as conn:
+        conn.execute(
+            "DELETE FROM password_reset_tokens WHERE user_id = ? AND used_at IS NULL",
+            (user_id,),
+        )
+        conn.execute(
+            """INSERT INTO password_reset_tokens
+               (user_id, token_hash, expires_at, used_at, created_at)
+               VALUES (?, ?, ?, NULL, ?)""",
+            (user_id, token_hash, expires.isoformat(), now.isoformat()),
+        )
+        conn.commit()
+
+    reset_url = f"{PUBLIC_BASE_URL}/reset-password?token={raw_token}"
+    subject = "VibeWork — сброс пароля"
+    text_body = (
+        "Здравствуйте.\n\n"
+        f"Чтобы задать новый пароль, перейдите по ссылке (действует 1 час):\n{reset_url}\n\n"
+        "Если вы не запрашивали сброс, проигнорируйте это письмо.\n"
+    )
+    html_body = (
+        "<p>Здравствуйте.</p>"
+        "<p>Чтобы задать новый пароль, нажмите на кнопку ниже (ссылка действует 1 час).</p>"
+        f'<p><a href="{reset_url}" style="color:#166534;font-weight:600;">Сбросить пароль</a></p>'
+        "<p style=\"color:#666;font-size:14px;\">Если вы не запрашивали сброс — удалите письмо.</p>"
+    )
+
+    ok, err_msg = await send_mailgun_message(email, subject, text_body, html_body)
+    if not ok:
+        with get_db() as conn:
+            conn.execute(
+                "DELETE FROM password_reset_tokens WHERE token_hash = ?",
+                (token_hash,),
+            )
+            conn.commit()
+        raise HTTPException(
+            status_code=503,
+            detail="Не удалось отправить письмо. Попробуйте позже.",
+        )
+
+    return {"ok": True, "message": _FORGOT_PUBLIC_MESSAGE}
+
+
+@router.post("/reset-password")
+async def email_reset_password(body: EmailResetPasswordBody):
+    """Установка нового пароля по одноразовому токену из письма."""
+    raw = (body.token or "").strip()
+    new_pw = sanitize_password_input(body.new_password)
+    if len(new_pw) < 8:
+        raise HTTPException(
+            status_code=422,
+            detail="Пароль не короче 8 символов (проверьте пробелы по краям).",
+        )
+
+    token_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    with get_db() as conn:
+        row = conn.execute(
+            """SELECT id, user_id, expires_at, used_at FROM password_reset_tokens
+               WHERE token_hash = ?""",
+            (token_hash,),
+        ).fetchone()
+
+    if not row or row["used_at"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Ссылка недействительна или уже использована. Запросите новую.",
+        )
+
+    exp_raw = str(row["expires_at"])
+    try:
+        exp = datetime.fromisoformat(exp_raw.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Ссылка недействительна. Запросите новую.",
+        )
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > exp:
+        raise HTTPException(
+            status_code=400,
+            detail="Срок действия ссылки истёк. Запросите сброс пароля снова.",
+        )
+
+    user_id = str(row["user_id"])
+    new_hash = bcrypt.hashpw(
+        new_pw.encode("utf-8"),
+        bcrypt.gensalt(),
+    ).decode("ascii")
+
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE email_users SET password_hash = ? WHERE user_id = ?",
+            (new_hash, user_id),
+        )
+        conn.execute(
+            "UPDATE password_reset_tokens SET used_at = ? WHERE id = ?",
+            (now_iso, row["id"]),
+        )
+        conn.commit()
+
+    return {"ok": True}
 
 
 @router.post("/login")

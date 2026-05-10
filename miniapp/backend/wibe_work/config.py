@@ -23,3 +23,14 @@ HH_MIN_POLL_ANSWERS = int(os.environ.get("HH_MIN_POLL_ANSWERS", "0"))
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-change-me-in-production-vibework")
 JWT_EXPIRE_DAYS = int(os.environ.get("JWT_EXPIRE_DAYS", "30"))
 JWT_EXPIRE_DELTA = timedelta(days=JWT_EXPIRE_DAYS)
+
+# Публичный URL сайта (для ссылок в письмах сброса пароля). Без завершающего слэша.
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:8000").strip().rstrip("/")
+
+# Mailgun: https://documentation.mailgun.com/en/latest/api-sending.html
+MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY", "").strip()
+MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN", "").strip()
+# us | eu — хост API
+MAILGUN_REGION = os.environ.get("MAILGUN_REGION", "us").strip().lower()
+# Отправитель: "VibeWork <noreply@mg.example.com>"
+EMAIL_FROM = os.environ.get("EMAIL_FROM", "").strip()

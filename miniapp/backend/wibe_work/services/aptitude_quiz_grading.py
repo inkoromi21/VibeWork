@@ -16,6 +16,16 @@ _GRADE_HINTS = {
     "university": "Полная версия: карьера, резюме, старт на рынке труда.",
 }
 
+# id опции «Уровень образования» в анкете — приоритетнее education_level, если тот не синхронизирован
+_EDUCATION_DETAIL_GRADE: Dict[str, str] = {
+    "school_9": "school",
+    "school_11": "school",
+    "college": "vocational",
+    "univ_bachelor": "university",
+    "univ_master": "university",
+    "univ_incomplete": "university",
+}
+
 
 def compute_quiz_grade(profile: Dict[str, Any]) -> str:
     """
@@ -24,6 +34,12 @@ def compute_quiz_grade(profile: Dict[str, Any]) -> str:
     university — неполное высшее и выше.
     Если образование не указано — ориентир по возрасту (до 17 / до 21 / далее).
     """
+    detail = profile.get("education_detail")
+    if detail is not None and str(detail).strip():
+        g = _EDUCATION_DETAIL_GRADE.get(str(detail).strip().lower())
+        if g:
+            return g
+
     raw = profile.get("education_level")
     rank = None
     if raw is not None and str(raw).strip():

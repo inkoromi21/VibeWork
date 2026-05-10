@@ -13,7 +13,6 @@ def _basic_data_block(profile: Dict[str, Any]) -> Dict[str, Any]:
         "interests": profile.get("interests"),
         "interest_spheres": parse_interest_spheres(profile),
         "education_level": profile.get("education_level"),
-        "study_form": profile.get("study_form"),
         "course_or_grade": profile.get("course_or_grade"),
         "city": profile.get("city"),
         "work_format_preference": profile.get("work_format_preference"),
@@ -22,9 +21,6 @@ def _basic_data_block(profile: Dict[str, Any]) -> Dict[str, Any]:
         "internship_ready": profile.get("internship_ready"),
         "hours_per_week": profile.get("hours_per_week"),
         "career_priority": profile.get("career_priority"),
-        "monthly_focus_skill": profile.get("monthly_focus_skill"),
-        "monthly_focus_project": profile.get("monthly_focus_project"),
-        "weekly_progress_note": profile.get("weekly_progress_note"),
     }
 
 
@@ -73,7 +69,7 @@ def _analyze_skills(
 
     if not names:
         notes = [
-            "Добавьте навыки: поля «Владение программами», «Программирование», SMM или блок «Компетенции».",
+            "Добавьте навыки: блок «Компетенции» или поля «Программирование», SMM в профиле.",
         ]
         notes.extend(everyday)
         return {

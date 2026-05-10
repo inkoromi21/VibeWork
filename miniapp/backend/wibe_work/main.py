@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 
-from wibe_work.miniapp_paths import MINIAPP_HTML, PROJECT_ROOT
+from wibe_work.miniapp_paths import MINIAPP_HTML, PROJECT_ROOT, RESET_PASSWORD_HTML
 
 load_dotenv(PROJECT_ROOT / ".env")
 
@@ -61,6 +61,14 @@ def _read_miniapp_html() -> str:
         return f.read()
 
 
+def _read_reset_password_html() -> str:
+    path = RESET_PASSWORD_HTML
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail=f"Reset password HTML not found: {path}")
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
 @app.get("/api/health/llm")
 async def health_llm():
     """Проверка LLM: облако или локальная Ollama (USE_OLLAMA=1)."""
@@ -83,6 +91,12 @@ async def miniapp():
 async def website_index():
     """Главная сайта — тот же UI, что мини-приложение в Telegram (miniapp/frontend/index.html)."""
     return _read_miniapp_html()
+
+
+@app.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page():
+    """Сброс пароля по ссылке из письма (Mailgun)."""
+    return _read_reset_password_html()
 
 
 if __name__ == "__main__":

@@ -8,6 +8,9 @@ EDUCATION_RANK: Dict[str, int] = {
     "": 0,
     "не указано": 0,
     "основное": 0,
+    # Сводное значение из анкеты (maps_education) — должно совпадать с рангом вуза / школы
+    "школа": 1,
+    "вуз": 3,
     "школьник": 1,
     "9 классов": 1,
     "среднее": 1,
@@ -55,7 +58,7 @@ _PRIORITY_RU = {
 
 
 def coach_profile_snippet(profile: Dict[str, Any]) -> str:
-    """Краткий текст для ИИ-чата: базовые поля анкеты + город, формат, приоритет, фокус месяца, прогресс."""
+    """Краткий текст для ИИ-чата: базовые поля анкеты + город, формат, приоритет."""
     if not profile:
         return ""
     lines: List[str] = []
@@ -80,15 +83,6 @@ def coach_profile_snippet(profile: Dict[str, Any]) -> str:
     pr = (profile.get("career_priority") or "").strip().lower()
     if pr:
         lines.append(f"Приоритет сейчас: {_PRIORITY_RU.get(pr, pr)}")
-    sk = (profile.get("monthly_focus_skill") or "").strip()
-    if sk:
-        lines.append(f"Навык месяца: {sk}")
-    pj = (profile.get("monthly_focus_project") or "").strip()
-    if pj:
-        lines.append(f"Проект месяца: {pj[:400]}")
-    wk = (profile.get("weekly_progress_note") or "").strip()
-    if wk:
-        lines.append(f"Прогресс за неделю: {wk[:400]}")
     return "\n".join(lines)
 
 
