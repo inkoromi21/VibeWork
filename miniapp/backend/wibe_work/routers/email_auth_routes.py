@@ -28,9 +28,7 @@ router = APIRouter(prefix="/auth/email", tags=["auth_email"])
 _FORGOT_COOLDOWN_SEC = 90
 _forgot_last_by_email: dict[str, float] = {}
 
-_FORGOT_PUBLIC_MESSAGE = (
-    "Если этот адрес зарегистрирован, мы отправили письмо со ссылкой для сброса пароля."
-)
+_FORGOT_PUBLIC_MESSAGE = "Ссылка для сброса пароля отправлена."
 
 # Изолированный `website/main.py` (порт 8765) писал сюда; миниаппа — в miniapp/data/*.db
 _LEGACY_ISOLATED_WEB_DB = PROJECT_ROOT / "website" / "data" / "vibework.db"
