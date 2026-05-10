@@ -35,6 +35,18 @@ MAILGUN_REGION = os.environ.get("MAILGUN_REGION", "us").strip().lower()
 # Отправитель: "VibeWork <noreply@mg.example.com>" или "VibeWork <you@yandex.ru>"
 EMAIL_FROM = os.environ.get("EMAIL_FROM", "").strip()
 
+# Unisender Go (транзакционные письма по HTTPS API): https://goapi.unisender.ru
+UNISENDER_API_KEY = os.environ.get("UNISENDER_API_KEY", "").strip()
+UNISENDER_GO_BASE_URL = os.environ.get(
+    "UNISENDER_GO_BASE_URL", "https://goapi.unisender.ru"
+).strip()
+
+# Unisender Web API (sendEmail) — базовый тариф Unisender, требует list_id и подтверждённого sender_email.
+UNISENDER_LIST_ID = os.environ.get("UNISENDER_LIST_ID", "").strip()
+UNISENDER_WEB_BASE_URL = os.environ.get(
+    "UNISENDER_WEB_BASE_URL", "https://api.unisender.com"
+).strip()
+
 # SMTP (бесплатно с Яндекс / Mail.ru / хостингом — пароль приложения). Приоритетнее Mailgun, если задан хост.
 def _smtp_port() -> int:
     raw = os.environ.get("EMAIL_SMTP_PORT", "587").strip()

@@ -104,6 +104,8 @@ def _smtp_nonempty_from_env_file(path: Path) -> dict[str, bool] | None:
         "EMAIL_SMTP_HOST",
         "EMAIL_SMTP_USER",
         "EMAIL_SMTP_PASSWORD",
+        "UNISENDER_API_KEY",
+        "UNISENDER_LIST_ID",
     )
     return {k: bool(str(raw.get(k) or "").strip()) for k in keys}
 
@@ -115,18 +117,25 @@ async def health_email():
     from wibe_work.services.mailgun_send import mailgun_configured
     from wibe_work.services.smtp_send import smtp_configured
     from wibe_work.services.transactional_email import transactional_email_configured
+    from wibe_work.services.unisender_go_send import unisender_go_configured
+    from wibe_work.services.unisender_send_email import unisender_web_configured
 
     root_env = PROJECT_ROOT / ".env"
     in_file = _smtp_nonempty_from_env_file(root_env)
     return {
         "transactional_ok": transactional_email_configured(),
         "smtp_ready": smtp_configured(),
+        "unisender_ready": unisender_web_configured() or unisender_go_configured(),
+        "unisender_web_ready": unisender_web_configured(),
+        "unisender_go_ready": unisender_go_configured(),
         "mailgun_ready": mailgun_configured(),
         "smtp_fields_set": {
             "EMAIL_FROM": bool(cfg.EMAIL_FROM),
             "EMAIL_SMTP_HOST": bool(cfg.EMAIL_SMTP_HOST),
             "EMAIL_SMTP_USER": bool(cfg.EMAIL_SMTP_USER),
             "EMAIL_SMTP_PASSWORD": bool(cfg.EMAIL_SMTP_PASSWORD),
+            "UNISENDER_API_KEY": bool(cfg.UNISENDER_API_KEY),
+            "UNISENDER_LIST_ID": bool(cfg.UNISENDER_LIST_ID),
         },
         "smtp_nonempty_in_dotenv_file": in_file,
         "dotenv_project_root": str(PROJECT_ROOT),
