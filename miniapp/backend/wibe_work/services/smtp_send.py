@@ -23,6 +23,20 @@ def smtp_configured() -> bool:
     )
 
 
+def smtp_missing_keys() -> list[str]:
+    """Имена переменных SMTP без значения (для сообщений об ошибке, без секретов)."""
+    out: list[str] = []
+    if not EMAIL_FROM:
+        out.append("EMAIL_FROM")
+    if not EMAIL_SMTP_HOST:
+        out.append("EMAIL_SMTP_HOST")
+    if not EMAIL_SMTP_USER:
+        out.append("EMAIL_SMTP_USER")
+    if not EMAIL_SMTP_PASSWORD:
+        out.append("EMAIL_SMTP_PASSWORD")
+    return out
+
+
 def send_smtp_message_sync(
     to_email: str,
     subject: str,

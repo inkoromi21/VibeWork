@@ -1,8 +1,15 @@
+import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 
 from wibe_work.miniapp_paths import MINIAPP_HTML, PROJECT_ROOT, RESET_PASSWORD_HTML
 
+# Сначала корневой .env репозитория (рядом с miniapp/), затем при необходимости — отдельный файл (systemd: VIBEWORK_ENV_FILE=/opt/.../.env).
 load_dotenv(PROJECT_ROOT / ".env")
+_extra_env = os.environ.get("VIBEWORK_ENV_FILE", "").strip()
+if _extra_env:
+    load_dotenv(Path(_extra_env).expanduser(), override=True)
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -52,6 +59,24 @@ app.include_router(website_api_router)
 
 init_db()
 
+try:
+    from wibe_work.services.transactional_email import transactional_email_configured
+
+    _env_path = PROJECT_ROOT / ".env"
+    print(
+        "[vibework] transactional email: "
+        f"{'OK' if transactional_email_configured() else 'NOT CONFIGURED'} · "
+        f"{_env_path} exists={_env_path.is_file()}"
+        + (
+            f" · also VIBEWORK_ENV_FILE={_extra_env!r}"
+            if _extra_env
+            else ""
+        ),
+        flush=True,
+    )
+except Exception as _e:
+    print(f"[vibework] email startup check: {_e}", flush=True)
+
 
 def _read_miniapp_html() -> str:
     path = MINIAPP_HTML
@@ -67,6 +92,31 @@ def _read_reset_password_html() -> str:
         raise HTTPException(status_code=404, detail=f"Reset password HTML not found: {path}")
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
+
+
+@app.get("/api/health/email")
+async def health_email():
+    """Диагностика сброса пароля: что видит процесс (без секретов)."""
+    from wibe_work import config as cfg
+    from wibe_work.services.mailgun_send import mailgun_configured
+    from wibe_work.services.smtp_send import smtp_configured
+    from wibe_work.services.transactional_email import transactional_email_configured
+
+    root_env = PROJECT_ROOT / ".env"
+    return {
+        "transactional_ok": transactional_email_configured(),
+        "smtp_ready": smtp_configured(),
+        "mailgun_ready": mailgun_configured(),
+        "smtp_fields_set": {
+            "EMAIL_FROM": bool(cfg.EMAIL_FROM),
+            "EMAIL_SMTP_HOST": bool(cfg.EMAIL_SMTP_HOST),
+            "EMAIL_SMTP_USER": bool(cfg.EMAIL_SMTP_USER),
+            "EMAIL_SMTP_PASSWORD": bool(cfg.EMAIL_SMTP_PASSWORD),
+        },
+        "dotenv_project_root": str(PROJECT_ROOT),
+        "dotenv_file_exists": root_env.is_file(),
+        "vibework_env_file": os.environ.get("VIBEWORK_ENV_FILE", "") or None,
+    }
 
 
 @app.get("/api/health/llm")

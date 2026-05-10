@@ -12,6 +12,7 @@ from wibe_work.bearer_auth import require_bearer_matches_user
 from wibe_work.config import PUBLIC_BASE_URL
 from wibe_work.jwt_service import create_access_token
 from wibe_work.miniapp_paths import PROJECT_ROOT
+from wibe_work.services.smtp_send import smtp_missing_keys
 from wibe_work.sqlite_db import get_db
 from wibe_work.api_schemas import (
     EmailForgotPasswordBody,
@@ -218,11 +219,20 @@ async def email_forgot_password(body: EmailForgotPasswordBody):
         return {"ok": True, "message": _FORGOT_PUBLIC_MESSAGE}
 
     if not transactional_email_configured():
+        miss = smtp_missing_keys()
+        env_hint = (
+            f" Не заданы: {', '.join(miss)}."
+            if miss
+            else " Заполните SMTP или Mailgun."
+        )
         raise HTTPException(
             status_code=503,
             detail=(
-                "Почта не настроена на сервере. Укажите в .env SMTP (EMAIL_SMTP_*) "
-                "и EMAIL_FROM или параметры Mailgun."
+                "Почта не настроена в этом процессе API."
+                + env_hint
+                + f" Ожидается файл {PROJECT_ROOT / '.env'} (рядом с папкой miniapp). "
+                "Перезапустите uvicorn после правок. "
+                "Проверка: GET /api/health/email"
             ),
         )
 
@@ -269,7 +279,10 @@ async def email_forgot_password(body: EmailForgotPasswordBody):
             conn.commit()
         raise HTTPException(
             status_code=503,
-            detail="Не удалось отправить письмо. Попробуйте позже.",
+            detail=(
+                "Не удалось отправить письмо."
+                + (f" {err_msg}" if err_msg else " Попробуйте позже.")
+            ),
         )
 
     _forgot_rate_commit(email)
