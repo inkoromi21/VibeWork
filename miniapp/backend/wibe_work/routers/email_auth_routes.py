@@ -21,7 +21,10 @@ from wibe_work.api_schemas import (
     EmailResetPasswordBody,
 )
 from wibe_work.password_input import sanitize_password_input
-from wibe_work.services.mailgun_send import mailgun_configured, send_mailgun_message
+from wibe_work.services.transactional_email import (
+    send_transactional_email,
+    transactional_email_configured,
+)
 
 router = APIRouter(prefix="/auth/email", tags=["auth_email"])
 
@@ -38,13 +41,15 @@ def _norm_email(email: str) -> str:
     return email.strip().lower()
 
 
-def _forgot_rate_allow(email: str) -> bool:
+def _forgot_rate_check(email: str) -> bool:
+    """Проверка интервала без записи — cooldown ставим только после успешной отправки или «тихого» ok."""
     now = time.time()
     last = _forgot_last_by_email.get(email, 0.0)
-    if now - last < _FORGOT_COOLDOWN_SEC:
-        return False
-    _forgot_last_by_email[email] = now
-    return True
+    return now - last >= _FORGOT_COOLDOWN_SEC
+
+
+def _forgot_rate_commit(email: str) -> None:
+    _forgot_last_by_email[email] = time.time()
 
 
 def _verify_bcrypt_password(raw: str, stored_hash: str) -> bool:
@@ -196,7 +201,7 @@ async def email_register(body: EmailRegisterBody):
 async def email_forgot_password(body: EmailForgotPasswordBody):
     """Запрос сброса: одно письмо на Mailgun; ответ одинаковый, если email не в базе."""
     email = _norm_email(str(body.email))
-    if not _forgot_rate_allow(email):
+    if not _forgot_rate_check(email):
         raise HTTPException(
             status_code=429,
             detail="Подождите около минуты перед повторной отправкой.",
@@ -209,12 +214,16 @@ async def email_forgot_password(body: EmailForgotPasswordBody):
         ).fetchone()
 
     if not row:
+        _forgot_rate_commit(email)
         return {"ok": True, "message": _FORGOT_PUBLIC_MESSAGE}
 
-    if not mailgun_configured():
+    if not transactional_email_configured():
         raise HTTPException(
             status_code=503,
-            detail="Отправка почты временно недоступна. Обратитесь в поддержку.",
+            detail=(
+                "Почта не настроена на сервере. Укажите в .env SMTP (EMAIL_SMTP_*) "
+                "и EMAIL_FROM или параметры Mailgun."
+            ),
         )
 
     user_id = str(row["user_id"])
@@ -250,7 +259,7 @@ async def email_forgot_password(body: EmailForgotPasswordBody):
         "<p style=\"color:#666;font-size:14px;\">Если вы не запрашивали сброс — удалите письмо.</p>"
     )
 
-    ok, err_msg = await send_mailgun_message(email, subject, text_body, html_body)
+    ok, err_msg = await send_transactional_email(email, subject, text_body, html_body)
     if not ok:
         with get_db() as conn:
             conn.execute(
@@ -263,6 +272,7 @@ async def email_forgot_password(body: EmailForgotPasswordBody):
             detail="Не удалось отправить письмо. Попробуйте позже.",
         )
 
+    _forgot_rate_commit(email)
     return {"ok": True, "message": _FORGOT_PUBLIC_MESSAGE}
 
 

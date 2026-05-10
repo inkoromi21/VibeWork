@@ -32,5 +32,24 @@ MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY", "").strip()
 MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN", "").strip()
 # us | eu — хост API
 MAILGUN_REGION = os.environ.get("MAILGUN_REGION", "us").strip().lower()
-# Отправитель: "VibeWork <noreply@mg.example.com>"
+# Отправитель: "VibeWork <noreply@mg.example.com>" или "VibeWork <you@yandex.ru>"
 EMAIL_FROM = os.environ.get("EMAIL_FROM", "").strip()
+
+# SMTP (бесплатно с Яндекс / Mail.ru / хостингом — пароль приложения). Приоритетнее Mailgun, если задан хост.
+def _smtp_port() -> int:
+    raw = os.environ.get("EMAIL_SMTP_PORT", "587").strip()
+    try:
+        return max(1, min(65535, int(raw)))
+    except ValueError:
+        return 587
+
+
+EMAIL_SMTP_HOST = os.environ.get("EMAIL_SMTP_HOST", "").strip()
+EMAIL_SMTP_PORT = _smtp_port()
+EMAIL_SMTP_USER = os.environ.get("EMAIL_SMTP_USER", "").strip()
+EMAIL_SMTP_PASSWORD = os.environ.get("EMAIL_SMTP_PASSWORD", "").strip()
+EMAIL_SMTP_USE_SSL = os.environ.get("EMAIL_SMTP_USE_SSL", "").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
