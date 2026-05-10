@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import secrets
 import sqlite3
 import time
@@ -28,6 +29,7 @@ from wibe_work.services.transactional_email import (
 )
 
 router = APIRouter(prefix="/auth/email", tags=["auth_email"])
+_log = logging.getLogger(__name__)
 
 _FORGOT_COOLDOWN_SEC = 90
 _forgot_last_by_email: dict[str, float] = {}
@@ -225,6 +227,12 @@ async def email_forgot_password(body: EmailForgotPasswordBody):
             if miss
             else " Заполните SMTP или Mailgun."
         )
+        _log.warning(
+            "forgot-password 503: почта не настроена email=%s missing_keys=%s project_root=%s",
+            email,
+            miss or [],
+            PROJECT_ROOT,
+        )
         raise HTTPException(
             status_code=503,
             detail=(
@@ -271,6 +279,11 @@ async def email_forgot_password(body: EmailForgotPasswordBody):
 
     ok, err_msg = await send_transactional_email(email, subject, text_body, html_body)
     if not ok:
+        _log.warning(
+            "forgot-password 503: отправка не удалась email=%s err=%s",
+            email,
+            err_msg or "",
+        )
         with get_db() as conn:
             conn.execute(
                 "DELETE FROM password_reset_tokens WHERE token_hash = ?",
