@@ -13,6 +13,16 @@ def resend_configured() -> bool:
     return bool(RESEND_API_KEY and EMAIL_FROM)
 
 
+def resend_missing_keys() -> list[str]:
+    """Имена переменных без значения (для сообщений об ошибке, без секретов)."""
+    out: list[str] = []
+    if not RESEND_API_KEY:
+        out.append("RESEND_API_KEY")
+    if not EMAIL_FROM:
+        out.append("EMAIL_FROM")
+    return out
+
+
 async def send_resend_message(
     to_email: str,
     subject: str,

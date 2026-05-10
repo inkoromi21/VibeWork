@@ -3895,10 +3895,14 @@
         const node = st.node || {};
         const choices = node.choices || [];
         const stepNum = st.step_index != null ? st.step_index + 1 : 1;
-        let html =
-            '<h2>День на работе</h2><div class="sim-progress">Шаг ' + stepNum + ' — выберите действие</div>';
+        let html = '<h2>День на работе</h2>';
         if (st.done) {
-            html += '<div class="block"><p style="color:var(--text)">' + esc(node.text || 'День завершён.') + '</p></div>';
+            html += '<div class="sim-progress">День завершён</div>';
+            const recap = (st.day_recap || st.summary || 'День завершён.').trim();
+            html +=
+                '<div class="block sim-day-recap"><h3 style="margin:0 0 10px;font-size:1rem">Итог дня</h3><pre style="white-space:pre-wrap;font-family:var(--font);font-size:.9rem;line-height:1.5;margin:0;color:var(--text)">' +
+                esc(recap) +
+                '</pre></div>';
             html += '<button type="button" class="btn-secondary" id="simAgain">Сыграть снова</button>';
             el.innerHTML = html;
             document.getElementById('simAgain').onclick = function () {
@@ -3907,6 +3911,7 @@
             };
             return;
         }
+        html += '<div class="sim-progress">Шаг ' + stepNum + ' — выберите действие</div>';
         html += '<div class="block"><p style="color:var(--text);margin:0">' + esc(node.text || '') + '</p></div>';
         for (let i = 0; i < choices.length; i++) {
             const c = choices[i];
@@ -3925,7 +3930,8 @@
                             role: st.role,
                             step_index: st.step_index,
                             career_points: st.career_points,
-                            choice_id: cid
+                            choice_id: cid,
+                            day_path: st.day_path || []
                         })
                     });
                     simulatorState = await r.json();

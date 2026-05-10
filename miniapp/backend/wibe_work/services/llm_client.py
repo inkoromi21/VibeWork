@@ -1,10 +1,12 @@
-"""Вызов chat/completions (Ollama / DeepSeek / OpenAI); если не сконфигурено — заглушка."""
+"""Вызов chat/completions (OpenAI-совместимый API: Groq, DeepSeek, OpenAI и т.д.)."""
 
 from __future__ import annotations
 
 import json
 import logging
 import os
+import threading
+from functools import lru_cache
 from typing import List, Literal, Optional, Tuple
 
 import requests
@@ -18,49 +20,28 @@ from wibe_work.services.llm_prompts import (
 logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = 45.0
-# Первый прогон локальной модели может занять минуту — для Ollama по умолчанию дольше.
-OLLAMA_DEFAULT_TIMEOUT = 120.0
+# Локальный совместимый сервер (127.0.0.1) — первый ответ может быть долгим.
+LOCAL_LLM_DEFAULT_TIMEOUT = 120.0
+
+_tls_http = threading.local()
 
 
-def ollama_mode_enabled() -> bool:
-    """Режим локальной Ollama: ключ облака не нужен."""
-    v = os.getenv("USE_OLLAMA", "").strip().lower()
-    if v in ("1", "true", "yes", "on"):
-        return True
-    return os.getenv("LLM_BACKEND", "").strip().lower() == "ollama"
+def _http_session() -> requests.Session:
+    s = getattr(_tls_http, "session", None)
+    if s is None:
+        s = requests.Session()
+        _tls_http.session = s
+    return s
 
 
-def _ollama_chat_url() -> str:
-    raw = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").strip().rstrip("/")
-    if "/v1/chat/completions" in raw:
-        return raw if raw.startswith("http") else f"http://{raw}"
-    if not raw.startswith("http"):
-        raw = f"http://{raw}"
-    return f"{raw}/v1/chat/completions"
-
-
-def _ollama_model() -> str:
-    return (
-        os.getenv("OLLAMA_MODEL", "").strip()
-        or os.getenv("CHAT_MODEL", "").strip()
-        or "llama3.2"
-    )
-
-
+@lru_cache(maxsize=1)
 def get_llm_settings() -> Optional[Tuple[str, str, str]]:
     """
-    (url, api_key, model). Любой провайдер с POST .../v1/chat/completions.
+    (url, api_key, model). Провайдер с POST .../v1/chat/completions.
 
-    Ollama (рекомендуется для разработки без облака):
-      USE_OLLAMA=1
-      OLLAMA_HOST=http://127.0.0.1:11434   # опционально
-      OLLAMA_MODEL=llama3.2                 # имя модели из `ollama list`
-
-    Либо без USE_OLLAMA: CHAT_API_URL=http://127.0.0.1:11434/v1/chat/completions — ключ не обязателен.
+    Облако: CHAT_API_KEY (или DEEPSEEK_*/OPENAI_*), CHAT_API_URL, CHAT_MODEL.
+    Локальный URL без ключа: если в CHAT_API_URL указан 127.0.0.1 / localhost — ключ не обязателен.
     """
-    if ollama_mode_enabled():
-        return (_ollama_chat_url(), os.getenv("OLLAMA_API_KEY", "").strip(), _ollama_model())
-
     chat_key = os.getenv("CHAT_API_KEY", "").strip()
     ds_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
     oa_key = os.getenv("OPENAI_API_KEY", "").strip()
@@ -113,7 +94,7 @@ def _is_local_llm_url(url: str) -> bool:
 
 def _http_timeout_seconds(url: str) -> float:
     if _is_local_llm_url(url):
-        return float(os.getenv("LLM_LOCAL_TIMEOUT", str(OLLAMA_DEFAULT_TIMEOUT)))
+        return float(os.getenv("LLM_LOCAL_TIMEOUT", str(LOCAL_LLM_DEFAULT_TIMEOUT)))
     return float(os.getenv("LLM_REQUEST_TIMEOUT", str(REQUEST_TIMEOUT)))
 
 
@@ -144,7 +125,7 @@ def fetch_llm_completion(
         "max_tokens": max_tokens,
     }
     try:
-        r = requests.post(url, headers=headers, data=json.dumps(body), timeout=timeout)
+        r = _http_session().post(url, headers=headers, json=body, timeout=timeout)
         r.raise_for_status()
         data = r.json()
         raw = data["choices"][0]["message"].get("content")
@@ -160,13 +141,12 @@ def fetch_llm_completion(
         logger.warning("LLM HTTP %s: %s", code, (e.response.text or "")[:500] if e.response else "")
         if code == 404 and _is_local_llm_url(url):
             notice = (
-                f"Ollama: модель «{model}» не найдена (404). В терминале: ollama pull {model} "
-                "и проверьте OLLAMA_MODEL в .env."
+                f"Локальная модель «{model}» не найдена (404). Проверьте CHAT_MODEL и что сервер LLM запущен."
             )
         elif code == 402:
             notice = "На счёте провайдера нет средств (402). Пополните баланс или смените ключ."
         elif code == 401:
-            notice = "Ключ API отклонён (401). Для Ollama задайте USE_OLLAMA=1 — ключ не нужен."
+            notice = "Ключ API отклонён (401). Проверьте CHAT_API_KEY в .env."
         elif code == 429:
             notice = "Слишком много запросов (429). Подождите и повторите."
         else:
@@ -177,7 +157,7 @@ def fetch_llm_completion(
         if _is_local_llm_url(url):
             return (
                 None,
-                "Нет ответа от Ollama. Запущено ли приложение Ollama, порт 11434? Команда проверки: curl http://127.0.0.1:11434/api/tags",
+                "Нет ответа от локального LLM. Проверьте CHAT_API_URL и что сервер слушает этот адрес.",
             )
         return None, "Не удалось связаться с API модели. Проверьте интернет и настройки URL."
 
@@ -224,8 +204,7 @@ def career_coach_chat_reply(
 
     if not llm_configured():
         hint = (
-            "Для локальной Ollama: USE_OLLAMA=1, OLLAMA_MODEL=<модель>, запущенный Ollama и ollama pull. "
-            "Для облака: CHAT_API_KEY или DEEPSEEK_API_KEY в .env. Перезапустите API после правок."
+            "Задайте CHAT_API_KEY и CHAT_API_URL (или DEEPSEEK_* / OPENAI_*) в .env. Перезапустите API после правок."
         )
         return (mock, "mock", hint)
 

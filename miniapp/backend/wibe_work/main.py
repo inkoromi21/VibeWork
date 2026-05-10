@@ -28,7 +28,7 @@ from wibe_work.routers import (
 )
 from wibe_work.routers.website_auth_compat_routes import router as website_auth_compat_router
 from wibe_work.routers.website_api_routes import router as website_api_router
-from wibe_work.services.llm_client import get_llm_settings, ollama_mode_enabled
+from wibe_work.services.llm_client import get_llm_settings
 
 app = FastAPI(title="VibeWork", description="Карьерный помощник")
 
@@ -94,20 +94,12 @@ def _read_reset_password_html() -> str:
         return f.read()
 
 
-def _smtp_nonempty_from_env_file(path: Path) -> dict[str, bool] | None:
+def _resend_nonempty_from_env_file(path: Path) -> dict[str, bool] | None:
     """Как dotenv читает файл с диска (без секретов — только флаг «не пусто»)."""
     if not path.is_file():
         return None
     raw = dotenv_values(path, encoding="utf-8")
-    keys = (
-        "EMAIL_FROM",
-        "EMAIL_SMTP_HOST",
-        "EMAIL_SMTP_USER",
-        "EMAIL_SMTP_PASSWORD",
-        "RESEND_API_KEY",
-        "UNISENDER_API_KEY",
-        "UNISENDER_LIST_ID",
-    )
+    keys = ("EMAIL_FROM", "RESEND_API_KEY")
     return {k: bool(str(raw.get(k) or "").strip()) for k in keys}
 
 
@@ -115,50 +107,35 @@ def _smtp_nonempty_from_env_file(path: Path) -> dict[str, bool] | None:
 async def health_email():
     """Диагностика сброса пароля: что видит процесс (без секретов)."""
     from wibe_work import config as cfg
-    from wibe_work.services.mailgun_send import mailgun_configured
     from wibe_work.services.resend_send import resend_configured
-    from wibe_work.services.smtp_send import smtp_configured
     from wibe_work.services.transactional_email import transactional_email_configured
-    from wibe_work.services.unisender_go_send import unisender_go_configured
-    from wibe_work.services.unisender_send_email import unisender_web_configured
 
     root_env = PROJECT_ROOT / ".env"
-    in_file = _smtp_nonempty_from_env_file(root_env)
+    in_file = _resend_nonempty_from_env_file(root_env)
     return {
         "transactional_ok": transactional_email_configured(),
-        "smtp_ready": smtp_configured(),
         "resend_ready": resend_configured(),
-        "unisender_ready": unisender_web_configured() or unisender_go_configured(),
-        "unisender_web_ready": unisender_web_configured(),
-        "unisender_go_ready": unisender_go_configured(),
-        "mailgun_ready": mailgun_configured(),
-        "smtp_fields_set": {
+        "resend_fields_set": {
             "EMAIL_FROM": bool(cfg.EMAIL_FROM),
-            "EMAIL_SMTP_HOST": bool(cfg.EMAIL_SMTP_HOST),
-            "EMAIL_SMTP_USER": bool(cfg.EMAIL_SMTP_USER),
-            "EMAIL_SMTP_PASSWORD": bool(cfg.EMAIL_SMTP_PASSWORD),
             "RESEND_API_KEY": bool(cfg.RESEND_API_KEY),
-            "UNISENDER_API_KEY": bool(cfg.UNISENDER_API_KEY),
-            "UNISENDER_LIST_ID": bool(cfg.UNISENDER_LIST_ID),
         },
-        "smtp_nonempty_in_dotenv_file": in_file,
+        "resend_nonempty_in_dotenv_file": in_file,
         "dotenv_project_root": str(PROJECT_ROOT),
         "dotenv_file_exists": root_env.is_file(),
         "vibework_env_file": os.environ.get("VIBEWORK_ENV_FILE", "") or None,
         "hint": (
-            "Если smtp_nonempty_in_dotenv_file показывает HOST/USER=false — в .env на сервере нет этих строк или они пустые (добавьте EMAIL_SMTP_HOST=smtp.gmail.com и EMAIL_SMTP_USER=...). "
-            "Если в файле true, а smtp_fields_set false — перезапустите API после правок .env."
+            "Если resend_nonempty_in_dotenv_file показывает false — в .env на сервере нет RESEND_API_KEY/EMAIL_FROM или они пустые. "
+            "Если в файле true, а resend_fields_set false — перезапустите API после правок .env."
         ),
     }
 
 
 @app.get("/api/health/llm")
 async def health_llm():
-    """Проверка LLM: облако или локальная Ollama (USE_OLLAMA=1)."""
+    """Проверка LLM: облачный или локальный OpenAI-совместимый эндпоинт."""
     cfg = get_llm_settings()
     out: dict = {
         "llm_configured": cfg is not None,
-        "ollama_mode": ollama_mode_enabled(),
     }
     if cfg:
         out["model"] = cfg[2]
@@ -178,7 +155,7 @@ async def website_index():
 
 @app.get("/reset-password", response_class=HTMLResponse)
 async def reset_password_page():
-    """Сброс пароля по ссылке из письма (Mailgun)."""
+    """Сброс пароля по ссылке из письма (Resend)."""
     return _read_reset_password_html()
 
 

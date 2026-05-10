@@ -251,8 +251,15 @@ class SimulatorStepBody(BaseModel):
     step_index: int = 0
     career_points: int = 0
     choice_id: str
+    day_path: List[Dict[str, Any]] | None = None
 
 
 @miniapp_prefixed_router.post("/simulator/step")
 async def simulator_step(body: SimulatorStepBody):
-    return sim_step(body.role, body.step_index, body.career_points, body.choice_id)
+    return sim_step(
+        body.role,
+        body.step_index,
+        body.career_points,
+        body.choice_id,
+        body.day_path,
+    )

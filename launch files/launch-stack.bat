@@ -1,6 +1,6 @@
 @echo off
 
-REM Единая точка входа: весь стек на Windows (четыре окна — API, Cloudflare Tunnel :8000, бот, сайт :8765).
+REM Единая точка входа: Windows — три окна (API :8000, Telegram-бот, сайт :8765).
 
 chcp 65001 >nul
 
@@ -21,8 +21,6 @@ if not exist "venv\Scripts\python.exe" (
 call venv\Scripts\activate.bat
 
 pip install -q -r miniapp\requirements.txt
-
-call miniapp\scripts\windows\ensure-ollama.bat
 
 if not defined HH_USER_AGENT set "HH_USER_AGENT=VibeWork/1.0 (+https://api.hh.ru)"
 
@@ -60,12 +58,6 @@ start "VibeWork — API :8000" cmd /k "cd /d %CD% && call venv\Scripts\activate.
 
 timeout /t 2 /nobreak >nul
 
-start "VibeWork — Cloudflare →8000" cmd /k call "%~dp0stack\cloudflared.bat"
-
-timeout /t 2 /nobreak >nul
-
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0stack\wait-tunnel-env.ps1"
-
 start "VibeWork — Telegram-бот" cmd /k cd /d "%CD%" ^&^& call "%~dp0stack\bot.bat"
 
 timeout /t 1 /nobreak >nul
@@ -74,8 +66,7 @@ start "VibeWork — сайт :8765" cmd /k cd /d "%CD%" ^&^& set WIBE_NO_PAUSE=1
 
 
 
-powershell -NoProfile -Command "& { Write-Host ''; Write-Host '✓ Окна запущены' -ForegroundColor Green; Write-Host '  API http://127.0.0.1:8000/ (миниапп /miniapp/), сайт http://127.0.0.1:8765' -ForegroundColor DarkGray; Write-Host '  TELEGRAM_PUBLIC_BASE_URL подставляется из окна Cloudflare в .env; бот ждёт URL перед стартом' -ForegroundColor DarkGray; Write-Host '  В Telegram: /start — кнопки сразу с HTTPS (перезапуск API не нужен)' -ForegroundColor DarkGray }"
+powershell -NoProfile -Command "& { Write-Host ''; Write-Host '✓ Окна запущены' -ForegroundColor Green; Write-Host '  API http://127.0.0.1:8000/ (миниапп /miniapp/), сайт http://127.0.0.1:8765' -ForegroundColor DarkGray; Write-Host '  Для Web App в Telegram задайте в .env HTTPS: TELEGRAM_PUBLIC_BASE_URL (прод-домен или свой туннель)' -ForegroundColor DarkGray }"
 
 pause
-
 

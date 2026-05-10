@@ -13,7 +13,7 @@ from wibe_work.bearer_auth import require_bearer_matches_user
 from wibe_work.config import PUBLIC_BASE_URL
 from wibe_work.jwt_service import create_access_token
 from wibe_work.miniapp_paths import PROJECT_ROOT
-from wibe_work.services.smtp_send import smtp_missing_keys
+from wibe_work.services.resend_send import resend_missing_keys
 from wibe_work.sqlite_db import get_db
 from wibe_work.api_schemas import (
     EmailForgotPasswordBody,
@@ -202,7 +202,7 @@ async def email_register(body: EmailRegisterBody):
 
 @router.post("/forgot-password")
 async def email_forgot_password(body: EmailForgotPasswordBody):
-    """Запрос сброса: одно письмо на Mailgun; ответ одинаковый, если email не в базе."""
+    """Запрос сброса: одно письмо через Resend; ответ одинаковый, если email не в базе."""
     email = _norm_email(str(body.email))
     if not _forgot_rate_check(email):
         raise HTTPException(
@@ -221,11 +221,11 @@ async def email_forgot_password(body: EmailForgotPasswordBody):
         return {"ok": True, "message": _FORGOT_PUBLIC_MESSAGE}
 
     if not transactional_email_configured():
-        miss = smtp_missing_keys()
+        miss = resend_missing_keys()
         env_hint = (
             f" Не заданы: {', '.join(miss)}."
             if miss
-            else " Заполните SMTP или Mailgun."
+            else " Заполните RESEND_API_KEY и EMAIL_FROM."
         )
         _log.warning(
             "forgot-password 503: почта не настроена email=%s missing_keys=%s project_root=%s",

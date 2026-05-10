@@ -324,6 +324,29 @@ def normalize_role(role_or_sphere: str) -> str:
     return "analyst"
 
 
+def _choice_label(step: Dict[str, Any], choice_id: str) -> str:
+    for c in step.get("choices") or []:
+        if c.get("id") == choice_id:
+            return str(c.get("label") or choice_id)
+    return choice_id
+
+
+def _format_day_recap(
+    path: List[Dict[str, Any]], total_points: int, closing: str
+) -> str:
+    lines: List[str] = ["Как вы прошли день:", ""]
+    for i, item in enumerate(path, 1):
+        scene = str(item.get("scene") or "").strip()
+        choice = str(item.get("choice") or "").strip()
+        pts = int(item.get("points") or 0)
+        lines.append(f"{i}. {scene}")
+        lines.append(f"   → Ваш выбор: «{choice}» (+{pts} оч.).")
+        lines.append("")
+    lines.append(f"Итого за день: {total_points} карьерных очков.")
+    lines.append(closing)
+    return "\n".join(lines)
+
+
 def list_simulator_options() -> List[Dict[str, str]]:
     """Одна строка на каждую рекомендуемую сферу — как в главной сфере анкеты."""
     out: List[Dict[str, str]] = []
@@ -343,6 +366,7 @@ def start(role: str) -> Dict[str, Any]:
         "role": r,
         "step_index": 0,
         "career_points": 0,
+        "day_path": [],
         "node": {
             "text": first["text"],
             "choices": first["choices"],
@@ -351,28 +375,46 @@ def start(role: str) -> Dict[str, Any]:
     }
 
 
-def step(role: str, step_index: int, career_points: int, choice_id: str) -> Dict[str, Any]:
+def step(
+    role: str,
+    step_index: int,
+    career_points: int,
+    choice_id: str,
+    day_path: List[Dict[str, Any]] | None = None,
+) -> Dict[str, Any]:
     r = normalize_role(role)
     steps = _STORIES.get(r) or _STORIES["analyst"]
     idx = max(0, min(len(steps) - 1, int(step_index)))
     cur = steps[idx]
     add = int(cur.get("points", {}).get(choice_id, 1))
     new_points = career_points + add
+    path = list(day_path) if day_path else []
+    path.append(
+        {
+            "scene": cur.get("text") or "",
+            "choice": _choice_label(cur, choice_id),
+            "points": add,
+        }
+    )
     next_idx = idx + 1
+    closing = "День закончен. Сохраняйте баланс глубины, коммуникации и скорости — так растёт и реальная карьера."
     if next_idx >= len(steps):
         return {
             "role": r,
             "step_index": next_idx,
             "career_points": new_points,
+            "day_path": path,
             "node": None,
             "done": True,
-            "summary": "День закончен. Сохраните баланс исследования, коммуникации и скорости.",
+            "summary": closing,
+            "day_recap": _format_day_recap(path, new_points, closing),
         }
     nxt = steps[next_idx]
     return {
         "role": r,
         "step_index": next_idx,
         "career_points": new_points,
+        "day_path": path,
         "node": {"text": nxt["text"], "choices": nxt["choices"]},
         "done": False,
     }

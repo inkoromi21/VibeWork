@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Единая точка входа: весь стек на macOS (четыре окна Terminal — API, Cloudflare Tunnel, бот, сайт).
+# Единая точка входа: macOS — три окна Terminal (API, Telegram-бот, сайт :8765).
 set -e
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STACK_DIR="$REPO_ROOT/launch files/stack"
@@ -23,7 +23,6 @@ if [ -d "$WEB_ROOT" ] && [ ! -x "$WEB_ROOT/.venv/bin/python" ] && [ ! -x "$WEB_R
   "$WEB_ROOT/.venv/bin/pip" install -q -r "$WEB_ROOT/requirements.txt"
 fi
 
-bash "$REPO_ROOT/miniapp/scripts/ensure-ollama.sh" "$REPO_ROOT" || true
 export HH_USER_AGENT="${HH_USER_AGENT:-VibeWork/1.0 (+https://api.hh.ru)}"
 
 if command -v lsof >/dev/null 2>&1; then
@@ -39,15 +38,14 @@ if command -v lsof >/dev/null 2>&1; then
   fi
 fi
 
-echo -e "${c_cya}▶ Открываю четыре окна Terminal…${c_rst}"
-echo -e "${c_dim}  API :8000 · cloudflared →8000 · Telegram-бот · сайт :${PORT:-8765}${c_rst}"
+echo -e "${c_cya}▶ Открываю три окна Terminal…${c_rst}"
+echo -e "${c_dim}  API :8000 · Telegram-бот · сайт :${PORT:-8765}${c_rst}"
+echo -e "${c_dim}  Web App в Telegram: задайте в .env HTTPS (TELEGRAM_PUBLIC_BASE_URL или прод-домен).${c_rst}"
 
 if ! osascript <<EOF
 tell application "Terminal"
     activate
     do script "cd '$REPO_ROOT' && ./venv/bin/python miniapp/run.py"
-    delay 1
-    do script "cd '$REPO_ROOT' && bash '$STACK_DIR/cloudflared.sh'"
     delay 1
     do script "cd '$REPO_ROOT' && bash '$STACK_DIR/bot.sh'"
     delay 1
@@ -63,5 +61,4 @@ fi
 echo ""
 echo -e "${c_grn}✓ Готово${c_rst}"
 echo -e "${c_dim}  API    http://127.0.0.1:8000/miniapp/${c_rst}"
-echo -e "${c_dim}  Туннель: URL из окна cloudflared (*.trycloudflare.com) → .env PUBLIC_BASE_URL${c_rst}"
 echo -e "${c_dim}  Сайт   http://127.0.0.1:${PORT:-8765}${c_rst}"

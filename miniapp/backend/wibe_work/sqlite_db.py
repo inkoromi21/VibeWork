@@ -7,19 +7,29 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional
 
 from wibe_work.miniapp_paths import DATA_DIR, PROJECT_ROOT
 
+_db_path_memo: Optional[Path] = None
+
 
 def _db_path() -> Path:
+    """Путь к SQLite; кэшируется на процесс (DATABASE_PATH не меняют без перезапуска)."""
+    global _db_path_memo
+    if _db_path_memo is not None:
+        return _db_path_memo
     env = os.environ.get("DATABASE_PATH")
     if env:
-        return Path(env)
+        _db_path_memo = Path(env)
+        return _db_path_memo
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     legacy = DATA_DIR / "career.db"
     if legacy.is_file():
-        return legacy
-    return DATA_DIR / "vibework.db"
+        _db_path_memo = legacy
+    else:
+        _db_path_memo = DATA_DIR / "vibework.db"
+    return _db_path_memo
 
 
 _legacy_done = False

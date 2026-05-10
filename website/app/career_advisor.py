@@ -82,7 +82,7 @@ REQUEST_TIMEOUT = 45.0
 def get_llm_settings() -> tuple[str, str, str] | None:
     """
     Настройки для реальной нейросети: URL chat/completions, API-ключ, model id.
-    Любой провайдер с OpenAI-совместимым POST /v1/chat/completions (DeepSeek, OpenAI, Ollama, Groq, …).
+    Любой провайдер с OpenAI-совместимым POST /v1/chat/completions (DeepSeek, OpenAI, Groq, …).
 
     Переменные (достаточно ключа и при необходимости URL/модели):
     - CHAT_API_KEY — общий ключ (приоритет)
@@ -90,7 +90,7 @@ def get_llm_settings() -> tuple[str, str, str] | None:
     - CHAT_MODEL — например deepseek-chat, gpt-4o-mini
 
     Совместимость: DEEPSEEK_API_KEY / DEEPSEEK_API_URL / DEEPSEEK_MODEL, OPENAI_API_KEY / OPENAI_MODEL.
-    Для локального Ollama: CHAT_API_URL=http://127.0.0.1:11434/v1/chat/completions, CHAT_API_KEY можно не задавать.
+    Для локального совместимого сервера: CHAT_API_URL=http://127.0.0.1:…/v1/chat/completions, CHAT_API_KEY можно не задавать.
     """
     chat_key = os.getenv("CHAT_API_KEY", "").strip()
     ds_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
@@ -123,7 +123,7 @@ def get_llm_settings() -> tuple[str, str, str] | None:
             model = "deepseek-chat"
 
     if local:
-        # Локальная Ollama не использует ключи облака; Bearer только если задан CHAT_API_KEY
+        # Локальный URL не требует облачного ключа; Bearer только если задан CHAT_API_KEY
         key = chat_key
 
     if not key and not local:

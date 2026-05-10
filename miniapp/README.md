@@ -25,7 +25,7 @@
 | `frontend/` | Статика Mini App (маршрут `GET /miniapp/`) |
 | `data/` | Рабочие данные по умолчанию (SQLite и прочее — см. код и `.env`) |
 | `bot/` | Long polling Telegram; см. [bot/README.md](bot/README.md) |
-| `scripts/` | Вспомогательные сценарии (например, Ollama на Windows/Linux) |
+| `scripts/` | Вспомогательные сценарии (утилиты, распаковка фронта и т.п.) |
 | `run.py` | Запуск uvicorn на `0.0.0.0:8000` |
 
 ---

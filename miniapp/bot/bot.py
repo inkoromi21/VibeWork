@@ -58,7 +58,7 @@ def get_telegram_effective_base() -> str:
 
             host = (urlparse(override).hostname or "").lower()
 
-            # В логе cloudflared встречается api.trycloudflare.com — не путать с quick tunnel.
+            # Служебные хосты бывших quick-tunnel логов — не использовать как публичный URL.
 
             if host in ("api.trycloudflare.com", "www.trycloudflare.com"):
 
@@ -180,9 +180,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             + "\n\n"
 
-            + "<i>Нет HTTPS для Web App: дождитесь окна Cloudflare (запись в <code>.env</code>) или "
+            + "<i>Нет HTTPS для Web App: укажите в <code>.env</code> прод-домен или другой HTTPS в "
 
-            "нажмите /start ещё раз через несколько секунд.</i>"
+            "<code>TELEGRAM_PUBLIC_BASE_URL</code>, перезапустите бота и снова нажмите /start.</i>"
 
         )
 

@@ -14,7 +14,7 @@
 - [Быстрый старт](#быстрый-старт)
 - [Конфигурация](#конфигурация)
 - [Запуск для разработки](#запуск-для-разработки)
-- [Модели LLM (Ollama и облако)](#модели-llm-ollama-и-облако)
+- [Модели LLM (облако и совместимый API)](#модели-llm-облако-и-совместимый-api)
 - [Проверка качества и тесты](#проверка-качества-и-тесты)
 - [Отдельный веб-сервер (каталог website)](#отдельный-веб-сервер-каталог-website)
 - [Эксплуатация в продакшене](#эксплуатация-в-продакшене)
@@ -30,7 +30,7 @@
 | Профиль | Динамическая анкета, сохранение в SQLite |
 | Диагностика | Тесты и метрики для последующего разбора |
 | Разбор и план | Аналитика и рекомендации на основе данных профиля |
-| ИИ-чат | Локально (Ollama) или облачные провайдеры при наличии ключей |
+| ИИ-чат | Облачные провайдеры (Groq, DeepSeek, OpenAI и др.) или локальный OpenAI-совместимый эндпоинт |
 | Вакансии | Интеграция с API hh.ru; при недоступности — демо-данные и ссылки |
 | Симулятор | Сценарий «день на работе» с ветвлением |
 | Аутентификация | Вход по e-mail/паролю и сценарии для Telegram |
@@ -51,7 +51,7 @@
 | `http://127.0.0.1:8000/miniapp/` | Тот же интерфейс (удобно как URL для бота) |
 | `http://127.0.0.1:8000/docs` | OpenAPI (Swagger) |
 | `http://127.0.0.1:8000/api/health` | Быстрая проверка: сервис отвечает |
-| `http://127.0.0.1:8000/api/health/llm` | Конфигурация LLM (JSON: `llm_configured`, `ollama_mode`, `model`) |
+| `http://127.0.0.1:8000/api/health/llm` | Конфигурация LLM (JSON: `llm_configured`, `model`) |
 
 Интерфейс в браузере совпадает с мини-приложением; исходник — **`miniapp/frontend/`**. Каталог **`website/frontend/`** — прежняя статика (по-прежнему доступна как `/static/...`). Код веб-API в **`website/app/`** подключается к общему приложению через `sys.path` (см. `miniapp/run.py`).
 
@@ -61,7 +61,7 @@
 
 - **Python 3.10+** для основного стека (`miniapp/requirements.txt`). На **Python 3.14** (Windows) для изолированного пакета `website/` см. примечание в [website/README.md](website/README.md) — там обновлены версии **pydantic**, чтобы ставились готовые колёса без сборки Rust.
 - Для **изолированного** запуска только пакета `website/` — отдельное окружение и `website/requirements.txt` (см. [website/README.md](website/README.md)).
-- Для Mini App в Telegram с устройства — **HTTPS** (Cloudflare Tunnel, свой домен или обратный прокси).
+- Для Mini App в Telegram с устройства — **HTTPS** (свой домен, обратный прокси или внешний туннель с HTTPS).
 
 ---
 
@@ -93,7 +93,7 @@ cp miniapp/.env.example .env   # Linux/macOS
 |------------|------------|
 | `TELEGRAM_BOT_TOKEN` | Токен бота от [@BotFather](https://t.me/BotFather) |
 | `PUBLIC_BASE_URL` | Базовый URL API; локально `http://127.0.0.1:8000`; на проде **`https://ваш-домен`** (тот же хост, что открывает nginx → приложение) |
-| `TELEGRAM_PUBLIC_BASE_URL` | HTTPS для кнопок Web App в Telegram; локально quick tunnel (`launch-stack.bat` дописывает в `.env`); на проде тот же **`https://ваш-домен`**, что и `PUBLIC_BASE_URL` |
+| `TELEGRAM_PUBLIC_BASE_URL` | HTTPS для кнопок Web App в Telegram; на проде тот же **`https://ваш-домен`**, что и `PUBLIC_BASE_URL` (задайте вручную в `.env`) |
 | `WEBSITE_URL` | Кнопка «Сайт»: корень сайта (`/`). Пусто — берётся та же база, что и для миниаппа; не задавайте `/miniapp/` |
 | `JWT_SECRET` | Секрет подписи JWT; в продакшене обязательно уникальное значение |
 | `DATABASE_PATH` | Путь к файлу SQLite (необязательно; иначе используется путь по умолчанию в коде) |
@@ -121,43 +121,22 @@ python miniapp/run.py
 | Задача | Команда |
 |--------|---------|
 | Только API и статика (порт 8000) | `python miniapp/run.py` |
-| Полный стек | macOS/Linux: `bash "launch files/launch-stack.sh"` · Windows: `launch files\launch-stack.bat` — открывает отдельные окна: API **:8000**, Cloudflare Tunnel→8000, Telegram-бот, веб **:8765** (`website/main.py`) |
+| Полный стек | macOS/Linux: `bash "launch files/launch-stack.sh"` · Windows: `launch files\launch-stack.bat` — открывает отдельные окна: API **:8000**, Telegram-бот, веб **:8765** (`website/main.py`) |
 | Только Telegram-бот (при уже запущенном API) | `python miniapp/bot/bot.py` |
 
 Вспомогательные сценарии лежат в **`launch files/stack/`**. Документация по боту: [miniapp/bot/README.md](miniapp/bot/README.md).
 
 ---
 
-## Модели LLM (Ollama и облако)
+## Модели LLM (облако и совместимый API)
 
-Чат использует совместимый с OpenAI эндпоинт **`/v1/chat/completions`**. Локально удобно поднимать **[Ollama](https://ollama.com)**.
+Чат использует эндпоинт **`/v1/chat/completions`** (формат OpenAI). Задайте в `.env` **`CHAT_API_URL`**, **`CHAT_API_KEY`** (при необходимости) и **`CHAT_MODEL`** — например Groq, DeepSeek или OpenAI. Для URL с `127.0.0.1` / `localhost` ключ не обязателен, если так настроен ваш локальный сервер.
 
-1. Установите Ollama и при необходимости запустите сервис (`ollama serve` или системный трей на Windows).
-2. Загрузите модель, например: `ollama pull llama3.2`.
-3. Проверка: `curl -s http://127.0.0.1:11434/api/tags`.
+Диагностика: `GET http://127.0.0.1:8000/api/health/llm` — поля `llm_configured`, `model`.
 
-Пример фрагмента `.env`:
+При долгом ответе локального URL увеличьте `LLM_LOCAL_TIMEOUT` (по умолчанию выше для localhost).
 
-```env
-USE_OLLAMA=1
-OLLAMA_HOST=http://127.0.0.1:11434
-OLLAMA_MODEL=llama3.2
-```
-
-Диагностика: `GET http://127.0.0.1:8000/api/health/llm` — поля `llm_configured`, `ollama_mode`, `model`.
-
-При долгом первом ответе можно увеличить таймаут, например `LLM_LOCAL_TIMEOUT=180`.
-
-Если Ollama включена в `.env`, сценарии **`launch-stack`** могут вызывать скрипты проверки/запуска из **`miniapp/scripts/`**; образ модели нужно подтянуть вручную (`ollama pull`).
-
-Без `USE_OLLAMA` можно задать прямой URL совместимого API, например:
-
-```env
-CHAT_API_URL=http://127.0.0.1:11434/v1/chat/completions
-CHAT_MODEL=llama3.2
-```
-
-Облачные ключи (`DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `CHAT_API_KEY` и др.) и выбор эндпоинта — в **`miniapp/backend/wibe_work/services/llm_client.py`**.
+Детали переменных окружения — в **`miniapp/backend/wibe_work/services/llm_client.py`**.
 
 Системные промпты (чат, разбор, заголовки сессий) собраны в одном месте: **`miniapp/backend/wibe_work/services/llm_prompts.py`** — правки формулировок ИИ удобно делать там.
 
