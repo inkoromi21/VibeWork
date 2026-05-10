@@ -35,6 +35,10 @@ MAILGUN_REGION = os.environ.get("MAILGUN_REGION", "us").strip().lower()
 # Отправитель: "VibeWork <noreply@mg.example.com>" или "VibeWork <you@yandex.ru>"
 EMAIL_FROM = os.environ.get("EMAIL_FROM", "").strip()
 
+# Resend (транзакционные письма через HTTPS API): https://resend.com
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+RESEND_BASE_URL = os.environ.get("RESEND_BASE_URL", "https://api.resend.com").strip()
+
 # Unisender Go (транзакционные письма по HTTPS API): https://goapi.unisender.ru
 UNISENDER_API_KEY = os.environ.get("UNISENDER_API_KEY", "").strip()
 UNISENDER_GO_BASE_URL = os.environ.get(

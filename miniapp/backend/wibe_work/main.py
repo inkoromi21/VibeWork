@@ -104,6 +104,7 @@ def _smtp_nonempty_from_env_file(path: Path) -> dict[str, bool] | None:
         "EMAIL_SMTP_HOST",
         "EMAIL_SMTP_USER",
         "EMAIL_SMTP_PASSWORD",
+        "RESEND_API_KEY",
         "UNISENDER_API_KEY",
         "UNISENDER_LIST_ID",
     )
@@ -115,6 +116,7 @@ async def health_email():
     """Диагностика сброса пароля: что видит процесс (без секретов)."""
     from wibe_work import config as cfg
     from wibe_work.services.mailgun_send import mailgun_configured
+    from wibe_work.services.resend_send import resend_configured
     from wibe_work.services.smtp_send import smtp_configured
     from wibe_work.services.transactional_email import transactional_email_configured
     from wibe_work.services.unisender_go_send import unisender_go_configured
@@ -125,6 +127,7 @@ async def health_email():
     return {
         "transactional_ok": transactional_email_configured(),
         "smtp_ready": smtp_configured(),
+        "resend_ready": resend_configured(),
         "unisender_ready": unisender_web_configured() or unisender_go_configured(),
         "unisender_web_ready": unisender_web_configured(),
         "unisender_go_ready": unisender_go_configured(),
@@ -134,6 +137,7 @@ async def health_email():
             "EMAIL_SMTP_HOST": bool(cfg.EMAIL_SMTP_HOST),
             "EMAIL_SMTP_USER": bool(cfg.EMAIL_SMTP_USER),
             "EMAIL_SMTP_PASSWORD": bool(cfg.EMAIL_SMTP_PASSWORD),
+            "RESEND_API_KEY": bool(cfg.RESEND_API_KEY),
             "UNISENDER_API_KEY": bool(cfg.UNISENDER_API_KEY),
             "UNISENDER_LIST_ID": bool(cfg.UNISENDER_LIST_ID),
         },
