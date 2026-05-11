@@ -13,7 +13,7 @@ if _extra_env:
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from wibe_work.sqlite_db import init_db
@@ -41,6 +41,7 @@ app.add_middleware(
 )
 
 _WEBSITE_FRONTEND_DIR = PROJECT_ROOT / "website" / "frontend"
+_FAVICON_PNG = _WEBSITE_FRONTEND_DIR / "favicon.png"
 if _WEBSITE_FRONTEND_DIR.is_dir():
     # Старая веб-статика (style.css, script.js) — на случай прямых ссылок; корень отдаёт тот же UI, что миниапп
     app.mount("/static", StaticFiles(directory=str(_WEBSITE_FRONTEND_DIR)), name="website_static")
@@ -140,6 +141,14 @@ async def health_llm():
     if cfg:
         out["model"] = cfg[2]
     return out
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon_ico():
+    """Табы и боты часто запрашивают /favicon.ico по умолчанию — отдаём тот же PNG."""
+    if not _FAVICON_PNG.is_file():
+        raise HTTPException(status_code=404, detail="favicon not found")
+    return FileResponse(_FAVICON_PNG, media_type="image/png")
 
 
 @app.get("/miniapp/", response_class=HTMLResponse)
