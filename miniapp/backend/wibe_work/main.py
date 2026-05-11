@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from wibe_work.sqlite_db import init_db
+from wibe_work import config as cfg
 from wibe_work.routers import (
     account_link_routes,
     assessment_routes,
@@ -32,10 +33,25 @@ from wibe_work.services.llm_client import get_llm_settings
 
 app = FastAPI(title="VibeWork", description="Карьерный помощник")
 
+def _parse_cors_origins(raw: str) -> list[str]:
+    # Comma/space separated list
+    parts: list[str] = []
+    for chunk in (raw or "").replace(" ", ",").split(","):
+        o = chunk.strip()
+        if o:
+            parts.append(o)
+    return parts
+
+
+_cors_origins = _parse_cors_origins(cfg.CORS_ALLOW_ORIGINS)
+_cors_has_wildcard = any(o == "*" for o in _cors_origins)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins if _cors_origins else [],
+    # credentials нельзя сочетать с allow_origins=["*"] — FastAPI/Starlette всё равно отрежет;
+    # оставляем True только при явных origin-ах.
+    allow_credentials=False if _cors_has_wildcard else True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -59,6 +75,50 @@ app.include_router(website_auth_compat_router)
 app.include_router(website_api_router)
 
 init_db()
+
+def _bool_env(raw: str) -> bool | None:
+    s = (raw or "").strip().lower()
+    if not s:
+        return None
+    if s in ("1", "true", "yes", "y", "on"):
+        return True
+    if s in ("0", "false", "no", "n", "off"):
+        return False
+    return None
+
+
+def _validate_security_config() -> None:
+    """
+    Строгие проверки только в prod, чтобы не ломать локальную разработку.
+    """
+    if cfg.VIBEWORK_ENV != "prod":
+        return
+
+    issues: list[str] = []
+
+    # JWT
+    if not cfg.JWT_SECRET or cfg.JWT_SECRET.strip() == "dev-change-me-in-production-vibework":
+        issues.append("JWT_SECRET не задан (или остался dev-дефолт).")
+
+    # Telegram
+    require_tg = _bool_env(cfg.REQUIRE_TELEGRAM_BOT_TOKEN)
+    if require_tg is None:
+        require_tg = True
+    if require_tg and not os.environ.get("TELEGRAM_BOT_TOKEN", "").strip():
+        issues.append("TELEGRAM_BOT_TOKEN не задан, а REQUIRE_TELEGRAM_BOT_TOKEN=true (по умолчанию в prod).")
+
+    # CORS
+    if not _cors_origins:
+        issues.append("CORS_ALLOW_ORIGINS пуст — браузерные клиенты не смогут ходить в API (или вы случайно отключили CORS).")
+    if _cors_has_wildcard:
+        issues.append("CORS_ALLOW_ORIGINS содержит '*': это опасно для прод-окружения.")
+
+    if issues:
+        msg = "Безопасность: конфиг для prod некорректен:\n- " + "\n- ".join(issues)
+        raise RuntimeError(msg)
+
+
+_validate_security_config()
 
 try:
     from wibe_work.services.transactional_email import transactional_email_configured

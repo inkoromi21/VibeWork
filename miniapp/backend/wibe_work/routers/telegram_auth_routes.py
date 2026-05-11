@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 
+from wibe_work import config as cfg
 from wibe_work.jwt_service import create_access_token
 from wibe_work.telegram_init_data import (
     check_telegram_auth,
@@ -75,21 +76,44 @@ async def auth_telegram(data: dict):
     if init_data:
         if not isinstance(init_data, str):
             raise HTTPException(400, detail="init_data должен быть строкой")
-        if bot_token:
-            if not validate_webapp_init_data(init_data, bot_token):
-                raise HTTPException(
-                    status_code=403,
-                    detail=(
-                        "Неверная подпись Mini App (init_data). Проверьте в .env TELEGRAM_BOT_TOKEN "
-                        "— он должен быть от того же бота, через которого открыто приложение; "
-                        "после смены токена перезапустите API."
-                    ),
-                )
+        require_tg = True
+        if cfg.REQUIRE_TELEGRAM_BOT_TOKEN.strip():
+            require_tg = cfg.REQUIRE_TELEGRAM_BOT_TOKEN.strip().lower() in ("1", "true", "yes", "y", "on")
+        elif cfg.VIBEWORK_ENV != "prod":
+            require_tg = False
+
+        if require_tg and not bot_token:
+            raise HTTPException(
+                status_code=503,
+                detail="TELEGRAM_BOT_TOKEN не настроен на сервере (в prod подпись Telegram обязательна).",
+            )
+
+        if bot_token and not validate_webapp_init_data(init_data, bot_token):
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Неверная подпись Mini App (init_data). Проверьте в .env TELEGRAM_BOT_TOKEN "
+                    "— он должен быть от того же бота, через которого открыто приложение; "
+                    "после смены токена перезапустите API."
+                ),
+            )
         tid, fn, un = parse_init_data_user_fields(init_data)
         if tid is None:
             raise HTTPException(400, detail="Не удалось разобрать init_data")
         user_id = _get_or_create_user_id_for_telegram_id(tid, fn, un)
         return {"access_token": create_access_token(user_id), "user_id": user_id}
+
+    # Login widget: подпись тоже должна быть обязательной в prod
+    require_tg = True
+    if cfg.REQUIRE_TELEGRAM_BOT_TOKEN.strip():
+        require_tg = cfg.REQUIRE_TELEGRAM_BOT_TOKEN.strip().lower() in ("1", "true", "yes", "y", "on")
+    elif cfg.VIBEWORK_ENV != "prod":
+        require_tg = False
+    if require_tg and not bot_token:
+        raise HTTPException(
+            status_code=503,
+            detail="TELEGRAM_BOT_TOKEN не настроен на сервере (в prod подпись Telegram обязательна).",
+        )
 
     if not check_telegram_auth(data, bot_token):
         raise HTTPException(status_code=403, detail="Неверная подпись Telegram")

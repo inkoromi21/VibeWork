@@ -10,6 +10,7 @@ import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from wibe_work import config as cfg
 from wibe_work.api_schemas import EmailLoginBody, EmailRegisterBody
 from wibe_work.bearer_auth import get_current_user_id_from_bearer
 from wibe_work.jwt_service import create_access_token
@@ -170,6 +171,16 @@ async def link_telegram_webapp_init(body: TelegramInitBody, current: CurrentUser
     чаще используйте /telegram/widget с виджетом на странице).
     """
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    require_tg = True
+    if cfg.REQUIRE_TELEGRAM_BOT_TOKEN.strip():
+        require_tg = cfg.REQUIRE_TELEGRAM_BOT_TOKEN.strip().lower() in ("1", "true", "yes", "y", "on")
+    elif cfg.VIBEWORK_ENV != "prod":
+        require_tg = False
+    if require_tg and not bot_token:
+        raise HTTPException(
+            status_code=503,
+            detail="TELEGRAM_BOT_TOKEN не настроен на сервере (в prod подпись Telegram обязательна).",
+        )
     if bot_token and not validate_webapp_init_data(body.init_data, bot_token):
         raise HTTPException(status_code=403, detail="Неверная подпись init_data")
     tid, fn, un = parse_init_data_user_fields(body.init_data)
@@ -194,6 +205,16 @@ async def link_telegram_login_widget(request: Request, current: CurrentUser):
     Telegram Login Widget на сайте: те же поля, что и у виджета (id, hash, …).
     """
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    require_tg = True
+    if cfg.REQUIRE_TELEGRAM_BOT_TOKEN.strip():
+        require_tg = cfg.REQUIRE_TELEGRAM_BOT_TOKEN.strip().lower() in ("1", "true", "yes", "y", "on")
+    elif cfg.VIBEWORK_ENV != "prod":
+        require_tg = False
+    if require_tg and not bot_token:
+        raise HTTPException(
+            status_code=503,
+            detail="TELEGRAM_BOT_TOKEN не настроен на сервере (в prod подпись Telegram обязательна).",
+        )
     data: dict[str, Any] = await request.json()
     if not check_telegram_auth(data, bot_token):
         raise HTTPException(status_code=403, detail="Неверная подпись Telegram")

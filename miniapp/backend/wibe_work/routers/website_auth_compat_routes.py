@@ -14,6 +14,7 @@ import bcrypt
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, field_validator
 
+from wibe_work import config as cfg
 from wibe_work.password_input import sanitize_password_input
 from wibe_work.sqlite_db import get_db
 from wibe_work.telegram_init_data import parse_init_data_user_id
@@ -117,22 +118,35 @@ def _user_id_from_cookie(raw: Optional[str]) -> Optional[str]:
 
 
 def _clear_cookie(response: Response) -> None:
+    # Secure — только при HTTPS (в проде обычно да).
+    secure_flag = None
+    if cfg.COOKIE_SECURE:
+        secure_flag = cfg.COOKIE_SECURE.strip().lower() in ("1", "true", "yes", "y", "on")
+    else:
+        secure_flag = cfg.PUBLIC_BASE_URL.lower().startswith("https://")
     response.set_cookie(
         key=SESSION_COOKIE,
         value="",
         httponly=True,
         samesite="lax",
+        secure=bool(secure_flag),
         max_age=0,
         path="/",
     )
 
 
 def _set_cookie(response: Response, token: str) -> None:
+    secure_flag = None
+    if cfg.COOKIE_SECURE:
+        secure_flag = cfg.COOKIE_SECURE.strip().lower() in ("1", "true", "yes", "y", "on")
+    else:
+        secure_flag = cfg.PUBLIC_BASE_URL.lower().startswith("https://")
     response.set_cookie(
         key=SESSION_COOKIE,
         value=token,
         httponly=True,
         samesite="lax",
+        secure=bool(secure_flag),
         max_age=SESSION_DAYS * 86400,
         path="/",
     )
