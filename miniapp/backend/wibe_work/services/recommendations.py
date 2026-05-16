@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from wibe_work.services.user_context import (
     education_rank,
