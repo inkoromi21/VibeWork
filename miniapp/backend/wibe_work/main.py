@@ -203,6 +203,56 @@ async def health_llm():
     return out
 
 
+@app.get("/api/health/hh")
+async def health_hh():
+    """Диагностика hh.ru: конфиг и лёгкий запрос к API (без секретов в ответе)."""
+    from wibe_work import config as hh_cfg
+    from wibe_work.services import hh_client
+
+    if hh_cfg.HH_APP_ACCESS_TOKEN:
+        auth_mode = "app_token"
+        oauth_ok = True
+    elif hh_cfg.HH_CLIENT_ID and hh_cfg.HH_CLIENT_SECRET:
+        auth_mode = "client_credentials"
+        oauth_ok = True
+    elif hh_cfg.HH_CLIENT_ID or hh_cfg.HH_CLIENT_SECRET:
+        auth_mode = "incomplete"
+        oauth_ok = False
+    else:
+        auth_mode = "none"
+        oauth_ok = False
+
+    out: dict = {
+        "hh_user_agent_set": bool(str(hh_cfg.HH_USER_AGENT or "").strip()),
+        "hh_oauth_configured": oauth_ok,
+        "hh_auth_mode": auth_mode,
+        "hint": (
+            "После одобрения на dev.hh.ru задайте HH_CLIENT_ID и HH_CLIENT_SECRET в корневом .env "
+            "и перезапустите API. User-Agent должен совпадать с заявкой. "
+            "CLI: python scripts/test_hh_api.py"
+        ),
+    }
+
+    try:
+        areas = hh_client.suggest_areas("Моск", limit=1)
+        out["api_ok"] = bool(areas)
+        if areas:
+            out["sample_area"] = areas[0]
+    except Exception as e:
+        out["api_ok"] = False
+        out["api_error"] = str(e)[:300]
+
+    if oauth_ok and not hh_cfg.HH_APP_ACCESS_TOKEN:
+        try:
+            hh_client._fetch_client_credentials_token()
+            out["token_ok"] = True
+        except Exception as e:
+            out["token_ok"] = False
+            out["token_error"] = str(e)[:300]
+
+    return out
+
+
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon_ico():
     """Табы и боты часто запрашивают /favicon.ico по умолчанию — отдаём тот же PNG."""

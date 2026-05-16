@@ -98,6 +98,8 @@ cp miniapp/.env.example .env   # Linux/macOS
 | `JWT_SECRET` | Секрет подписи JWT; в продакшене обязательно уникальное значение |
 | `DATABASE_PATH` | Путь к файлу SQLite (необязательно; иначе используется путь по умолчанию в коде) |
 | `HH_USER_AGENT` | Идентификатор клиента для API hh.ru в формате из их документации |
+| `HH_CLIENT_ID` / `HH_CLIENT_SECRET` | После одобрения заявки на [dev.hh.ru](https://dev.hh.ru/admin) — OAuth `client_credentials` (см. `scripts/test_hh_api.py`, `GET /api/health/hh`) |
+| `HH_APP_ACCESS_TOKEN` | Альтернатива паре id/secret — готовый access token из кабинета |
 
 ### 3. Запуск API
 
