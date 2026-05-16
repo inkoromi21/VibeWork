@@ -127,12 +127,19 @@ async def quiz_questions(
     profile = load_profile(user_id)
     intr = _interest_for_user(profile, interest)
     grade = compute_quiz_grade(profile)
+    from wibe_work.services.aptitude_quiz import get_quiz_bundle
+
+    bundle = get_quiz_bundle(intr, grade)
     return {
-        "interest": intr,
+        "interest": bundle["interest"],
         "test_grade": grade,
         "test_grade_label": quiz_grade_label(grade),
         "test_grade_hint": quiz_grade_hint(grade),
-        "questions": get_questions_for_interest(intr, grade),
+        "technical_count": bundle["technical_count"],
+        "personality_count": bundle["personality_count"],
+        "technical": bundle["technical"],
+        "personality": bundle["personality"],
+        "questions": bundle["questions"],
     }
 
 
@@ -142,6 +149,14 @@ async def quiz_analyze(user_id: str, request: Request, body: AnalyzeRequest):
     profile = load_profile(user_id)
     if not body.answers:
         raise HTTPException(status_code=400, detail="Нужны ответы на вопросы")
+    qids = {int(a.question_id) for a in body.answers}
+    expected = set(range(1, 16))
+    if qids != expected:
+        missing = sorted(expected - qids)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Нужны ответы на все 15 вопросов (1–10 по сфере, 11–15 личностные). Не хватает: {missing}",
+        )
     interest = _interest_for_user(profile, body.interest)
     preparation = _prep_for_user(profile, body.preparation_level)
     education = (profile.get("education_level") or "не указано").strip()
@@ -226,8 +241,16 @@ async def career_coach_chat(user_id: str, request: Request, body: ChatRequest):
     )
     hint = (snap or {}).get("directions_hint") or ""
     msgs = [{"role": m.role, "content": m.content} for m in body.messages[-20:]]
-    snippet = coach_profile_snippet(load_profile(user_id))
-    reply, source, notice = career_coach_chat_reply(msgs, summary, hint, snippet)
+    profile = load_profile(user_id)
+    snippet = coach_profile_snippet(profile)
+    reply, source, notice = career_coach_chat_reply(
+        msgs,
+        summary,
+        hint,
+        snippet,
+        profile=profile,
+        analysis_snap=snap,
+    )
     return {"reply": reply, "source": source, "notice": notice}
 
 

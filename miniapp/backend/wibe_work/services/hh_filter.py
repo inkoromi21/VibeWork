@@ -5,7 +5,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from wibe_work.sqlite_db import get_db
 from wibe_work.services.diagnostics import run_diagnostics
-from wibe_work.services.recommendations import run_recommendations
+from wibe_work.services.recommendations import (
+    _direction_for_sphere_id,
+    run_recommendations,
+)
 from wibe_work.services.hh_client import search_vacancies, slim_vacancy_items, suggest_area_id
 from wibe_work.services.user_context import (
     load_competencies,
@@ -85,19 +88,34 @@ def can_finalize_hh_filter(
 
 
 def _map_experience(profile: Dict[str, Any]) -> str:
+    pain = (profile.get("primary_pain") or "").strip()
+    if pain in ("pain_no_exp", "pain_low_confidence"):
+        return "noExperience"
+    prep = (profile.get("preparation_level") or "").strip().lower()
+    if prep == "weak":
+        return "noExperience"
+    detail = (profile.get("education_detail") or "").strip().lower()
+    if detail in ("school_9", "school_11", "school_8_11", "college", "spo"):
+        return "noExperience"
     off = profile.get("experience_official")
     if off and str(off).strip():
         low = str(off).lower()
-        if any(x in low for x in ("год", "лет", "12 ", "24 ", "36 ")):
+        if any(x in low for x in ("3", "три", "более 3", "4", "5", "6")):
+            return "between3And6"
+        if any(x in low for x in ("год", "лет", "12 ", "24 ", "36 ", "1", "2")):
             return "between1And3"
         return "between1And3"
     return "noExperience"
 
 
 def _map_schedule(profile: Dict[str, Any]) -> Optional[str]:
-    pref = (profile.get("work_format_preference") or "").lower()
-    if "удал" in pref:
+    pref = (profile.get("work_format_preference") or profile.get("work_format_pref") or "").lower()
+    if pref in ("remote", "удалённо", "удаленно") or "удал" in pref:
         return "remote"
+    if pref in ("hybrid", "гибрид"):
+        return "flexible"
+    if pref in ("office", "офис"):
+        return "fullDay"
     return None
 
 
@@ -211,16 +229,46 @@ def _extract_stack_labels(profile: Dict[str, Any], competencies: List[Dict[str, 
     return [h[1] for h in hits]
 
 
-def _usable_sphere_token(raw: str) -> Optional[str]:
-    t = (raw or "").strip()
-    if not t or len(t) > 32:
+# id сферы в анкете → поисковая фраза на hh.ru
+_SPHERE_ID_TO_HH_PHRASE: Dict[str, str] = {
+    "it_dev": "разработчик программист",
+    "data": "аналитик данных",
+    "design": "UX дизайнер",
+    "creative": "дизайнер креатив",
+    "marketing": "маркетолог",
+    "sales": "менеджер по продажам",
+    "logistics": "логист",
+    "medicine": "медицинский регистратор",
+    "education": "преподаватель",
+    "engineering": "инженер",
+    "mgmt": "менеджер проектов",
+    "finance": "финансовый аналитик",
+    "hr_edu": "рекрутер HR",
+    "sport": "тренер инструктор",
+    "other": "стажировка начинающий специалист",
+}
+
+
+def _load_analysis_best_track(user_id: str) -> Optional[str]:
+    """Лучший сценарий из сохранённого разбора (после теста)."""
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM vibework_snapshots WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        if not row:
+            return None
+        data = json.loads(row["payload_json"])
+        scenarios = data.get("scenarios") or {}
+        best = str(scenarios.get("best_plan_name") or "").strip()
+        if not best:
+            plans = scenarios.get("plans") or []
+            if plans:
+                best = str(plans[0].get("name") or "").strip()
+        return re.sub(r"^План [ABC]:\s*", "", best).strip() or None
+    except (json.JSONDecodeError, TypeError, KeyError):
         return None
-    low = re.sub(r"\s+", "_", t.lower())
-    if low in _SPHERE_SLUGS_SKIP:
-        return None
-    if re.fullmatch(r"[a-z][a-z0-9_]{1,20}", low):
-        return None
-    return t
 
 
 def _hh_search_phrase(
@@ -254,10 +302,18 @@ def _hh_search_phrase(
         return "инженер"
     if "образован" in dl or "наук" in dl:
         return "преподаватель"
-    for s in spheres[:2]:
-        u = _usable_sphere_token(s)
-        if u:
-            return u[:40]
+    if "финанс" in dl or "эконом" in dl:
+        return "финансовый аналитик"
+    if "универсал" in dl:
+        return "стажировка начинающий специалист"
+    for s in spheres[:3]:
+        sid = (s or "").strip().lower()
+        phrase = _SPHERE_ID_TO_HH_PHRASE.get(sid)
+        if phrase:
+            return phrase
+        mapped = _direction_for_sphere_id(sid)
+        if mapped:
+            return _hh_search_phrase(mapped, stack, [])
     return "стажировка начинающий специалист"
 
 
@@ -265,10 +321,24 @@ def _build_search_text(
     profile: Dict[str, Any],
     rec: Dict[str, Any],
     competencies: List[Dict[str, Any]],
+    *,
+    user_id: Optional[str] = None,
+    search_direction_override: Optional[str] = None,
 ) -> str:
     stack = _extract_stack_labels(profile, competencies)[:2]
     spheres = parse_interest_spheres(profile)
-    direction = str(rec.get("primary_direction") or "")
+    if not spheres and (profile.get("main_sphere") or "").strip():
+        spheres = [str(profile.get("main_sphere")).strip()]
+    direction = (search_direction_override or "").strip() or str(
+        rec.get("primary_direction") or ""
+    )
+    if not search_direction_override and user_id:
+        track = _load_analysis_best_track(user_id)
+        if track and len(track) > 3:
+            text = track[:80]
+            if stack and _is_it_search_direction(direction):
+                text = f"{stack[0]} {text}"[:120]
+            return re.sub(r"\s+", " ", text).strip()
     text = _hh_search_phrase(direction, stack, spheres)
     text = re.sub(r"\s+", " ", text).strip()
     return text[:120] if text else "стажировка начинающий специалист"
@@ -308,9 +378,18 @@ def build_hh_query_params(
     rec: Dict[str, Any],
     area_id: Optional[str],
     competencies: Optional[List[Dict[str, Any]]] = None,
+    *,
+    user_id: Optional[str] = None,
+    search_direction_override: Optional[str] = None,
 ) -> Dict[str, Any]:
     comps = competencies if competencies is not None else []
-    text = _build_search_text(profile, rec, comps)
+    text = _build_search_text(
+        profile,
+        rec,
+        comps,
+        user_id=user_id,
+        search_direction_override=search_direction_override,
+    )
 
     params: Dict[str, Any] = {
         "text": text or "стажер",
@@ -366,7 +445,14 @@ def fetch_live_hh_vacancies(
     city_raw = (city_override or "").strip() or (profile.get("city") or "")
     city = str(city_raw).strip() if city_raw else None
     area_id = suggest_area_id(str(city)) if city else None
-    params = build_hh_query_params(profile, rec, area_id, competencies)
+    params = build_hh_query_params(
+        profile,
+        rec,
+        area_id,
+        competencies,
+        user_id=user_id,
+        search_direction_override=sd or None,
+    )
 
     if only_remote:
         params["schedule"] = "remote"
@@ -391,6 +477,17 @@ def fetch_live_hh_vacancies(
     direction = str(rec.get("primary_direction") or "")
     if _is_it_search_direction(direction):
         items = [it for it in items if _IT_TITLE_PATTERN.search(it.get("name") or "")]
+    from wibe_work.services.hh_web_link import build_hh_web_search_url
+
+    hh_url = build_hh_web_search_url(
+        text=str(params.get("text") or ""),
+        city=city,
+        only_remote=only_remote,
+        only_entry_level=only_entry_level,
+        hh_experience=hh_experience or params.get("experience"),
+        min_salary=min_salary or params.get("salary"),
+        work_format="remote" if only_remote else None,
+    )
     return {
         "source": "hh.ru",
         "found": raw.get("found"),
@@ -398,6 +495,7 @@ def fetch_live_hh_vacancies(
         "page": raw.get("page"),
         "per_page": raw.get("per_page"),
         "items": items,
+        "hh_search_url": hh_url,
         "search_hint": {
             "text": params.get("text"),
             "area_id": area_id,
@@ -406,7 +504,79 @@ def fetch_live_hh_vacancies(
             "experience": params.get("experience"),
             "schedule": params.get("schedule"),
             "search_field": params.get("search_field"),
+            "employment": params.get("employment"),
         },
+    }
+
+
+def build_hh_demo_fallback(
+    user_id: str,
+    profile: Dict[str, Any],
+    *,
+    only_remote: bool = False,
+    only_entry_level: bool = False,
+    hh_experience: Optional[str] = None,
+    min_salary: Optional[int] = None,
+    city_override: Optional[str] = None,
+    search_direction: Optional[str] = None,
+    per_page: int = 15,
+    notice: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Демо-ответ и ссылка на hh.ru с тем же запросом, что и живой поиск."""
+    from wibe_work.services.hh_web_link import build_hh_web_search_url, demo_hh_items
+
+    competencies = load_competencies(user_id)
+    rec = run_recommendations(profile, competencies)
+    sd = (search_direction or "").strip()
+    if sd:
+        rec = {**rec, "primary_direction": sd}
+    city_raw = (city_override or "").strip() or (profile.get("city") or "")
+    city = str(city_raw).strip() if city_raw else None
+    area_id = suggest_area_id(str(city)) if city else None
+    params = build_hh_query_params(
+        profile,
+        rec,
+        area_id,
+        competencies,
+        user_id=user_id,
+        search_direction_override=sd or None,
+    )
+    apply_user_experience_filter(
+        params, hh_experience=hh_experience, only_entry_level=only_entry_level
+    )
+    if only_remote:
+        params["schedule"] = "remote"
+    if min_salary is not None and min_salary > 0:
+        params["salary"] = int(min_salary)
+        params["only_with_salary"] = "true"
+    hh_url = build_hh_web_search_url(
+        text=str(params.get("text") or ""),
+        city=city,
+        only_remote=only_remote,
+        only_entry_level=only_entry_level,
+        hh_experience=hh_experience or params.get("experience"),
+        min_salary=min_salary or params.get("salary"),
+        work_format="remote" if only_remote else None,
+    )
+    items = demo_hh_items(hh_url)
+    return {
+        "source": "demo",
+        "notice": notice
+        or "hh.ru API недоступен. Показаны демо-вакансии — откройте поиск на hh.ru по кнопке.",
+        "hh_search_url": hh_url,
+        "search_hint": {
+            "text": params.get("text"),
+            "area_id": area_id,
+            "city": city,
+            "search_direction": rec.get("primary_direction"),
+            "experience": params.get("experience"),
+            "schedule": params.get("schedule"),
+        },
+        "found": len(items),
+        "pages": 1,
+        "page": 0,
+        "per_page": per_page,
+        "items": items,
     }
 
 
@@ -417,7 +587,9 @@ def build_filter_bundle(user_id: str) -> Dict[str, Any]:
 
     city = profile.get("city")
     area_id = suggest_area_id(str(city)) if city else None
-    query_params = build_hh_query_params(profile, rec, area_id, competencies)
+    query_params = build_hh_query_params(
+        profile, rec, area_id, competencies, user_id=user_id
+    )
     human = {
         "primary_direction": rec.get("primary_direction"),
         "skills_for_first_offer": rec.get("skills_for_first_offer"),

@@ -640,10 +640,34 @@ _W_DEFAULT: WRow = [
     [(2, 0, 2, 1), (1, 2, 2, 1), (1, 1, 2, 2), (2, 1, 2, 0)],
 ]
 
+TECHNICAL_COUNT = 10
+PERSONALITY_COUNT = 5
+PERSONALITY_ID_START = 11
+
+# Текст вопроса 12 (интерес ↔ работа) по треку сферы
+_SPHERE_EXPERT_Q12: Dict[str, str] = {
+    "tech": "Чем для вас ближе связка «интерес к технологиям и работа»?",
+    "creative": "Чем ближе связка «творчество, визуал, контент и работа»?",
+    "people": "Чем ближе связка «работа с людьми и то, что вам важно»?",
+    "general": "Чем для вас ближе связка «интерес и работа»?",
+}
+
 _PROFILE_BY_INTEREST: Dict[str, List[Dict[str, Any]]] = {
     "it_dev": _PROFILE_IT,
     "data": _PROFILE_DATA,
     "design": _PROFILE_DESIGN,
+    "marketing": _PROFILE_DESIGN,  # fallback built-in; приоритет — website bank
+    "sales": _PROFILE_DEFAULT,
+    "engineering": _PROFILE_IT,
+    "mgmt": _PROFILE_DEFAULT,
+    "finance": _PROFILE_DATA,
+    "hr_edu": _PROFILE_DEFAULT,
+    "logistics": _PROFILE_DEFAULT,
+    "medicine": _PROFILE_DEFAULT,
+    "education": _PROFILE_DEFAULT,
+    "creative": _PROFILE_DESIGN,
+    "sport": _PROFILE_DEFAULT,
+    "other": _PROFILE_DEFAULT,
     "default": _PROFILE_DEFAULT,
 }
 
@@ -651,6 +675,18 @@ _WEIGHT_PROFILE: Dict[str, WRow] = {
     "it_dev": _W_IT,
     "data": _W_DATA,
     "design": _W_DESIGN,
+    "marketing": _W_DESIGN,
+    "sales": _W_DEFAULT,
+    "engineering": _W_IT,
+    "mgmt": _W_DEFAULT,
+    "finance": _W_DATA,
+    "hr_edu": _W_DEFAULT,
+    "logistics": _W_DEFAULT,
+    "medicine": _W_DEFAULT,
+    "education": _W_DEFAULT,
+    "creative": _W_DESIGN,
+    "sport": _W_DEFAULT,
+    "other": _W_DEFAULT,
     "default": _W_DEFAULT,
 }
 
@@ -669,17 +705,58 @@ def _expert_block_for_grade(grade: str) -> List[Dict[str, Any]]:
     return _EXPERT_UNIVERSITY
 
 
-def get_questions_for_interest(interest: str, grade: str = "university") -> List[Dict[str, Any]]:
-    """10 вопросов по сфере (id 1–10) + 5 от эксперта (id 11–15), грейд влияет на блок эксперта."""
+def _technical_questions(interest: str) -> List[Dict[str, Any]]:
+    from wibe_work.services.aptitude_quiz_content_bridge import fetch_technical_from_website
+
+    web = fetch_technical_from_website(interest)
+    if web and len(web) >= TECHNICAL_COUNT:
+        return web[:TECHNICAL_COUNT]
+
     prof = copy.deepcopy(_PROFILE_BY_INTEREST[_interest_key(interest)])
+    for q in prof:
+        q["block"] = "technical"
+    return prof[:TECHNICAL_COUNT]
+
+
+def _personality_questions(interest: str, grade: str) -> List[Dict[str, Any]]:
+    from wibe_work.services.aptitude_quiz_content_bridge import personality_track_for_interest
+
     expert = copy.deepcopy(_expert_block_for_grade(grade))
-    return prof + expert
+    track = personality_track_for_interest(interest)
+    q12 = _SPHERE_EXPERT_Q12.get(track) or _SPHERE_EXPERT_Q12["general"]
+    for q in expert:
+        if q.get("id") == 12 and q12:
+            q["text"] = q12
+        q["block"] = "personality"
+    return expert
+
+
+def get_quiz_bundle(interest: str, grade: str = "university") -> Dict[str, Any]:
+    """10 технических по сфере + 5 личностных (сфера × уровень образования)."""
+    technical = _technical_questions(interest)
+    personality = _personality_questions(interest, grade)
+    combined = technical + personality
+    return {
+        "interest": (interest or "").strip() or "other",
+        "test_grade": (grade or "university").strip().lower(),
+        "technical_count": len(technical),
+        "personality_count": len(personality),
+        "technical": technical,
+        "personality": personality,
+        "questions": combined,
+    }
+
+
+def get_questions_for_interest(interest: str, grade: str = "university") -> List[Dict[str, Any]]:
+    """Совместимость: плоский список id 1–15."""
+    return get_quiz_bundle(interest, grade)["questions"]
 
 
 def get_pro_weights_matrix_for_interest(interest: str) -> WRow:
     """15 строк весов в порядке question_id 1…15."""
     k = _interest_key(interest)
-    return list(_WEIGHT_PROFILE[k]) + list(_EXPERT_WEIGHTS)
+    tech_w = _WEIGHT_PROFILE.get(k, _W_DEFAULT)
+    return list(tech_w) + list(_EXPERT_WEIGHTS)
 
 
 def letter_to_index(letter: str) -> int:

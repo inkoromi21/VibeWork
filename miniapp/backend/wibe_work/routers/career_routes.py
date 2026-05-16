@@ -12,13 +12,13 @@ from wibe_work.services.diagnostics import run_diagnostics
 from wibe_work.services.hh_client import search_vacancies, slim_vacancy_items, suggest_areas
 from wibe_work.services.hh_filter import (
     build_filter_bundle,
+    build_hh_demo_fallback,
     can_finalize_hh_filter,
     fetch_live_hh_vacancies,
     load_user_hh_state,
     regenerate_user_hh_bundle,
     save_user_hh_state,
 )
-from wibe_work.services.hh_web_link import build_hh_web_search_url, demo_hh_items
 from wibe_work.services.job_search import match_jobs_for_user
 from wibe_work.services.mts_match import match_mts_roles
 from wibe_work.services.user_pain_mapping import align_pains
@@ -118,70 +118,34 @@ async def get_hh_live_jobs(
             city_override=hh_city,
             search_direction=search_direction,
         )
-    except requests.exceptions.HTTPError as e:
-        code = e.response.status_code if e.response is not None else None
-        # hh не ответил — отдаём демо-карточки и ссылку на поиск на hh.ru
+    except requests.exceptions.HTTPError:
         profile = load_profile(user_id) or {}
-        text = (
-            (profile.get("target_direction") or "")
-            or (profile.get("profession") or "")
-            or (profile.get("interest") or "")
-            or "вакансии"
-        )
-        city = hh_city or profile.get("city")
-        hh_url = build_hh_web_search_url(
-            text=str(text),
-            city=str(city) if city else None,
+        return build_hh_demo_fallback(
+            user_id,
+            profile,
             only_remote=only_remote,
             only_entry_level=only_entry_level,
             hh_experience=hh_experience,
             min_salary=min_salary,
-            work_format="remote" if only_remote else None,
-            level="стажер" if only_entry_level else None,
+            city_override=hh_city,
+            search_direction=search_direction,
+            per_page=per_page,
+            notice="hh.ru API недоступен (часто блокировка по сети/провайдеру). Показаны демо-вакансии — откройте поиск на hh.ru по кнопке.",
         )
-        items = demo_hh_items(hh_url)
-        return {
-            "source": "demo",
-            "notice": "hh.ru API недоступен (часто блокировка по сети/провайдеру). Показаны демо-вакансии — откройте поиск на hh.ru по кнопке.",
-            "hh_search_url": hh_url,
-            "search_hint": {"text": str(text), "city": str(city) if city else None},
-            "found": len(items),
-            "pages": 1,
-            "page": 0,
-            "per_page": per_page,
-            "items": items,
-        }
-    except requests.RequestException as e:
+    except requests.RequestException:
         profile = load_profile(user_id) or {}
-        text = (
-            (profile.get("target_direction") or "")
-            or (profile.get("profession") or "")
-            or (profile.get("interest") or "")
-            or "вакансии"
-        )
-        city = hh_city or profile.get("city")
-        hh_url = build_hh_web_search_url(
-            text=str(text),
-            city=str(city) if city else None,
+        return build_hh_demo_fallback(
+            user_id,
+            profile,
             only_remote=only_remote,
             only_entry_level=only_entry_level,
             hh_experience=hh_experience,
             min_salary=min_salary,
-            work_format="remote" if only_remote else None,
-            level="стажер" if only_entry_level else None,
+            city_override=hh_city,
+            search_direction=search_direction,
+            per_page=per_page,
+            notice="Сеть до hh.ru недоступна. Показаны демо-вакансии — откройте поиск на hh.ru по кнопке.",
         )
-        items = demo_hh_items(hh_url)
-        return {
-            "source": "demo",
-            "notice": "Сеть до hh.ru недоступна. Показаны демо-вакансии — откройте поиск на hh.ru по кнопке.",
-            "hh_search_url": hh_url,
-            "search_hint": {"text": str(text), "city": str(city) if city else None},
-            "found": len(items),
-            "pages": 1,
-            "page": 0,
-            "per_page": per_page,
-            "items": items,
-        }
 
 
 @router.get("/pains/{user_id}")

@@ -57,8 +57,27 @@ _PRIORITY_RU = {
 }
 
 
+_PAIN_LABELS: Dict[str, str] = {
+    "pain_career": "Не знаю, кем стать",
+    "pain_no_exp": "Нет опыта",
+    "pain_region": "Мало вакансий в городе",
+    "pain_money_courses": "Нет денег на курсы",
+    "pain_interview": "Боюсь собеседований",
+    "pain_overload": "Слишком много информации",
+    "pain_low_confidence": "Кажется, что ничего не умею",
+    "pain_gap_skills": "Умею многое, но работу не дают",
+}
+
+_WORK_FORMAT_RU = {
+    "office": "офис",
+    "remote": "удалённо",
+    "hybrid": "гибрид",
+    "any": "не важно",
+}
+
+
 def coach_profile_snippet(profile: Dict[str, Any]) -> str:
-    """Краткий текст для ИИ-чата: базовые поля анкеты + город, формат, приоритет."""
+    """Краткий текст для ИИ-чата: поля анкеты."""
     if not profile:
         return ""
     lines: List[str] = []
@@ -68,21 +87,45 @@ def coach_profile_snippet(profile: Dict[str, Any]) -> str:
     city = (profile.get("city") or "").strip()
     if city:
         lines.append(f"Город: {city}")
-    ms = (profile.get("main_sphere") or "").strip()
-    if ms:
-        lines.append(f"Главная сфера (анкета): {ms}")
+    spheres = parse_interest_spheres(profile)
+    if spheres:
+        lines.append(f"Сферы интересов: {', '.join(spheres)}")
+    elif (profile.get("main_sphere") or "").strip():
+        lines.append(f"Главная сфера: {profile.get('main_sphere')}")
+    cg = (profile.get("course_grade") or profile.get("course_or_grade") or "")
+    if str(cg).strip():
+        lines.append(f"Курс/класс: {cg}")
+    sf = (profile.get("study_form") or "").strip()
+    if sf:
+        lines.append(f"Форма обучения: {sf}")
     edu = (profile.get("education_detail") or profile.get("education_level") or "").strip()
     if edu:
         lines.append(f"Образование: {edu}")
+    like = (profile.get("like_to_do") or "").strip()
+    if like:
+        lines.append(f"Нравится: {like[:200]}")
+    dislike = (profile.get("dislike_to_do") or "").strip()
+    if dislike:
+        lines.append(f"Не нравится: {dislike[:160]}")
     prep_prof = (profile.get("preparation_level") or "").strip()
     if prep_prof:
-        lines.append(f"Подготовка (самооценка): {prep_prof}")
-    wf = (profile.get("work_format_preference") or profile.get("work_format_pref") or "").strip()
+        lines.append(f"Подготовка: {prep_prof}")
+    wf_raw = (profile.get("work_format_preference") or profile.get("work_format_pref") or "")
+    wf = str(wf_raw).strip()
     if wf:
-        lines.append(f"Формат работы: {wf}")
+        lines.append(f"Формат работы: {_WORK_FORMAT_RU.get(wf, wf)}")
+    ws = (profile.get("work_schedule") or "").strip()
+    if ws:
+        lines.append(f"График: {ws}")
+    sal = profile.get("target_salary")
+    if sal is not None and str(sal).strip() != "":
+        lines.append(f"Целевая зарплата: {sal} ₽/мес")
     pr = (profile.get("career_priority") or "").strip().lower()
     if pr:
         lines.append(f"Приоритет сейчас: {_PRIORITY_RU.get(pr, pr)}")
+    pain = (profile.get("primary_pain") or "").strip()
+    if pain:
+        lines.append(f"Главная сложность: {_PAIN_LABELS.get(pain, pain)}")
     return "\n".join(lines)
 
 

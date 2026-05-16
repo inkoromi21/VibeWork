@@ -20,10 +20,13 @@ _GRADE_HINTS = {
 _EDUCATION_DETAIL_GRADE: Dict[str, str] = {
     "school_9": "school",
     "school_11": "school",
+    "school_8_11": "school",
     "college": "vocational",
+    "spo": "vocational",
     "univ_bachelor": "university",
     "univ_master": "university",
     "univ_incomplete": "university",
+    "graduate": "university",
 }
 
 

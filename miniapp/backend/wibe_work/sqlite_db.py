@@ -95,6 +95,8 @@ _PROFILE_EXTRA_COLS = [
     ("monthly_focus_skill", "TEXT"),
     ("monthly_focus_project", "TEXT"),
     ("weekly_progress_note", "TEXT"),
+    ("primary_pain", "TEXT"),
+    ("course_grade", "TEXT"),
 ]
 
 _JOB_EXTRA_COLS = [

@@ -48,6 +48,8 @@ class ProfileData(BaseModel):
     monthly_focus_skill: Optional[str] = None
     monthly_focus_project: Optional[str] = None
     weekly_progress_note: Optional[str] = None
+    primary_pain: Optional[str] = None
+    course_grade: Optional[str] = None
 
     @field_validator("nickname", mode="before")
     @classmethod

@@ -57,20 +57,44 @@ _DIRECTION_KEYWORDS: List[Tuple[str, List[str]]] = [
         "Юриспруденция",
         ["юрист", "право", "закон", "договор"],
     ),
+    (
+        "Финансы и экономика",
+        ["финанс", "бухгалт", "эконом", "аудит", "казнач", "бюджет"],
+    ),
 ]
 
 _SPHERE_TO_DIRECTION = {
     "it": "IT / разработка",
+    "it_dev": "IT / разработка",
     "айти": "IT / разработка",
+    "data": "Аналитика и данные",
+    "marketing": "Маркетинг и продажи",
     "маркетинг": "Маркетинг и продажи",
+    "design": "Дизайн и креатив",
     "дизайн": "Дизайн и креатив",
+    "creative": "Дизайн и креатив",
+    "sales": "Маркетинг и продажи",
     "продажи": "Маркетинг и продажи",
+    "logistics": "Маркетинг и продажи",
     "логистика": "Маркетинг и продажи",
+    "medicine": "Универсальные роли",
     "медицина": "Универсальные роли",
+    "education": "Образование и наука",
     "образование": "Образование и наука",
-    "творчество": "Дизайн и креатив",
+    "engineering": "Инженерия и производство",
+    "mgmt": "Управление и продукт",
+    "finance": "Финансы и экономика",
+    "hr_edu": "HR и подбор",
+    "sport": "Универсальные роли",
     "спорт": "Универсальные роли",
+    "finance": "Финансы и экономика",
+    "creative": "Дизайн и креатив",
+    "logistics": "Маркетинг и продажи",
+    "medicine": "Универсальные роли",
+    "other": "Универсальные роли",
 }
+
+_SPHERE_KEYS_BY_LEN = sorted(_SPHERE_TO_DIRECTION.keys(), key=len, reverse=True)
 
 
 def _tokenize(text: str) -> Set[str]:
@@ -107,14 +131,33 @@ def _score_directions(text_blob: str) -> List[Dict[str, Any]]:
 def _boost_from_spheres(spheres: List[str]) -> str:
     extra: List[str] = []
     for s in spheres:
-        low = s.lower()
-        for key, direction in _SPHERE_TO_DIRECTION.items():
+        low = s.strip().lower()
+        if not low:
+            continue
+        if low in _SPHERE_TO_DIRECTION:
+            extra.append(_SPHERE_TO_DIRECTION[low])
+            continue
+        matched = False
+        for key in _SPHERE_KEYS_BY_LEN:
             if key in low:
-                extra.append(direction)
+                extra.append(_SPHERE_TO_DIRECTION[key])
+                matched = True
                 break
-        else:
+        if not matched:
             extra.append(s)
     return " ".join(extra)
+
+
+def _direction_for_sphere_id(sphere_id: str) -> Optional[str]:
+    k = (sphere_id or "").strip().lower()
+    if not k:
+        return None
+    if k in _SPHERE_TO_DIRECTION:
+        return _SPHERE_TO_DIRECTION[k]
+    for key in _SPHERE_KEYS_BY_LEN:
+        if key in k:
+            return _SPHERE_TO_DIRECTION[key]
+    return None
 
 
 def _skill_plan_for_direction(
@@ -136,6 +179,8 @@ def _skill_plan_for_direction(
         "Образование и наука": ["Методики обучения", "Презентации", "Научная грамотность"],
         "HR и подбор": ["Скрининг резюме", "Поиск кандидатов", "Коммуникация с кандидатами", "Excel / ATS"],
         "Юриспруденция": ["Трудовое право", "Договорная работа", "Исследование практики", "Документооборот"],
+        "Финансы и экономика": ["Excel", "Бухучёт", "Финансовая отчётность", "1С"],
+        "Универсальные роли": ["Коммуникация", "Планирование", "Работа в команде"],
     }
     target_skills = plans.get(direction, ["Коммуникация", "Планирование", "Работа в команде"])
     out: List[Dict[str, Any]] = []
@@ -173,15 +218,32 @@ def run_recommendations(
     profile: Dict[str, Any], competencies: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
     spheres = parse_interest_spheres(profile)
+    if not spheres and (profile.get("main_sphere") or "").strip():
+        spheres = [str(profile.get("main_sphere")).strip()]
     blob_parts = [
         str(profile.get("interests") or ""),
         str(profile.get("like_to_do") or ""),
+        str(profile.get("dislike_to_do") or ""),
         str(profile.get("software_skills") or ""),
         str(profile.get("programming_skills") or ""),
         _boost_from_spheres(spheres),
     ]
     blob = " ".join(blob_parts)
     inclinations = _score_directions(blob)
+    main_sphere = (profile.get("main_sphere") or "").strip()
+    main_dir = _direction_for_sphere_id(main_sphere) if main_sphere else None
+    if main_dir:
+        inclinations = [
+            i for i in inclinations if i.get("direction") != main_dir
+        ]
+        inclinations.insert(
+            0,
+            {
+                "direction": main_dir,
+                "score": 0.92,
+                "reason": "Главная сфера из анкеты.",
+            },
+        )
     top_direction = inclinations[0]["direction"]
 
     names, _ = merge_skills_from_profile(competencies, profile)

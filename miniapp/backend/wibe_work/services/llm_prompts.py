@@ -49,9 +49,9 @@ CAREER_COACH_CHAT_SYSTEM = """ТЫ И РОЛЬ
 
 ОПОРА НА ДАННЫЕ (если они есть в запросе пользователя)
 В запрос к тебе могут быть включены фрагменты:
-- «Контекст разбора» — краткое резюме сохранённого теста/разбора (возраст, сфера, образование, город, подготовка и т.п.).
-- «Направления» — три варианта A/B/C с названиями и долями совпадения из приложения.
-- «Анкета (уже заполнено)» — актуальные поля профиля (город, формат работы, приоритет и др.).
+- «Анкета (уже заполнено)» — поля профиля: возраст, город, сферы, образование, что нравится/не нравится, формат работы, приоритет (обучение/деньги/баланс), главная сложность (боль).
+- «Разбор и тест» — сохранённый результат: индекс готовности, оси методики (самопознание, люди, структура, баланс), сценарии A/B/C, краткий ИИ-вывод, разрыв навыков, фокус по ситуации, план на 4 недели.
+- «Направления» — краткая строка A/B/C с процентами (дубль для удобства).
 
 Правила:
 - Считай эти данные источником правды для общих рекомендаций. Не противоречь им (не предлагай совсем другую сферу как «единственно верную», если разбор говорит обратное), если только пользователь явно не просит сменить курс.
@@ -190,3 +190,198 @@ def build_chat_user_instruction_suffix() -> str:
         "ИНСТРУКЦИЯ: ответь одним сообщением на последнюю реплику пользователя (выделена выше). "
         "Не повторяй блоки анкеты списком без нужды — вплетай факты в совет там, где они уместны."
     )
+
+
+# ---------------------------------------------------------------------------
+# Ситуационные дополнения к system (выбираются по боли, теме реплики, наличию разбора)
+# ---------------------------------------------------------------------------
+CHAT_ADDENDUM_NO_ANALYSIS = """ДОПОЛНИТЕЛЬНО (разбора ещё нет)
+У пользователя нет сохранённого разбора после теста. Не ссылайся на конкретные проценты осей или сценарии A/B/C.
+Мягко предложи: заполнить анкету (город, сферы, что нравится) и пройти тест (10 вопросов по сфере + 5 личностных) — тогда советы станут точнее.
+Дай полезный общий ответ на вопрос, не отказывайся помогать."""
+
+CHAT_ADDENDUM_PAIN_CAREER = """ДОПОЛНИТЕЛЬНО (главная сложность: не знает, кем стать)
+Помоги сузить выбор: 2–3 гипотезы направлений, критерии «подходит / не подходит», один эксперимент на 2 недели (мини-проект, стажировка, интервью с практиком).
+Не дави одной «единственной» профессией — сравни варианты честно."""
+
+CHAT_ADDENDUM_PAIN_NO_EXP = """ДОПОЛНИТЕЛЬНО (главная сложность: нет опыта)
+Фокус: учебные и волонтёрские кейсы в резюме, стажировки, отклики «без опыта», навыки из повседневности (школа, хобби, помощь людям).
+Не обесценивай отсутствие официальной работы — переводи в доказуемые результаты."""
+
+CHAT_ADDENDUM_PAIN_REGION = """ДОПОЛНИТЕЛЬНО (главная сложность: мало вакансий в городе)
+Учитывай удалёнку, гибрид, релокацию как опции. Если в анкете указан город — не предлагай только офис в другом городе без обсуждения переезда."""
+
+CHAT_ADDENDUM_PAIN_MONEY = """ДОПОЛНИТЕЛЬНО (главная сложность: нет денег на курсы)
+Рекомендуй бесплатные треки: документация, Stepik, YouTube, open-source, учебные проекты. Не навязывай платные школы как единственный путь."""
+
+CHAT_ADDENDUM_PAIN_INTERVIEW = """ДОПОЛНИТЕЛЬНО (главная сложность: страх собеседований)
+Структура ответа STAR, тренировка вслух, список типовых вопросов по сфере, разбор тревоги без медицинских диагнозов. Маленькие шаги: 3 пробных ответа записать на диктофон."""
+
+CHAT_ADDENDUM_PAIN_OVERLOAD = """ДОПОЛНИТЕЛЬНО (главная сложность: слишком много информации)
+Один шаг на эту неделю, остальное в «потом». Помоги расставить приоритет по цели из анкеты (обучение / деньги / баланс)."""
+
+CHAT_ADDENDUM_PAIN_LOW_CONFIDENCE = """ДОПОЛНИТЕЛЬНО (главная сложность: кажется, что ничего не умею)
+Список сильных сторон из фактов (что уже делает хорошо). Попроси назвать 3 примера от близких или из учёбы. Без токсичного позитива."""
+
+CHAT_ADDENDUM_PAIN_GAP_SKILLS = """ДОПОЛНИТЕЛЬНО (главная сложность: умею многое, но работу не дают)
+Сопоставление с требованиями вакансий, узкий разрыв навыков, портфолио/кейсы, отклики с сопроводительным. Если в разборе есть «закрыть навыки» — опирайся на них."""
+
+CHAT_ADDENDUM_JOBS = """ДОПОЛНИТЕЛЬНО (тема: вакансии, hh.ru, отклики, резюме)
+Конкретика: как искать по сфере и городу, фильтры опыта, сопроводительное, не обещай трудоустройство. Упомяни вкладку «Вакансии» в приложении, если уместно."""
+
+CHAT_ADDENDUM_LEARNING = """ДОПОЛНИТЕЛЬНО (тема: обучение, курсы, что учить)
+Траектория на 4–8 недель, один инструмент за раз, связь со сферой из анкеты/разбора. Учитывай уровень подготовки (weak/medium/strong)."""
+
+CHAT_ADDENDUM_GREETING = """ДОПОЛНИТЕЛЬНО (короткое приветствие без вопроса)
+Кратко поприветствуй и предложи один конкретный вопрос по делу ИЛИ дай мини-совет по профилю, если данных достаточно. Не устраивай длинный опрос."""
+
+_PAIN_ADDENDA = {
+    "pain_career": CHAT_ADDENDUM_PAIN_CAREER,
+    "pain_no_exp": CHAT_ADDENDUM_PAIN_NO_EXP,
+    "pain_region": CHAT_ADDENDUM_PAIN_REGION,
+    "pain_money_courses": CHAT_ADDENDUM_PAIN_MONEY,
+    "pain_interview": CHAT_ADDENDUM_PAIN_INTERVIEW,
+    "pain_overload": CHAT_ADDENDUM_PAIN_OVERLOAD,
+    "pain_low_confidence": CHAT_ADDENDUM_PAIN_LOW_CONFIDENCE,
+    "pain_gap_skills": CHAT_ADDENDUM_PAIN_GAP_SKILLS,
+}
+
+_TOPIC_KEYWORDS: list[tuple[tuple[str, ...], str]] = [
+    (("ваканс", "hh.ru", "hh ", "отклик", "резюме", "собес", "интервью", "оффер", "стажиров"), "jobs"),
+    (("курс", "учить", "обучен", "навык", "stepik", "python", "sql", "figma"), "learning"),
+]
+
+
+def _last_user_text(messages: list[dict]) -> str:
+    for m in reversed(messages):
+        if (m.get("role") or "") == "user":
+            return str(m.get("content", "")).strip()
+    if messages:
+        return str(messages[-1].get("content", "")).strip()
+    return ""
+
+
+def select_chat_addenda(
+    last_user: str,
+    profile: dict | None,
+    analysis_snap: dict | None,
+) -> list[str]:
+    """Какие situational-блоки добавить к system."""
+    out: list[str] = []
+    if not analysis_snap:
+        out.append(CHAT_ADDENDUM_NO_ANALYSIS)
+    profile = profile or {}
+    pain = (profile.get("primary_pain") or "").strip()
+    if pain in _PAIN_ADDENDA:
+        out.append(_PAIN_ADDENDA[pain])
+    low = last_user.lower()
+    seen_topics: set[str] = set()
+    for keys, topic in _TOPIC_KEYWORDS:
+        if topic in seen_topics:
+            continue
+        if any(k in low for k in keys):
+            seen_topics.add(topic)
+            if topic == "jobs":
+                out.append(CHAT_ADDENDUM_JOBS)
+            elif topic == "learning":
+                out.append(CHAT_ADDENDUM_LEARNING)
+    if len(last_user) < 40 and any(
+        w in low for w in ("привет", "здравств", "добрый", "hi", "hello", "хай")
+    ):
+        out.append(CHAT_ADDENDUM_GREETING)
+    return out
+
+
+def build_chat_system_prompt(
+    addenda: list[str] | None = None,
+) -> str:
+    """Базовый system + ситуационные дополнения."""
+    if not addenda:
+        return CAREER_COACH_CHAT_SYSTEM
+    unique = []
+    seen: set[str] = set()
+    for a in addenda:
+        if a not in seen:
+            seen.add(a)
+            unique.append(a)
+    return CAREER_COACH_CHAT_SYSTEM + "\n\n" + "\n\n".join(unique)
+
+
+def build_analysis_context_for_chat(analysis_snap: dict | None) -> str:
+    """Текстовый блок разбора для user-prompt чата."""
+    if not analysis_snap:
+        return ""
+    lines: list[str] = []
+    ps = (analysis_snap.get("profile_summary") or "").strip()
+    if ps:
+        lines.append("Профиль (из расчёта): " + ps[:600])
+    readiness = analysis_snap.get("readiness") or {}
+    if readiness.get("value_percent") is not None:
+        lines.append(f"Индекс готовности: {readiness['value_percent']}%")
+    axes = (analysis_snap.get("style_radar") or {}).get("axes") or []
+    if axes:
+        ax = "; ".join(
+            f"{a.get('label', '?')}: {a.get('value_percent', '?')}%"
+            for a in axes[:6]
+        )
+        lines.append("Оси методики: " + ax)
+    narrative = (analysis_snap.get("ai_narrative") or "").strip()
+    if narrative:
+        lines.append("Краткий вывод разбора: " + narrative[:700])
+    scenarios = analysis_snap.get("scenarios") or {}
+    plans = scenarios.get("plans") or []
+    if plans:
+        pl = ", ".join(
+            f"{p.get('id')}: {p.get('name', '')} (~{p.get('score_percent', '?')}%)"
+            for p in plans[:3]
+        )
+        lines.append("Сценарии A/B/C: " + pl)
+    gap = analysis_snap.get("gap_analysis") or {}
+    closing = gap.get("closing_skills") or []
+    if closing:
+        lines.append("Навыки закрыть в первую очередь: " + ", ".join(str(x) for x in closing[:5]))
+    pain = analysis_snap.get("pain_focus") or {}
+    if pain.get("label"):
+        tips = pain.get("tips") or []
+        tip_s = ("; ".join(str(t) for t in tips[:2] if t)) if tips else ""
+        lines.append(f"Фокус по ситуации: {pain['label']}" + (f" — {tip_s}" if tip_s else ""))
+    weekly = analysis_snap.get("weekly_roadmap") or []
+    if weekly:
+        wk = weekly[0]
+        topics = wk.get("topics") or []
+        if topics:
+            lines.append(
+                f"План (старт): {wk.get('week_range', '')} — {', '.join(str(t) for t in topics[:3])}"
+            )
+    return "\n".join(lines)
+
+
+def build_chat_user_prompt(
+    messages: list[dict],
+    *,
+    profile_snippet: str = "",
+    analysis_snap: dict | None = None,
+    directions_hint: str = "",
+    legacy_context_summary: str = "",
+) -> str:
+    """Собирает user-prompt для карьерного чата."""
+    last_user = _last_user_text(messages)
+    parts: list[str] = []
+    if (profile_snippet or "").strip():
+        parts.append("Анкета (уже заполнено):\n" + profile_snippet.strip()[:1200])
+    analysis_block = build_analysis_context_for_chat(analysis_snap)
+    if analysis_block:
+        parts.append("Разбор и тест:\n" + analysis_block[:2200])
+    elif (legacy_context_summary or "").strip():
+        parts.append("Контекст разбора:\n" + legacy_context_summary.strip()[:1800])
+    if (directions_hint or "").strip():
+        parts.append("Направления:\n" + directions_hint.strip()[:500])
+    transcript = "\n".join(
+        f"{m.get('role', 'user')}: {str(m.get('content', ''))[:900]}" for m in messages[-10:]
+    )
+    user_tail = (
+        "\n\nПоследнее сообщение пользователя (ответь только на него):\n"
+        f"«{last_user[:2000]}»"
+    )
+    prompt = "\n\n".join(parts + [f"История диалога:\n{transcript}", user_tail])
+    return prompt + build_chat_user_instruction_suffix()

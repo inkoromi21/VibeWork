@@ -12,9 +12,10 @@ from typing import List, Literal, Optional, Tuple
 import requests
 
 from wibe_work.services.llm_prompts import (
-    CAREER_COACH_CHAT_SYSTEM,
     DEFAULT_GENERIC_SYSTEM,
-    build_chat_user_instruction_suffix,
+    build_chat_system_prompt,
+    build_chat_user_prompt,
+    select_chat_addenda,
 )
 
 logger = logging.getLogger(__name__)
@@ -172,9 +173,12 @@ def _mock_career_chat_reply(_last_user: str) -> str:
 
 def career_coach_chat_reply(
     messages: List[dict],
-    context_summary: str,
-    directions_hint: str,
+    context_summary: str = "",
+    directions_hint: str = "",
     profile_snippet: str = "",
+    *,
+    profile: Optional[dict] = None,
+    analysis_snap: Optional[dict] = None,
 ) -> Tuple[str, Literal["llm", "mock"], Optional[str]]:
     last_user = ""
     for m in reversed(messages):
@@ -184,22 +188,15 @@ def career_coach_chat_reply(
     if not last_user and messages:
         last_user = str(messages[-1].get("content", "")).strip()
 
-    parts: List[str] = []
-    if context_summary.strip():
-        parts.append("Контекст разбора:\n" + context_summary[:1800])
-    if directions_hint.strip():
-        parts.append("Направления:\n" + directions_hint[:500])
-    if (profile_snippet or "").strip():
-        parts.append("Анкета (уже заполнено):\n" + profile_snippet.strip()[:900])
-    transcript = "\n".join(
-        f"{m.get('role', 'user')}: {str(m.get('content', ''))[:900]}" for m in messages[-10:]
+    addenda = select_chat_addenda(last_user, profile, analysis_snap)
+    system_prompt = build_chat_system_prompt(addenda)
+    user_prompt = build_chat_user_prompt(
+        messages,
+        profile_snippet=profile_snippet,
+        analysis_snap=analysis_snap,
+        directions_hint=directions_hint,
+        legacy_context_summary=context_summary,
     )
-    user_tail = (
-        "\n\nПоследнее сообщение пользователя (ответь только на него):\n"
-        f"«{last_user[:2000]}»"
-    )
-    user_prompt = "\n\n".join(parts + [f"История диалога:\n{transcript}", user_tail])
-    user_prompt += build_chat_user_instruction_suffix()
     mock = _mock_career_chat_reply(last_user or "ваш вопрос")
 
     if not llm_configured():
@@ -212,7 +209,7 @@ def career_coach_chat_reply(
         user_prompt,
         max_tokens=900,
         temperature=0.25,
-        system_prompt=CAREER_COACH_CHAT_SYSTEM,
+        system_prompt=system_prompt,
     )
     if out:
         return out, "llm", None

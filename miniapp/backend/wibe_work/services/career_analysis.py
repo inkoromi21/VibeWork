@@ -10,6 +10,56 @@ from wibe_work.miniapp_paths import data_file
 from wibe_work.services.llm_client import fetch_llm_completion, llm_configured
 from wibe_work.services.llm_prompts import ANALYSIS_NARRATIVE_SYSTEM, build_analysis_user_prompt
 from wibe_work.services.aptitude_quiz import get_pro_weights_matrix_for_interest, letter_to_index
+from wibe_work.services.user_context import (
+    _PAIN_LABELS,
+    coach_profile_snippet,
+    profile_skill_blob,
+)
+from wibe_work.services.user_pain_mapping import align_pains
+
+_SKILL_ORDER = (
+    "programming",
+    "analytics",
+    "communication",
+    "design",
+    "management",
+)
+_SKILL_TO_PACK_KEY = {
+    "programming": "программирование",
+    "analytics": "аналитика",
+    "communication": "коммуникации",
+    "design": "дизайн",
+    "management": "организация_и_управление",
+}
+
+_MINIAPP_TO_WEBSITE_INTEREST = {
+    "it_dev": "IT",
+    "data": "данные_и_AI",
+    "design": "дизайн",
+    "marketing": "маркетинг",
+    "sales": "продажи",
+    "engineering": "инженерия",
+    "mgmt": "продукт_и_PMO",
+    "finance": "финансы_и_контроль",
+    "hr_edu": "HR_и_рекрутинг",
+    "logistics": "логистика",
+    "medicine": "наука",
+    "education": "бизнес",
+    "creative": "дизайн",
+    "sport": "бизнес",
+    "other": "IT",
+}
+
+_PAIN_FIRST_STEP: Dict[str, str] = {
+    "pain_career": "Зафиксируйте 3 гипотезы из сценариев A/B/C и проверьте одну коротким проектом за 2 недели.",
+    "pain_no_exp": "Добавьте в резюме один учебный или волонтёрский кейс с цифрой результата — даже без официальной работы.",
+    "pain_region": "Сузьте поиск: удалёнка/гибрид и 2–3 города с реальными вакансиями по вашей сфере.",
+    "pain_money_courses": "Выберите один бесплатный трек из блока «Обучение» и доведите до артефакта (конспект или мини-проект).",
+    "pain_interview": "Три тренировочных ответа на типовые вопросы по сфере — вслух, с таймером 2 минуты.",
+    "pain_overload": "Один шаг на эту неделю из этапов роста; остальное — в список «потом».",
+    "pain_low_confidence": "Список из 5 навыков из повседневности (школа, хобби, помощь людям) — без сравнения с «идеалом».",
+    "pain_gap_skills": "Сопоставьте топ-3 разрыва навыков с одной вакансией мечты и закройте самый узкий за месяц.",
+}
 
 _MTS_PATH = data_file("mts_role_matrix.json")
 
@@ -459,6 +509,221 @@ def _analysis_narrative_llm(
     return "", "mock", notice
 
 
+def _profile_summary_rich(
+    profile: Dict[str, Any],
+    profile_extra: Dict[str, Any],
+    interest: str,
+    education: str,
+    preparation_level: str,
+) -> str:
+    """Текст для LLM и чата: анкета + параметры теста."""
+    snippet = coach_profile_snippet(profile)
+    city = profile.get("city") or profile_extra.get("city") or ""
+    age = profile.get("age") or profile_extra.get("age")
+    tail = (
+        f"Сфера теста: {interest}; возраст: {age or '—'}; "
+        f"образование (сводка): {education}; город: {city or 'не указан'}; "
+        f"подготовка: {preparation_level}."
+    )
+    if snippet:
+        return snippet + "\n" + tail
+    return tail
+
+
+def _resolve_profession_pack(interest: str) -> Any:
+    try:
+        import sys
+
+        repo = Path(__file__).resolve().parents[4]
+        website = repo / "website"
+        if website.is_dir() and str(website) not in sys.path:
+            sys.path.insert(0, str(website))
+        from app.api_schemas import Interest
+        from app.profession_packs import resolve_profession_pack
+
+        key = _MINIAPP_TO_WEBSITE_INTEREST.get((interest or "").strip(), "IT")
+        return resolve_profession_pack(Interest(key))
+    except Exception:
+        return None
+
+
+def _skill_scores(
+    profile: Dict[str, Any],
+    axes: List[Dict[str, Any]],
+    fp: int,
+    interest: str,
+) -> Dict[str, int]:
+    scores = {
+        k: 40 + (fp >> (i * 5)) % 14 for i, k in enumerate(_SKILL_ORDER)
+    }
+    dom = _dominant_radar_key(axes)
+    if dom == "structure_mastery":
+        scores["programming"] += 12
+        scores["analytics"] += 14
+    elif dom == "people_service":
+        scores["communication"] += 14
+        scores["management"] += 10
+    elif dom == "self_insight":
+        scores["analytics"] += 8
+        scores["communication"] += 6
+    else:
+        scores["management"] += 8
+
+    blob = (profile_skill_blob(profile) or "").lower()
+    if any(x in blob for x in ("python", "java", "javascript", "sql", "git", "c++")):
+        scores["programming"] = min(94, scores["programming"] + 12)
+    if any(x in blob for x in ("excel", "аналит", "data", "bi", "tableau")):
+        scores["analytics"] = min(94, scores["analytics"] + 10)
+    if any(x in blob for x in ("figma", "дизайн", "photoshop", "ui", "ux")):
+        scores["design"] = min(94, scores["design"] + 12)
+    if interest in ("sales", "hr_edu", "mgmt", "education"):
+        scores["communication"] = min(94, scores["communication"] + 8)
+
+    for k in _SKILL_ORDER:
+        scores[k] = max(36, min(94, scores[k]))
+    return scores
+
+
+def _target_for_track(track_name: str) -> Dict[str, int]:
+    t = (track_name or "").lower()
+    targets = {k: 70 for k in _SKILL_ORDER}
+    if any(x in t for x in ("python", "java", "backend", "devops", "sql", "данн")):
+        targets["programming"] = 82
+        targets["analytics"] = 78
+    elif any(x in t for x in ("дизайн", "ux", "ui", "график")):
+        targets["design"] = 85
+        targets["communication"] = 72
+    elif any(x in t for x in ("продаж", "hr", "клиент", "рекрут")):
+        targets["communication"] = 84
+        targets["management"] = 76
+    elif any(x in t for x in ("маркет", "контент", "smm")):
+        targets["communication"] = 78
+        targets["analytics"] = 75
+    return targets
+
+
+def _build_gap_analysis(
+    profile: Dict[str, Any],
+    interest: str,
+    top_track: str,
+    axes: List[Dict[str, Any]],
+    fp: int,
+) -> Dict[str, Any]:
+    pack = _resolve_profession_pack(interest)
+    user = _skill_scores(profile, axes, fp, interest)
+    target = _target_for_track(top_track)
+    labels = (
+        dict(pack.gap_bar_labels)
+        if pack
+        else {
+            _SKILL_TO_PACK_KEY[k]: k.replace("_", " ").title()
+            for k in _SKILL_ORDER
+        }
+    )
+    headline = pack.gap_headline if pack else "Навыки vs цель выбранного направления"
+    bars: List[Dict[str, Any]] = []
+    closeness: List[int] = []
+    for sk in _SKILL_ORDER:
+        pack_key = _SKILL_TO_PACK_KEY[sk]
+        u = user[sk]
+        tg = target.get(sk, 70)
+        gap = max(0, tg - u)
+        closeness.append(100 - min(100, gap))
+        bars.append(
+            {
+                "label": labels.get(pack_key, sk),
+                "user_percent": u,
+                "target_percent": min(100, tg),
+                "gap_percent": min(100, gap),
+            }
+        )
+    overall = sum(closeness) // max(1, len(closeness))
+    weak = sorted(
+        ((b["label"], b["gap_percent"]) for b in bars if b["gap_percent"] > 15),
+        key=lambda x: -x[1],
+    )
+    closing = [w[0] for w in weak[:3]]
+    if not closing:
+        closing = ["Портфолио или учебный кейс", "Обратная связь наставника", "Регулярные отклики"]
+    return {
+        "headline": headline,
+        "overall_hp": overall,
+        "bars": bars,
+        "closing_skills": closing,
+    }
+
+
+def _pain_focus(profile: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    pain_id = (profile.get("primary_pain") or "").strip()
+    if pain_id and pain_id in _PAIN_LABELS:
+        tips = align_pains(profile).get("matched_pains") or []
+        extra = [t.get("bot_value", [""])[0] for t in tips[:2] if t.get("bot_value")]
+        return {
+            "pain_id": pain_id,
+            "label": _PAIN_LABELS[pain_id],
+            "tips": [_PAIN_FIRST_STEP.get(pain_id, "")] + extra,
+        }
+    aligned = align_pains(profile)
+    matched = aligned.get("matched_pains") or []
+    if matched:
+        m = matched[0]
+        return {
+            "pain_id": None,
+            "label": m.get("pain", ""),
+            "tips": (m.get("bot_value") or [])[:3],
+        }
+    return None
+
+
+def _weekly_roadmap(top_track: str, interest: str) -> List[Dict[str, Any]]:
+    pack = _resolve_profession_pack(interest)
+    pk = pack.key if pack else "tech"
+    low = (top_track or "").lower()
+    if pk == "tech" and any(x in low for x in ("python", "java", "данн", "sql", "backend")):
+        return [
+            {
+                "week_range": "Недели 1–2",
+                "topics": ["Git и окружение", "основы языка или SQL + 5 задач"],
+            },
+            {
+                "week_range": "Недели 3–4",
+                "topics": ["мини-проект в портфолио", "черновик резюме под отклики"],
+            },
+        ]
+    if pk == "design" or "дизайн" in low:
+        return [
+            {
+                "week_range": "Недели 1–2",
+                "topics": ["Figma: auto-layout", "редизайн одного экрана"],
+            },
+            {
+                "week_range": "Недели 3–4",
+                "topics": ["мини-кейс в портфолио", "3 работы с контекстом задачи"],
+            },
+        ]
+    if pk in ("sales", "marketing"):
+        return [
+            {
+                "week_range": "Недели 1–2",
+                "topics": ["воронка и метрики", "один учебный креатив или скрипт"],
+            },
+            {
+                "week_range": "Недели 3–4",
+                "topics": ["кейс с цифрами", "10 целевых откликов"],
+            },
+        ]
+    return [
+        {
+            "week_range": "Недели 1–2",
+            "topics": ["рынок и 5 вакансий-ориентиров", "один ключевой инструмент сферы"],
+        },
+        {
+            "week_range": "Недели 3–4",
+            "topics": ["учебный кейс или проект", "резюме и сопроводительное"],
+        },
+    ]
+
+
 def _learning_cards(interest: str, preparation: str) -> List[Dict[str, Any]]:
     base = {
         "it_dev": [
@@ -518,8 +783,17 @@ def _learning_cards(interest: str, preparation: str) -> List[Dict[str, Any]]:
     return cards
 
 
-def _advice_blocks(scenarios: Dict[str, Any], preparation: str) -> Dict[str, Any]:
+def _advice_blocks(
+    scenarios: Dict[str, Any],
+    preparation: str,
+    profile: Dict[str, Any],
+    gap: Dict[str, Any],
+) -> Dict[str, Any]:
     plans = scenarios.get("plans") or []
+    closing = gap.get("closing_skills") or []
+    priority = closing[:3] if closing else ["самопознание", "карьерные ценности", "резюме и отклики"]
+    pain_id = (profile.get("primary_pain") or "").strip()
+    pain_step = _PAIN_FIRST_STEP.get(pain_id) if pain_id else None
     out = {}
     for p in plans:
         pid = p.get("id", "A")
@@ -529,12 +803,14 @@ def _advice_blocks(scenarios: Dict[str, Any], preparation: str) -> Dict[str, Any
             "Резюме: структура и примеры (видео/статьи) или поддержка карьерного консультанта; попросите близких назвать ваши сильные стороны",
             "Сопоставьте тип среды (по Голланду) и комфорт в команде: общение vs регламент, логика vs отношения, план vs гибкость",
         ]
+        if pain_step:
+            steps.insert(0, pain_step)
         if preparation == "weak":
             steps.insert(0, "Начните с короткого вводного курса или чеклиста по направлению 10–15 ч")
         out[pid] = {
             "title": p.get("name", "План"),
             "steps": steps,
-            "priority_skills": ["самопознание", "карьерные ценности", "резюме и отклики"],
+            "priority_skills": priority,
         }
     return {"by_plan": out}
 
@@ -594,16 +870,19 @@ def build_analysis_result(
         readiness = readiness_vec
     fp = _answer_fingerprint(answers)
     scenarios = _pick_scenario_plans(interest, axes, fp)
+    plans = scenarios.get("plans") or []
+    top_track = str(scenarios.get("best_plan_name") or (plans[0].get("name") if plans else interest))
+    top_track = re.sub(r"^План [ABC]:\s*", "", top_track).strip() or interest
+    gap = _build_gap_analysis(profile, interest, top_track, axes, fp)
     mts_rows = _rank_mts_rows(profile, profile_extra, interest, answers, axes)
     learning = _learning_cards(interest, preparation_level)
-    advice = _advice_blocks(scenarios, preparation_level)
+    advice = _advice_blocks(scenarios, preparation_level, profile, gap)
     stages = _growth_stages(interest)
+    pain_focus = _pain_focus(profile)
+    weekly = _weekly_roadmap(top_track, interest)
 
-    city = profile.get("city") or profile_extra.get("city") or ""
-    age = profile.get("age") or profile_extra.get("age")
-    profile_summary = (
-        f"Возраст: {age}; сфера: {interest}; образование: {education}; "
-        f"город: {city or 'не указан'}; подготовка: {preparation_level}."
+    profile_summary = _profile_summary_rich(
+        profile, profile_extra, interest, education, preparation_level
     )
     directions_hint = ", ".join(
         f"{p['id']}: {p.get('name', '')} (~{p['score_percent']}%)"
@@ -648,6 +927,9 @@ def build_analysis_result(
         "learning": learning,
         "individual_advice": advice,
         "growth_stages": stages,
+        "gap_analysis": gap,
+        "pain_focus": pain_focus,
+        "weekly_roadmap": weekly,
         "behavioral_hint": behavioral,
         "ai_narrative": narrative,
         "ai_narrative_source": ai_narrative_source,
@@ -671,6 +953,9 @@ def public_analysis_payload(full: Dict[str, Any]) -> Dict[str, Any]:
         "learning",
         "individual_advice",
         "growth_stages",
+        "gap_analysis",
+        "pain_focus",
+        "weekly_roadmap",
         "behavioral_hint",
         "ai_narrative",
         "ai_narrative_source",
