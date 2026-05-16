@@ -2339,8 +2339,13 @@ document.getElementById("btn-auth-login").addEventListener("click", async () => 
 document.getElementById("btn-auth-register").addEventListener("click", async () => {
   const email = document.getElementById("auth-email")?.value?.trim();
   const password = document.getElementById("auth-password")?.value || "";
+  const agree = document.getElementById("hh-agree");
   if (!email || password.length < 8) {
     showToast("Укажите email и пароль не короче 8 символов.");
+    return;
+  }
+  if (agree && !agree.checked) {
+    showToast("Чтобы зарегистрироваться, подтвердите согласие с офертой hh.ru.");
     return;
   }
   const { ok, j } = await authRequest("/api/auth/register", email, password);

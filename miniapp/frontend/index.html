@@ -2198,6 +2198,15 @@
                   '<button type="button" class="pwd-square" id="toggleAuthPass2" aria-pressed="false" aria-label="Показать пароль">○</button>' +
                   '<span class="pwd-reveal-caption">Показать пароль</span></div>'
                 : '') +
+            (isReg
+                ? '<div class="block" style="margin-top:12px;padding:12px 12px;border:1px solid var(--border);border-radius:12px;background:rgba(0,0,0,.02)">' +
+                  '<label style="display:flex;gap:10px;align-items:flex-start;margin:0;cursor:pointer;user-select:none">' +
+                  '<input type="checkbox" id="hhAgree" style="margin-top:3px">' +
+                  '<span style="font-size:.92rem;line-height:1.35;color:var(--text)">' +
+                  'Регистрируясь, я принимаю условия ' +
+                  '<a href="https://hh.ru/account/agreement" target="_blank" rel="noopener noreferrer">«Соглашения об оказании услуг по содействию в трудоустройстве (оферта)»</a>.' +
+                  '</span></label></div>'
+                : '') +
             '<button type="button" class="btn-primary" style="width:100%;margin-top:4px" onclick="window.__vw.submitAuth()">' + (isReg ? 'Зарегистрироваться' : 'Войти') + '</button>' +
             (!isReg
                 ? '<p class="auth-forgot"><a href="/reset-password">Забыли пароль?</a></p>'
@@ -2240,6 +2249,12 @@
             }
             if (pass.length < 8) {
                 errBox.textContent = 'Пароль — не короче 8 символов';
+                errBox.style.display = 'block';
+                return;
+            }
+            const agree = document.getElementById('hhAgree');
+            if (agree && !agree.checked) {
+                errBox.textContent = 'Чтобы зарегистрироваться, подтвердите согласие с офертой hh.ru.';
                 errBox.style.display = 'block';
                 return;
             }

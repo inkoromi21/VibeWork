@@ -54,6 +54,15 @@
       <p class="auth-gate-sub muted">Профиль, тесты и разбор — после входа в аккаунт VibeWork.</p>
       <input type="email" id="auth-email" class="auth-field auth-gate-field" placeholder="Email" autocomplete="username" />
       <input type="password" id="auth-password" class="auth-field auth-gate-field" placeholder="Пароль (не короче 8 символов)" autocomplete="current-password" />
+      <label class="auth-hint auth-gate-hint muted small" style="display:flex;gap:10px;align-items:flex-start;margin:10px 0 0;cursor:pointer;">
+        <input type="checkbox" id="hh-agree" style="margin-top:3px" />
+        <span>
+          Регистрируясь, я принимаю условия
+          <a href="https://hh.ru/account/agreement" target="_blank" rel="noopener noreferrer">
+            «Соглашения об оказании услуг по содействию в трудоустройстве (оферта)»
+          </a>.
+        </span>
+      </label>
       <div class="auth-gate-actions">
         <button type="button" class="btn-auth-gate btn-auth-gate-primary" id="btn-auth-login">Войти</button>
         <button type="button" class="btn-auth-gate btn-auth-gate-secondary" id="btn-auth-register">Регистрация</button>
