@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+    <meta name="vibework-build" content="20260517-admin-login">
     <script>
     (function () {
         /** Сброс inline --* с documentElement (их выставляет Telegram Mini App), иначе они сильнее CSS тёмной темы. */
@@ -1475,6 +1476,37 @@
         .auth-forgot { margin-top: 14px; text-align: center; font-size: .85rem; }
         .auth-forgot a { color: var(--accent-dark); font-weight: 600; text-decoration: none; }
         .auth-forgot a:hover { text-decoration: underline; }
+        .auth-hh-agree {
+            margin-top: 8px;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.02);
+        }
+        .auth-hh-agree label {
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+            margin: 0;
+            cursor: pointer;
+            user-select: none;
+        }
+        .auth-hh-agree input[type="checkbox"] {
+            width: 15px;
+            height: 15px;
+            margin: 2px 0 0;
+            flex-shrink: 0;
+            accent-color: var(--accent);
+        }
+        .auth-hh-agree-text {
+            font-size: 0.78rem;
+            line-height: 1.3;
+            color: var(--text-muted);
+        }
+        .auth-hh-agree-text a {
+            color: var(--accent-dark);
+            font-weight: 500;
+        }
         .pwd-input { margin-bottom: 6px; }
         .pwd-reveal { display: flex; flex-direction: row; align-items: center; gap: 10px; margin: 0 0 14px; }
         .pwd-square {
@@ -1891,6 +1923,39 @@
             width: 100%;
             margin-top: 0 !important;
         }
+        .vw-msg-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        .vw-msg-actions .vw-msg-btn {
+            flex: 1 1 120px;
+            min-width: 120px;
+        }
+        .vw-msg-btn--danger {
+            border-color: #c62828;
+            color: #fff;
+            background: #c62828;
+        }
+        .account-pwd-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-top: 14px;
+        }
+        .account-pwd-actions .btn-primary {
+            margin-top: 0 !important;
+        }
+        .btn-account-delete {
+            border: 1px solid #c62828;
+            color: #c62828;
+            background: transparent;
+        }
+        .btn-account-delete:hover {
+            background: rgba(198, 40, 40, 0.08);
+        }
 
         .theme-toggle {
             flex-shrink: 0;
@@ -2033,6 +2098,8 @@
     let profileSchema = null;
     let profileDraft = {};
     let profileWizardStep = 0;
+    /** userId, для которого profileDraft уже подтянут с сервера (не сбрасывать при «Далее»). */
+    let profileDraftSessionUser = null;
     let cachedProfile = {};
     /** Пока false — чипы анкеты не знают данные с сервера (до первого GET /profile). */
     let profileFetchDone = false;
@@ -2108,7 +2175,10 @@
         if (vwAppAlertEscapeBound) return;
         vwAppAlertEscapeBound = true;
         document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') hideAppAlert();
+            if (e.key === 'Escape') {
+                hideAppConfirm();
+                hideAppAlert();
+            }
         });
     }
 
@@ -2156,13 +2226,72 @@
         const cb = overlay._vwOnClose;
         overlay._vwOnClose = null;
         overlay.classList.remove('is-open');
-        document.body.style.overflow = '';
+        if (!document.getElementById('vwAppConfirmOverlay')?.classList.contains('is-open')) {
+            document.body.style.overflow = '';
+        }
         if (typeof cb === 'function') {
             try {
                 cb();
             } catch (e) {
                 /* ignore */
             }
+        }
+    }
+
+    function showAppConfirm(message, title, onConfirm) {
+        ensureAppAlertEscape();
+        let overlay = document.getElementById('vwAppConfirmOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'vwAppConfirmOverlay';
+            overlay.className = 'vw-msg-overlay';
+            overlay.setAttribute('role', 'dialog');
+            overlay.setAttribute('aria-modal', 'true');
+            overlay.innerHTML =
+                '<div class="vw-msg-shell">' +
+                '<h2 class="vw-msg-title" id="vwAppConfirmTitle"></h2>' +
+                '<p class="vw-msg-text" id="vwAppConfirmText"></p>' +
+                '<div class="vw-msg-actions">' +
+                '<button type="button" class="btn-secondary vw-msg-btn" id="vwAppConfirmCancel">Отмена</button>' +
+                '<button type="button" class="btn-primary vw-msg-btn vw-msg-btn--danger" id="vwAppConfirmOk">Да, удалить</button>' +
+                '</div></div>';
+            document.body.appendChild(overlay);
+            document.getElementById('vwAppConfirmCancel').onclick = hideAppConfirm;
+            overlay.addEventListener('click', function (e) {
+                if (e.target === overlay) hideAppConfirm();
+            });
+            document.getElementById('vwAppConfirmOk').onclick = function () {
+                const fn = overlay._vwOnConfirm;
+                hideAppConfirm();
+                if (typeof fn === 'function') {
+                    try {
+                        fn();
+                    } catch (e) {
+                        /* ignore */
+                    }
+                }
+            };
+        }
+        const tEl = document.getElementById('vwAppConfirmTitle');
+        const xEl = document.getElementById('vwAppConfirmText');
+        const ttl = title || 'Вы уверены?';
+        tEl.textContent = ttl;
+        tEl.style.display = '';
+        xEl.textContent = message || '';
+        overlay._vwOnConfirm = typeof onConfirm === 'function' ? onConfirm : null;
+        overlay.classList.add('is-open');
+        document.body.style.overflow = 'hidden';
+        const okBtn = document.getElementById('vwAppConfirmOk');
+        if (okBtn) okBtn.focus();
+    }
+
+    function hideAppConfirm() {
+        const overlay = document.getElementById('vwAppConfirmOverlay');
+        if (!overlay) return;
+        overlay._vwOnConfirm = null;
+        overlay.classList.remove('is-open');
+        if (!document.getElementById('vwAppMsgOverlay')?.classList.contains('is-open')) {
+            document.body.style.overflow = '';
         }
     }
 
@@ -2460,6 +2589,8 @@
         analysisCheckDone = true;
     }
 
+    let sessionCheckedThisPage = false;
+
     function clearAuth() {
         const __prevUid = localStorage.getItem('userId');
         if (__prevUid) localStorage.removeItem('vw_chat_session_' + __prevUid);
@@ -2468,10 +2599,22 @@
         localStorage.removeItem('userId');
         localStorage.removeItem(ACCESS_TOKEN_KEY);
         localStorage.removeItem(USER_EMAIL_KEY);
+        try {
+            const keys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && (k.indexOf('vw_chat_session_') === 0 || k.indexOf('vibework_') === 0)) keys.push(k);
+            }
+            keys.forEach(function (k) { localStorage.removeItem(k); });
+        } catch (e) { /* */ }
         userId = null;
+        sessionCheckedThisPage = false;
         testSphereSelection = null;
         cachedProfile = {};
         profileFetchDone = false;
+        profileDraft = {};
+        profileWizardStep = 0;
+        profileDraftSessionUser = null;
         hasSavedAnalysis = false;
         analysisCheckDone = false;
     }
@@ -2526,10 +2669,12 @@
             '<p class="tagline" style="text-align:center;margin:0 0 8px">Карьерный навигатор 14–30</p>' +
             '<div class="auth-card">' +
             '<h2 style="margin-top:0">' + (isReg ? 'Регистрация' : 'Вход') + '</h2>' +
-            '<p class="muted">Почта и пароль — доступ к анкете, тесту и разбору.</p>' +
+            '<p class="muted">' + (isReg
+                ? 'Почта и пароль — доступ к анкете, тесту и разбору.'
+                : 'Пользователь — email и пароль. Администратор — логин из .env (например admin) и пароль админа.') + '</p>' +
             '<div id="authErr" class="auth-error" style="display:none"></div>' +
-            '<label for="authEmail">Email</label>' +
-            '<input type="email" id="authEmail" autocomplete="email" placeholder="you@example.com">' +
+            '<label for="authEmail">' + (isReg ? 'Email' : 'Email или логин администратора') + '</label>' +
+            '<input type="text" id="authEmail" autocomplete="username" placeholder="' + (isReg ? 'you@example.com' : 'you@example.com или admin') + '">' +
             '<label for="authPass">Пароль</label>' +
             '<input class="pwd-input" type="password" id="authPass" autocomplete="' + (isReg ? 'new-password' : 'current-password') + '" placeholder="' + (isReg ? 'Не меньше 8 символов' : '••••••••') + '">' +
             '<div class="pwd-reveal">' +
@@ -2543,13 +2688,13 @@
                   '<span class="pwd-reveal-caption">Показать пароль</span></div>'
                 : '') +
             (isReg
-                ? '<div class="block" style="margin-top:12px;padding:12px 12px;border:1px solid var(--border);border-radius:12px;background:rgba(0,0,0,.02)">' +
-                  '<label style="display:flex;gap:10px;align-items:flex-start;margin:0;cursor:pointer;user-select:none">' +
-                  '<input type="checkbox" id="hhAgree" style="margin-top:3px">' +
-                  '<span style="font-size:.92rem;line-height:1.35;color:var(--text)">' +
+                ? '<div class="auth-hh-agree">' +
+                  '<label for="hhAgree">' +
+                  '<input type="checkbox" id="hhAgree">' +
+                  '<span class="auth-hh-agree-text">' +
                   'Регистрируясь, я принимаю условия ' +
-                  '<a href="https://hh.ru/account/agreement" target="_blank" rel="noopener noreferrer">«Соглашения об оказании услуг по содействию в трудоустройстве (оферта)»</a>.' +
-                  '</span></label></div>'
+                  '<a href="https://hh.ru/account/agreement" target="_blank" rel="noopener noreferrer">оферты hh.ru о содействии в трудоустройстве</a>.</span>' +
+                  '</label></div>'
                 : '') +
             '<button type="button" class="btn-primary" style="width:100%;margin-top:4px" onclick="window.__vw.submitAuth()">' + (isReg ? 'Зарегистрироваться' : 'Войти') + '</button>' +
             (!isReg
@@ -2569,14 +2714,58 @@
         wireThemeToggleClicks();
     }
 
+    function isAdminLoginField(value) {
+        return String(value || '').trim().indexOf('@') < 0;
+    }
+
+    async function submitAdminLogin(login, pass) {
+        const errBox = document.getElementById('authErr');
+        let res;
+        try {
+            res = await fetch(apiUrl('/admin/api/login'), {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ login: login, password: pass })
+            });
+        } catch (e) {
+            errBox.textContent = 'Нет связи с сервером';
+            errBox.style.display = 'block';
+            return;
+        }
+        const data = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+            let m = data.detail;
+            if (typeof m !== 'string') m = 'Неверный логин или пароль администратора';
+            errBox.textContent = m;
+            errBox.style.display = 'block';
+            return;
+        }
+        window.location.href = '/admin';
+    }
+
     async function submitAuth() {
         const errBox = document.getElementById('authErr');
         errBox.style.display = 'none';
         const email = document.getElementById('authEmail').value.trim();
         const pass = sanitizePasswordInput(document.getElementById('authPass').value);
         if (!email) {
-            errBox.textContent = 'Укажите почту';
+            errBox.textContent = 'Укажите почту или логин';
             errBox.style.display = 'block';
+            return;
+        }
+        if (authMode === 'register' && isAdminLoginField(email)) {
+            errBox.textContent = 'Администратор входит через «Войти», не через регистрацию.';
+            errBox.style.display = 'block';
+            return;
+        }
+        if (authMode !== 'register' && isAdminLoginField(email)) {
+            if (!pass) {
+                errBox.textContent = 'Укажите пароль администратора';
+                errBox.style.display = 'block';
+                return;
+            }
+            await submitAdminLogin(email, pass);
             return;
         }
         if (!isValidEmailAddress(email)) {
@@ -2626,6 +2815,10 @@
             errBox.style.display = 'block';
             return;
         }
+        if (data.admin) {
+            window.location.href = data.redirect || '/admin';
+            return;
+        }
         localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
         localStorage.setItem('userId', data.user_id);
         localStorage.setItem(USER_EMAIL_KEY, data.email || email);
@@ -2664,6 +2857,9 @@
     }
 
     async function renderShell() {
+        if (userId && localStorage.getItem(ACCESS_TOKEN_KEY)) {
+            if (!(await ensureSessionStillValid())) return;
+        }
         if (userId && !profileFetchDone) await refreshCachedProfile();
         if (!userId) {
             cachedProfile = {};
@@ -3087,7 +3283,37 @@
         return '<label>' + esc(field.label) + req + '</label>' + help + input;
     }
 
+    function syncProfileDraftFromCurrentStep(schema, stepIdx) {
+        const root = document.getElementById('profileFormRoot');
+        const sec = (schema.sections || [])[stepIdx];
+        if (!root || !sec) return;
+        const fields = sec.fields || [];
+        for (let fi = 0; fi < fields.length; fi++) {
+            const f = fields[fi];
+            if (f.type === 'hidden') continue;
+            if (f.type === 'multiselect') {
+                const arr = [];
+                root.querySelectorAll('.chip[data-ms="' + f.id + '"].on').forEach(function (chip) {
+                    const opt = chip.getAttribute('data-opt');
+                    if (opt) arr.push(opt);
+                });
+                profileDraft[f.id] = arr;
+                continue;
+            }
+            const el = root.querySelector('[data-fid="' + f.id + '"]');
+            if (!el) continue;
+            if (el.type === 'number') {
+                profileDraft[f.id] = el.value === '' ? '' : el.value;
+            } else if (el.type === 'range') {
+                profileDraft[f.id] = el.value;
+            } else {
+                profileDraft[f.id] = el.value;
+            }
+        }
+    }
+
     function validateWizardStep(schema, stepIdx) {
+        syncProfileDraftFromCurrentStep(schema, stepIdx);
         const sec = (schema.sections || [])[stepIdx];
         if (!sec || sec.optional) return true;
         const fields = sec.fields || [];
@@ -3176,7 +3402,11 @@
             const profile = normalizeProfileDraftFromServer(await res.json(), schema);
             cachedProfile = Object.assign({}, profile);
             profileFetchDone = true;
-            profileDraft = Object.assign({}, profile);
+            if (profileDraftSessionUser !== userId) {
+                profileDraft = Object.assign({}, profile);
+                profileDraftSessionUser = userId;
+                profileWizardStep = 0;
+            }
             const sections = schema.sections || [];
             if (profileWizardStep < 0) profileWizardStep = 0;
             if (profileWizardStep >= sections.length) profileWizardStep = Math.max(0, sections.length - 1);
@@ -3215,6 +3445,7 @@
             const btnPrev = document.getElementById('btnProfilePrev');
             if (btnPrev) {
                 btnPrev.onclick = function () {
+                    syncProfileDraftFromCurrentStep(schema, profileWizardStep);
                     profileWizardStep--;
                     renderProfileTab();
                 };
@@ -3261,6 +3492,7 @@
                             const pr = await fetchJson('/profile/' + encodeURIComponent(userId));
                             cachedProfile = normalizeProfileDraftFromServer(await pr.json(), schema);
                             profileDraft = Object.assign({}, cachedProfile);
+                            profileDraftSessionUser = userId;
                         } catch (e2) {}
                         currentTab = 'home';
                         await renderShell();
@@ -5040,7 +5272,10 @@
                     '<label style="margin-top:12px">Повтор нового пароля</label>' +
                     '<input type="password" id="vwAccNewPwd2" autocomplete="new-password" style="width:100%;max-width:420px">' +
                     '<p id="vwAccPwdErr" style="display:none;margin-top:10px;color:#c62828;font-size:0.875rem"></p>' +
-                    '<button type="button" class="btn-primary" style="margin-top:14px" id="vwAccChangePwd">Сохранить новый пароль</button>' +
+                    '<div class="account-pwd-actions">' +
+                    '<button type="button" class="btn-primary" id="vwAccChangePwd">Сохранить новый пароль</button>' +
+                    '<button type="button" class="btn-secondary btn-account-delete" id="vwAccDeleteAccount">Удалить аккаунт</button>' +
+                    '</div>' +
                     '</div></div>';
                 el.innerHTML = html;
                 if (
@@ -5272,6 +5507,37 @@
                     }
                     btn.disabled = false;
                 };
+                document.getElementById('vwAccDeleteAccount').onclick = function () {
+                    showAppConfirm(
+                        'Аккаунт и все данные (анкета, ответы, чаты, прогресс) будут удалены без возможности восстановления.',
+                        'Вы уверены?',
+                        async function () {
+                            try {
+                                const res = await fetch(apiUrl('/auth/account'), {
+                                    method: 'DELETE',
+                                    headers: apiFetchHeaders()
+                                });
+                                if (res.status === 401) {
+                                    clearAuth();
+                                    showAuthScreen();
+                                    return;
+                                }
+                                const data = await res.json().catch(function () { return {}; });
+                                if (!res.ok) {
+                                    let m = data.detail;
+                                    if (typeof m !== 'string') m = 'Не удалось удалить аккаунт.';
+                                    showAppAlert(m, 'Ошибка');
+                                    return;
+                                }
+                                clearAuth();
+                                showAuthScreen();
+                                showAppAlert('Аккаунт удалён.', 'Готово');
+                            } catch (e) {
+                                showAppAlert(String(e.message || e), 'Ошибка');
+                            }
+                        }
+                    );
+                };
             } catch (e) {
                 el.innerHTML = '<p class="muted">' + esc(String(e.message || e)) + '</p>';
             }
@@ -5395,6 +5661,7 @@
             userId = data.user_id;
             profileFetchDone = false;
             currentTab = 'home';
+            sessionCheckedThisPage = false;
             return true;
         } catch (e) {
             return false;
@@ -5403,17 +5670,33 @@
 
     async function validateStoredSession() {
         const tok = localStorage.getItem(ACCESS_TOKEN_KEY);
-        if (!userId || !tok) return false;
+        const uid = localStorage.getItem('userId') || userId;
+        if (!uid || !tok) return false;
+        userId = uid;
         try {
             const res = await fetch(apiUrl('/auth/session'), { headers: apiFetchHeaders() });
+            if (res.status === 401 || res.status === 403 || res.status === 404) return false;
             if (!res.ok) return false;
             const data = await res.json().catch(function () { return {}; });
-            if (data.user_id) userId = data.user_id;
+            if (!data.ok || !data.user_id) return false;
+            userId = data.user_id;
             if (data.email) localStorage.setItem(USER_EMAIL_KEY, data.email);
             return true;
         } catch (e) {
             return false;
         }
+    }
+
+    async function ensureSessionStillValid() {
+        if (!userId || !localStorage.getItem(ACCESS_TOKEN_KEY)) return false;
+        if (sessionCheckedThisPage) return true;
+        const ok = await validateStoredSession();
+        sessionCheckedThisPage = true;
+        if (!ok) {
+            clearAuth();
+            showAuthScreen();
+        }
+        return ok;
     }
 
     (async function bootstrap() {

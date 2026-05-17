@@ -26,6 +26,13 @@ HH_MIN_POLL_ANSWERS = int(os.environ.get("HH_MIN_POLL_ANSWERS", "0"))
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-change-me-in-production-vibework")
 JWT_EXPIRE_DAYS = int(os.environ.get("JWT_EXPIRE_DAYS", "30"))
 JWT_EXPIRE_DELTA = timedelta(days=JWT_EXPIRE_DAYS)
+# Токены, выданные до этой метки (ISO UTC), считаются недействительными. Задайте при полном сбросе аккаунтов.
+JWT_INVALID_BEFORE = os.environ.get("JWT_INVALID_BEFORE", "").strip()
+
+# Восстановление пользователей из website/data/vibework.db при входе (по умолчанию выкл.)
+ENABLE_LEGACY_WEBSITE_MIGRATION = os.environ.get(
+    "ENABLE_LEGACY_WEBSITE_MIGRATION", ""
+).strip().lower() in ("1", "true", "yes")
 
 # CORS для браузера. В проде задайте домен(ы) явно: "https://vibework.example,https://www.vibework.example"
 # По умолчанию — только локальная разработка.

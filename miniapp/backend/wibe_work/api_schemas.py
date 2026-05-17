@@ -94,8 +94,23 @@ class EmailRegisterBody(BaseModel):
 
 
 class EmailLoginBody(BaseModel):
-    email: EmailStr
+    """email: обычный адрес или логин админа без @ (ADMIN_LOGIN из .env)."""
+
+    email: str = Field(..., min_length=1, max_length=320)
     password: str = Field(..., min_length=1, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def email_or_admin_login(cls, v: str) -> str:
+        s = (v or "").strip()
+        if not s:
+            raise ValueError("Укажите email или логин")
+        if "@" not in s:
+            return s
+        local, _, domain = s.partition("@")
+        if not local or not domain or "." not in domain:
+            raise ValueError("Некорректный email")
+        return s.lower()
 
 
 class EmailPasswordChangeBody(BaseModel):

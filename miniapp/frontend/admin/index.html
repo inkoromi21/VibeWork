@@ -130,17 +130,9 @@
 </head>
 <body>
 <div class="wrap">
-    <div id="loginView">
-        <div class="card" style="max-width:400px;margin:40px auto">
-            <h1>Вход администратора</h1>
-            <p class="muted">Логин и пароль задаются в корневом <code>.env</code> (<code>ADMIN_LOGIN</code>, <code>ADMIN_PASSWORD</code>).</p>
-            <div id="loginMsg" class="msg err hidden"></div>
-            <label for="admLogin">Логин</label>
-            <input id="admLogin" type="text" autocomplete="username">
-            <label for="admPass">Пароль</label>
-            <input id="admPass" type="password" autocomplete="current-password">
-            <button type="button" class="btn-primary" id="btnLogin">Войти</button>
-        </div>
+    <div id="gateView" class="card" style="max-width:420px;margin:48px auto;text-align:center">
+        <p class="muted" id="gateText">Проверка доступа…</p>
+        <div id="loginMsg" class="msg err hidden"></div>
     </div>
 
     <div id="dashView" class="hidden">
@@ -172,7 +164,8 @@
 <script>
 (function () {
     const API = '/admin/api';
-    const loginView = document.getElementById('loginView');
+    const gateView = document.getElementById('gateView');
+    const gateText = document.getElementById('gateText');
     const dashView = document.getElementById('dashView');
     const loginMsg = document.getElementById('loginMsg');
     const dashMsg = document.getElementById('dashMsg');
@@ -211,48 +204,30 @@
     }
 
     async function checkSession() {
-        const me = await api('/me');
+        let me;
+        try {
+            const res = await fetch(API + '/me', { credentials: 'include' });
+            me = await res.json().catch(function () { return {}; });
+        } catch (e) {
+            me = {};
+        }
         if (!me.configured) {
-            showMsg(loginMsg, 'Админка не настроена: добавьте ADMIN_LOGIN и ADMIN_PASSWORD в .env и перезапустите API.', false);
-            loginView.classList.remove('hidden');
-            dashView.classList.add('hidden');
+            if (gateText) gateText.textContent = 'Админка не настроена';
+            showMsg(loginMsg, 'Добавьте ADMIN_LOGIN и ADMIN_PASSWORD в .env и перезапустите API.', false);
             return;
         }
         if (me.authenticated) {
-            loginView.classList.add('hidden');
+            gateView.classList.add('hidden');
             dashView.classList.remove('hidden');
             await loadUsers();
-        } else {
-            loginView.classList.remove('hidden');
-            dashView.classList.add('hidden');
+            return;
         }
+        window.location.replace('/');
     }
-
-    document.getElementById('btnLogin').onclick = async function () {
-        showMsg(loginMsg, '');
-        try {
-            await api('/login', {
-                method: 'POST',
-                body: JSON.stringify({
-                    login: document.getElementById('admLogin').value.trim(),
-                    password: document.getElementById('admPass').value
-                })
-            });
-            document.getElementById('admPass').value = '';
-            loginView.classList.add('hidden');
-            dashView.classList.remove('hidden');
-            await loadUsers();
-        } catch (e) {
-            showMsg(loginMsg, e.message, false);
-        }
-    };
 
     document.getElementById('btnLogout').onclick = async function () {
         try { await api('/logout', { method: 'POST' }); } catch (e) { /* */ }
-        selectedId = null;
-        detail = null;
-        dashView.classList.add('hidden');
-        loginView.classList.remove('hidden');
+        window.location.replace('/');
     };
 
     async function loadUsers() {
@@ -286,9 +261,7 @@
             });
         } catch (e) {
             if (String(e.message).indexOf('401') >= 0 || e.message.indexOf('администратора') >= 0) {
-                dashView.classList.add('hidden');
-                loginView.classList.remove('hidden');
-                showMsg(loginMsg, 'Сессия истекла. Войдите снова.', false);
+                window.location.replace('/');
                 return;
             }
             wrap.innerHTML = '';
@@ -413,10 +386,6 @@
                 : '<p class="muted">Нет отметок по шагам обучения.</p>';
         }
     }
-
-    document.getElementById('admPass').addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') document.getElementById('btnLogin').click();
-    });
 
     checkSession().catch(function (e) {
         showMsg(loginMsg, e.message, false);

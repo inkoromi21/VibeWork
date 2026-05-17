@@ -12,6 +12,8 @@
 | `TELEGRAM_PUBLIC_BASE_URL` | HTTPS для Web App в Telegram |
 | `WEBSITE_URL` | Кнопка «Сайт» (пусто = тот же хост) |
 | `JWT_SECRET` | Подпись JWT |
+| `JWT_INVALID_BEFORE` | ISO UTC: токены, выданные раньше этой метки, недействительны (после `python scripts/reset_all_users.py` выставляется автоматически) |
+| `ENABLE_LEGACY_WEBSITE_MIGRATION` | `1` — при входе подтягивать старых пользователей из `website/data/vibework.db` (по умолчанию выкл.) |
 | `ADMIN_LOGIN` | Логин входа в админ-панель (`/admin`) |
 | `ADMIN_PASSWORD` | Пароль администратора (только в `.env`, не в git) |
 | `ADMIN_SESSION_HOURS` | Длительность сессии админа в часах (по умолчанию 12) |

@@ -143,6 +143,16 @@ except Exception as _e:
     print(f"[vibework] email startup check: {_e}", flush=True)
 
 
+def _html_no_cache(content: str) -> HTMLResponse:
+    return HTMLResponse(
+        content,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+        },
+    )
+
+
 def _read_miniapp_html() -> str:
     path = MINIAPP_HTML
     if not path.is_file():
@@ -275,26 +285,26 @@ async def favicon_ico():
 
 @app.get("/miniapp/", response_class=HTMLResponse)
 async def miniapp():
-    return _read_miniapp_html()
+    return _html_no_cache(_read_miniapp_html())
 
 
 @app.get("/", response_class=HTMLResponse)
 async def website_index():
     """Главная сайта — тот же UI, что мини-приложение в Telegram (miniapp/frontend/index.html)."""
-    return _read_miniapp_html()
+    return _html_no_cache(_read_miniapp_html())
 
 
 @app.get("/reset-password", response_class=HTMLResponse)
 async def reset_password_page():
     """Сброс пароля по ссылке из письма (Resend)."""
-    return _read_reset_password_html()
+    return _html_no_cache(_read_reset_password_html())
 
 
 @app.get("/admin", response_class=HTMLResponse)
 @app.get("/admin/", response_class=HTMLResponse)
 async def admin_page():
     """Панель администратора (отдельный вход из .env)."""
-    return _read_admin_html()
+    return _html_no_cache(_read_admin_html())
 
 
 if __name__ == "__main__":

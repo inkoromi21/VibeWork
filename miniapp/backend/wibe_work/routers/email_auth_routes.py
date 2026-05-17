@@ -7,10 +7,10 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 
 from wibe_work.bearer_auth import require_bearer_matches_user
-from wibe_work.config import PUBLIC_BASE_URL
+from wibe_work.config import ENABLE_LEGACY_WEBSITE_MIGRATION, PUBLIC_BASE_URL
 from wibe_work.jwt_service import create_access_token
 from wibe_work.miniapp_paths import PROJECT_ROOT
 from wibe_work.services.resend_send import resend_missing_keys
@@ -371,9 +371,29 @@ async def email_reset_password(body: EmailResetPasswordBody):
 
 
 @router.post("/login")
-async def email_login(body: EmailLoginBody):
-    email = _norm_email(str(body.email))
+async def email_login(body: EmailLoginBody, response: Response):
+    raw_login = str(body.email).strip()
     pw = sanitize_password_input(body.password)
+    if "@" not in raw_login:
+        from wibe_work.admin_auth import (
+            admin_credentials_configured,
+            create_admin_session_token,
+            set_admin_cookie,
+            verify_admin_credentials,
+        )
+
+        if not admin_credentials_configured():
+            raise HTTPException(
+                status_code=503,
+                detail="Админка не настроена: ADMIN_LOGIN и ADMIN_PASSWORD в .env",
+            )
+        if not verify_admin_credentials(raw_login, pw):
+            raise HTTPException(status_code=401, detail="Неверный логин или пароль администратора")
+        token = create_admin_session_token()
+        set_admin_cookie(response, token)
+        return {"admin": True, "redirect": "/admin", "ok": True}
+
+    email = _norm_email(raw_login)
     with get_db() as conn:
         row = conn.execute(
             "SELECT user_id, password_hash FROM email_users WHERE email = ?",
@@ -386,8 +406,9 @@ async def email_login(body: EmailLoginBody):
             )
         user_id = str(row["user_id"])
     else:
-        # Учётка могла быть создана только в изолированном website/data/vibework.db
-        user_id = _migrate_legacy_isolated_user_if_valid(email, pw)
+        user_id = None
+        if ENABLE_LEGACY_WEBSITE_MIGRATION:
+            user_id = _migrate_legacy_isolated_user_if_valid(email, pw)
         if not user_id:
             if _legacy_isolated_db_has_email(email):
                 raise HTTPException(

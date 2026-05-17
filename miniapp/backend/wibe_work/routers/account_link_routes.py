@@ -23,6 +23,7 @@ from wibe_work.telegram_init_data import (
 from wibe_work.routers.telegram_auth_routes import _get_or_create_user_id_for_telegram_id
 from wibe_work.user_merge import merge_users_into_transaction
 from wibe_work.services.telegram_bot_info import get_telegram_bot_username
+from wibe_work.services.user_accounts import account_exists, delete_user_account
 
 router = APIRouter(prefix="/auth/account", tags=["account"])
 
@@ -64,6 +65,16 @@ def _telegram_uid_for_telegram_id(conn, telegram_id: int) -> str | None:
 
 
 CurrentUser = Annotated[str, Depends(get_current_user_id_from_bearer)]
+
+
+@router.delete("")
+async def delete_account(current: CurrentUser):
+    """Удалить текущий аккаунт и все связанные данные."""
+    if not account_exists(current):
+        raise HTTPException(status_code=401, detail="Сессия недействительна.")
+    if not delete_user_account(current):
+        raise HTTPException(status_code=404, detail="Аккаунт не найден.")
+    return {"ok": True}
 
 
 @router.get("/status")
