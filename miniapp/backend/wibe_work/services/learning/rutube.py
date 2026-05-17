@@ -96,7 +96,14 @@ def _item_to_card(item: Dict[str, Any], *, query: str = "") -> Optional[Dict[str
     if not url:
         return None
     title = str(item.get("title") or "Видео на Rutube").strip()
-    desc = str(item.get("description") or "")[:300]
+    desc = str(item.get("description") or "").strip()[:300]
+    if not desc and query:
+        desc = (
+            f"Видео по теме «{query[:60]}» — посмотрите начало и решите, "
+            "подходит ли формат и темп."
+        )
+    elif not desc:
+        desc = "Видеоурок на Rutube — кратко просмотрите и выпишите главную мысль для шага."
     kind = "курс" if _course_score(title, query) >= 8 else "видео"
     return {
         "title": title[:200],

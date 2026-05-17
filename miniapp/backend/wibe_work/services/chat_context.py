@@ -35,6 +35,9 @@ def _format_advice(advice: Dict[str, Any], scenarios: Dict[str, Any]) -> List[st
     best = str(scenarios.get("best_plan_id") or "A")
     lines.append(f"Индивидуальные советы (лучший план {best}):")
     block = by.get(best) or by.get("A") or {}
+    intro = (block.get("intro") or "").strip()
+    if intro:
+        lines.append(f"  {_trunc(intro, 200)}")
     for sk in block.get("priority_skills") or []:
         lines.append(f"  Приоритет: {sk}")
     for i, st in enumerate(block.get("steps") or [], 1):
@@ -50,9 +53,9 @@ def _format_advice(advice: Dict[str, Any], scenarios: Dict[str, Any]) -> List[st
 def _format_growth_stages(stages: List[Dict[str, Any]]) -> List[str]:
     lines: List[str] = []
     for s in (stages or [])[:3]:
+        intro = _trunc(str(s.get("intro") or s.get("body") or ""), 100)
         lines.append(
-            f"Этап {s.get('stage')}: {s.get('title', '')} ({s.get('horizon', '')}) — "
-            + _trunc(str(s.get("body") or ""), 120)
+            f"Этап {s.get('stage')}: {s.get('title', '')} ({s.get('horizon', '')}) — {intro}"
         )
     return lines
 
@@ -179,8 +182,14 @@ def build_comprehensive_chat_context(
     if weekly:
         wk_lines = []
         for w in weekly[:2]:
-            topics = ", ".join(str(t) for t in (w.get("topics") or [])[:4])
-            wk_lines.append(f"{w.get('week_range', '')}: {topics}")
+            if w.get("learn"):
+                wk_lines.append(
+                    f"{w.get('week_range', '')}: изучить — {_trunc(str(w.get('learn')), 80)}; "
+                    f"итог — {_trunc(str(w.get('outcome')), 60)}"
+                )
+            else:
+                topics = ", ".join(str(t) for t in (w.get("topics") or [])[:4])
+                wk_lines.append(f"{w.get('week_range', '')}: {topics}")
         sections.append("=== План на недели ===\n" + "\n".join(wk_lines))
 
     mts = (snap.get("mts_matrix") or {}).get("rows") or []

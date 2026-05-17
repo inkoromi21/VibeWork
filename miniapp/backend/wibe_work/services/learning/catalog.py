@@ -42,13 +42,78 @@ def get_resource(resource_id: str) -> Optional[Dict[str, Any]]:
     return resources_by_id().get(resource_id)
 
 
+_CATALOG_BLURBS: Dict[str, str] = {
+    "roadmap_backend": "Карта тем для backend: что учить по шагам, чтобы дойти до junior без хаоса.",
+    "roadmap_frontend": "Дорожная карта frontend: HTML, CSS, JS и экосистема в логичном порядке.",
+    "roadmap_devops": "Обзор DevOps: инфраструктура, CI/CD, облака — куда смотреть в начале пути.",
+    "roadmap_data_analyst": "Карта для аналитика данных: SQL, Python, визуализация и soft skills.",
+    "odin_fullstack": "Бесплатный путь full stack: проекты в браузере, много практики, английский интерфейс.",
+    "fcc_responsive": "Интерактивный курс вёрстки: адаптивные страницы с проверкой заданий.",
+    "fcc_python": "Python с нуля на freeCodeCamp: основы и небольшие проекты в браузере.",
+    "cs50_intro": "Классический вводный курс Harvard: логика, алгоритмы и программирование с нуля.",
+    "ms_learn_python": "Короткие модули Microsoft: синтаксис Python и первые скрипты.",
+    "ms_learn_azure_fund": "База облака Azure — полезно, если целитесь в DevOps или backend в облаке.",
+    "mdn_html": "Официальный учебник MDN по HTML: разметка страниц с примерами.",
+    "mdn_js": "Справочник и гайд по JavaScript — основа для frontend и простого backend.",
+    "mdn_http": "Как работают HTTP-запросы и API — must-have перед backend-проектами.",
+    "devdocs_python": "Быстрый справочник по Python — удобно держать открытым при задачах.",
+    "stepik_python": "Курс на русском: Python от переменных до функций, с тестами после уроков.",
+    "git_branching": "Интерактивный тренажёр Git: ветки, merge и rebase визуально.",
+    "github_skills": "Пошаговые задания на GitHub: репозиторий, issues, pull request.",
+    "kaggle_learn": "Микрокурсы по данным: Python, pandas, визуализация, ввод в ML.",
+    "sql_academy": "Тренажёр SQL на русском: SELECT, JOIN, агрегаты с автопроверкой.",
+    "hf_learn": "Введение в NLP и трансформеры — для тех, кто идёт в data/ML.",
+    "google_ml_crash": "Короткое введение в ML от Google: термины, модели, этика.",
+    "deeplearning_ai_short": "Небольшие курсы по нейросетям и LLM — можно брать выборочно.",
+    "figma_learn": "Официальные уроки Figma: макеты, компоненты, прототипы.",
+    "google_design": "Материалы Google про UX: принципы, кейсы, насмотренность.",
+    "hubspot_academy": "Бесплатные курсы по маркетингу и CRM — воронка, контент, метрики.",
+    "atlassian_agile": "Простое объяснение Agile и Scrum для менеджмента и команд.",
+    "exercism_python": "Задачи по Python с наставником: код проверяют, дают фидбек.",
+    "exercism_javascript": "Практика JavaScript малыми шагами — удобно после основ MDN.",
+    "codewars_python": "Ката-задачи по Python разной сложности — разминка перед собесами.",
+    "leetcode_explore": "Тематические наборы задач: структуры данных и алгоритмы.",
+    "linkedin_learning_note": "Платформа курсов (часто по подписке) — если есть доступ через вуз или работу.",
+    "udemy_note": "Каталог платных курсов — сравнивайте отзывы, есть частые скидки.",
+    "rutube_education": "Подборка обучающих каналов и плейлистов на Rutube.",
+}
+
+
+def _generic_resource_blurb(r: Dict[str, Any]) -> str:
+    kind = str(r.get("kind") or r.get("format") or "ресурс").lower()
+    title = str(r.get("title") or "материал")[:80]
+    if kind == "roadmap":
+        return "Дорожная карта: порядок тем и навыков по направлению."
+    if kind in ("курс", "course"):
+        return f"Бесплатный пошаговый курс — разберите основы по «{title}»."
+    if kind in ("документация", "docs", "справочник"):
+        return f"Справочник и примеры — держите под рукой при выполнении шага."
+    if kind in ("практика", "practice", "симулятор"):
+        return "Практика с заданиями: закрепите тему шага на конкретных упражнениях."
+    if kind in ("видео", "video"):
+        return "Видеоурок — посмотрите вводную часть и решите, подходит ли темп."
+    if kind in ("гайд", "article"):
+        return "Короткий обзор темы — прочитайте и выпишите 3 идеи для себя."
+    return "Материал по теме шага — откройте и отметьте, что примените на практике."
+
+
+def resource_description(r: Dict[str, Any]) -> str:
+    raw = str(r.get("description") or "").strip()
+    if raw:
+        return raw[:400]
+    rid = str(r.get("id") or "")
+    if rid in _CATALOG_BLURBS:
+        return _CATALOG_BLURBS[rid]
+    return _generic_resource_blurb(r)
+
+
 def resource_to_card(r: Dict[str, Any], *, source_type: str = "curated") -> Dict[str, Any]:
     return {
         "id": r.get("id"),
         "title": r.get("title") or "Материал",
         "url": r.get("url") or "#",
         "kind": r.get("kind") or r.get("format") or "ресурс",
-        "description": r.get("description") or "",
+        "description": resource_description(r),
         "provider": r.get("provider") or "curated",
         "source_type": source_type,
         "is_free": bool(r.get("is_free", True)),

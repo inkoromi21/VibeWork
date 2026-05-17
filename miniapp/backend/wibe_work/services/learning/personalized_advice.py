@@ -127,6 +127,19 @@ def _pool_materials(
     return merged[:14]
 
 
+def _material_card(m: Dict[str, Any]) -> Dict[str, Any]:
+    desc = str(m.get("description") or "").strip()
+    card: Dict[str, Any] = {
+        "title": m.get("title"),
+        "url": m.get("url") or "",
+        "kind": m.get("kind") or "ресурс",
+        "provider": m.get("provider"),
+    }
+    if desc:
+        card["description"] = desc[:220]
+    return card
+
+
 def _pick_materials(
     materials: List[Dict[str, Any]],
     *,
@@ -157,22 +170,81 @@ def _pick_materials(
         url = m.get("url") or ""
         if url:
             used.add(url)
-        picked.append(
-            {
-                "title": m.get("title"),
-                "url": url,
-                "kind": m.get("kind") or "ресурс",
-                "provider": m.get("provider"),
-            }
-        )
+        picked.append(_material_card(m))
     return picked
 
 
 def _step(
     text: str,
     materials: Optional[List[Dict[str, Any]]] = None,
+    *,
+    section: str = "",
 ) -> Dict[str, Any]:
-    return {"text": text, "materials": materials or []}
+    out: Dict[str, Any] = {"text": text, "materials": materials or []}
+    if section:
+        out["section"] = section
+    return out
+
+
+def _human_skill_label(skill: str) -> str:
+    sk = (skill or "").strip()
+    if not sk:
+        return "навыки из разрыва"
+    if re.match(r"^[a-z0-9_.\-]+$", sk, re.I):
+        return sk.replace("_", " ").replace("-", " ").title()
+    return sk
+
+
+def _skill_keywords(skill: str, track: Optional[str]) -> Tuple[str, ...]:
+    parts = [p for p in re.split(r"[\s_\-]+", skill.lower()) if len(p) > 2]
+    if track:
+        parts.append(track)
+    return tuple(parts[:4])
+
+
+_PAIN_INTRO: Dict[str, str] = {
+    "pain_career": "Сейчас полезно выбрать одно направление и проверить его маленьким делом за пару недель — без бесконечного «а вдруг другое».",
+    "pain_no_exp": "Опыта в резюме может не быть — это нормально: опирайтесь на учёбу, проекты и то, чем уже помогали людям.",
+    "pain_region": "Если город сужает выбор — смотрите удалёнку и 2–3 города, где реально есть вакансии по вашей сфере.",
+    "pain_money_courses": "Платные курсы не обязательны: возьмите один бесплатный трек ниже и доведите до конкретного результата.",
+    "pain_interview": "Собеседования пугают — отработайте три ответа вслух, с таймером на 2 минуты, по типовым вопросам сферы.",
+    "pain_overload": "Не пытайтесь закрыть всё сразу: один шаг на эту неделю, остальное — в заметку «потом».",
+    "pain_low_confidence": "Если кажется, что «ничего не умею» — начните с фактов из жизни (школа, хобби, помощь людям), а не с сравнением с идеалом.",
+    "pain_gap_skills": "Разрыв навыков — это список задач, а не приговор: закройте один узкий пункт за месяц.",
+}
+
+
+def _build_plan_intro(
+    plan_name: str,
+    *,
+    score: Any,
+    like: str,
+    pain_id: Optional[str],
+) -> str:
+    parts = [f"Направление «{plan_name}»"]
+    if score is not None:
+        parts.append(f"по тесту близко вам примерно на {score}%")
+    intro = ". ".join(parts) + "."
+    if like:
+        intro += f" В анкете вы отметили, что нравится: {like}."
+    pain_line = _PAIN_INTRO.get(pain_id or "")
+    if pain_line:
+        intro += " " + pain_line
+    return intro
+
+
+def _flatten_sections(sections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    flat: List[Dict[str, Any]] = []
+    for sec in sections:
+        title = str(sec.get("title") or "").strip()
+        for st in sec.get("steps") or []:
+            if not isinstance(st, dict):
+                continue
+            item = dict(st)
+            if title and not item.get("section"):
+                item["section"] = title
+            flat.append(item)
+    return flat
 
 
 def _rule_based_plan_advice(
@@ -183,84 +255,109 @@ def _rule_based_plan_advice(
     gap: Dict[str, Any],
     sphere: str,
     materials: List[Dict[str, Any]],
-    pain_step: Optional[str],
+    pain_id: Optional[str],
     priority: List[str],
 ) -> Dict[str, Any]:
+    del gap, sphere  # reserved for future profile hooks
     plan_name = _plan_label(plan)
     track = _infer_track_from_plan(plan_name)
     used: Set[str] = set()
-    steps: List[Dict[str, Any]] = []
+    priority_top = [_human_skill_label(s) for s in priority[:3]]
+    like = (profile.get("like_to_do") or "").strip()[:100]
+    intro = _build_plan_intro(
+        plan_name,
+        score=plan.get("score_percent"),
+        like=like,
+        pain_id=pain_id,
+    )
 
-    intro_kw = ("курс", "intro", "beginner", "основ", "python", track or "обучен")
-    if preparation == "weak":
-        intro_m = _pick_materials(materials, keywords=intro_kw, limit=2, used_urls=used)
-        steps.append(
-            _step(
-                f"Начните с короткого вводного трека по «{plan_name}» (10–15 ч): закрепите базу перед откликами.",
-                intro_m,
-            )
-        )
+    skill_focus = priority_top[0] if priority_top else "базу по направлению"
+    skill_kw = _skill_keywords(priority[0] if priority else "", track)
+
+    sections: List[Dict[str, Any]] = []
+
+    sections.append(
+        {
+            "title": "С чего начать",
+            "steps": [
+                _step(
+                    f"Подтяните «{skill_focus}»: выберите один материал ниже, 30–60 минут в день. "
+                    "К концу недели — короткий итог: конспект, мини-задача или заметка «что понял».",
+                    _pick_materials(
+                        materials,
+                        keywords=skill_kw + (track or "", "курс", "урок"),
+                        limit=2,
+                        used_urls=used,
+                    ),
+                    section="С чего начать",
+                ),
+            ],
+        }
+    )
+
+    learn_text = {
+        "weak": (
+            f"Если база по «{plan_name}» пока слабая — заложите 10–15 часов на вводный курс. "
+            "Не спешите с откликами, пока не сделаете хотя бы одно маленькое задание из курса."
+        ),
+        "medium": (
+            f"У вас уже есть зацепки по «{plan_name}» — один модуль в неделю и сразу маленькая практика "
+            "(задача, скрипт, макет — что ближе к направлению)."
+        ),
+        "strong": (
+            f"База уже есть — углубляйте «{plan_name}» через pet-проект на 2–3 недели. "
+            "Курс используйте как справочник, а не как бесконечную теорию."
+        ),
+    }
+    learn_kw: Tuple[str, ...] = ("курс", "intro", "beginner", "основ", track or "обучен")
+    if preparation == "strong":
+        learn_kw = ("github", "portfolio", "project", track or "", "практик")
     elif preparation == "medium":
-        steps.append(
-            _step(
-                f"Закрепите средний уровень по «{plan_name}»: один учебный модуль + одна практическая задача в неделю.",
-                _pick_materials(materials, keywords=(track or "practice", "практик", "exercism"), limit=2, used_urls=used),
-            )
-        )
-    else:
-        steps.append(
-            _step(
-                f"У вас уже сильная база — углубите «{plan_name}» через pet-проект или open-source на 2–3 недели.",
-                _pick_materials(materials, keywords=("github", "portfolio", "project", track or ""), limit=2, used_urls=used),
-            )
-        )
+        learn_kw = (track or "practice", "практик", "exercism", "stepik")
 
-    if pain_step:
-        steps.insert(0, _step(pain_step, _pick_materials(materials, keywords=("карьер", "резюме"), limit=1, used_urls=used)))
-
-    skill_focus = priority[0] if priority else "навыки из разрыва"
-    steps.append(
-        _step(
-            f"Закройте приоритет «{skill_focus}»: выберите 1 материал, доведите до артефакта (конспект, мини-кейс или код).",
-            _pick_materials(
-                materials,
-                keywords=tuple(re.split(r"\s+", skill_focus.lower())[:3]) + (track or "",),
-                limit=2,
-                used_urls=used,
-            ),
-        )
+    sections.append(
+        {
+            "title": "Обучение",
+            "steps": [
+                _step(
+                    learn_text.get(preparation, learn_text["medium"]),
+                    _pick_materials(materials, keywords=learn_kw, limit=2, used_urls=used),
+                    section="Обучение",
+                ),
+            ],
+        }
     )
 
-    steps.append(
-        _step(
-            "Трио самоисследования: сильные стороны, текущие интересы, готовность решать запросы других (не только «для себя»).",
-        )
+    sections.append(
+        {
+            "title": "Резюме и отклики",
+            "steps": [
+                _step(
+                    f"Через 2–3 недели обновите резюме: три пункта про «{plan_name}» — "
+                    "что учили, что сделали руками, какой был результат (даже учебный). "
+                    "Можно попросить близких назвать 2–3 ваши сильные стороны — часто видят то, что вы сами не замечаете.",
+                    _pick_materials(
+                        materials,
+                        keywords=(track or "", "stepik", "roadmap", "курс"),
+                        limit=1,
+                        used_urls=used,
+                    ),
+                    section="Резюме и отклики",
+                ),
+            ],
+        }
     )
-    steps.append(
-        _step(
-            "Зафиксируйте карьерные ценности (якоря Шейна): что в работе опора — экспертиза, автономия, вызов или баланс.",
-        )
-    )
-    steps.append(
-        _step(
-            "Резюме и отклики: обновите 3 буллета под «"
-            + plan_name
-            + "»; попросите близких назвать ваши сильные стороны.",
-            _pick_materials(materials, keywords=("резюме", "карьер", "stepik", "roadmap"), limit=1, used_urls=used),
-        )
-    )
-    steps.append(
-        _step(
-            "Сопоставьте тип среды (Голланд) и комфорт в команде: общение vs регламент, логика vs отношения.",
-        )
-    )
+
+    steps = _flatten_sections(sections)
 
     return {
         "title": plan.get("name", "План"),
         "plan_direction": plan_name,
         "track": track,
-        "priority_skills": priority[:3],
-        "steps": steps[:6],
+        "intro": intro,
+        "priority_skills": priority_top,
+        "sections": sections,
+        "steps": steps,
         "source": "rules",
     }
 
@@ -286,35 +383,59 @@ def _merge_llm_plan(
     *,
     fallback: Dict[str, Any],
 ) -> Dict[str, Any]:
-    steps_in = llm_block.get("steps") or []
-    steps: List[Dict[str, Any]] = []
-    for item in steps_in[:6]:
+    def _parse_step(item: Any, section: str = "") -> Optional[Dict[str, Any]]:
         if isinstance(item, str):
-            steps.append(_step(item))
-        elif isinstance(item, dict):
-            text = str(item.get("text") or item.get("step") or "").strip()
-            if not text:
+            text = item.strip()
+            return _step(text, section=section) if text else None
+        if not isinstance(item, dict):
+            return None
+        text = str(item.get("text") or item.get("step") or "").strip()
+        if not text:
+            return None
+        mats = []
+        for m in item.get("materials") or []:
+            if isinstance(m, dict) and m.get("url"):
+                mats.append(_material_card(m))
+        sec = str(item.get("section") or section or "").strip()
+        return _step(text, mats, section=sec)
+
+    sections: List[Dict[str, Any]] = []
+    llm_sections = llm_block.get("sections")
+    if isinstance(llm_sections, list) and llm_sections:
+        for sec in llm_sections[:4]:
+            if not isinstance(sec, dict):
                 continue
-            mats = []
-            for m in item.get("materials") or []:
-                if isinstance(m, dict) and m.get("url"):
-                    mats.append(
-                        {
-                            "title": m.get("title") or "Материал",
-                            "url": m.get("url"),
-                            "kind": m.get("kind") or "ресурс",
-                            "provider": m.get("provider"),
-                        }
-                    )
-            steps.append(_step(text, mats))
+            title = str(sec.get("title") or "").strip() or "Шаги"
+            sec_steps: List[Dict[str, Any]] = []
+            for item in sec.get("steps") or []:
+                st = _parse_step(item, section=title)
+                if st:
+                    sec_steps.append(st)
+            if sec_steps:
+                sections.append({"title": title, "steps": sec_steps})
+
+    steps: List[Dict[str, Any]] = []
+    if sections:
+        steps = _flatten_sections(sections)
+    else:
+        for item in llm_block.get("steps") or []:
+            st = _parse_step(item)
+            if st:
+                steps.append(st)
+        if steps:
+            sections = [{"title": "Ваш план", "steps": steps}]
+
     if not steps:
         return fallback
+    intro = str(llm_block.get("intro") or "").strip() or fallback.get("intro") or ""
     return {
         "title": llm_block.get("title") or plan.get("name") or f"План {plan_id}",
         "plan_direction": _plan_label(plan),
         "track": fallback.get("track"),
+        "intro": intro,
         "priority_skills": llm_block.get("priority_skills") or fallback.get("priority_skills"),
-        "steps": steps,
+        "sections": sections or fallback.get("sections"),
+        "steps": steps[:5],
         "source": "llm",
     }
 
@@ -334,12 +455,11 @@ def build_individual_advice(
     Советы по планам A/B/C с материалами.
     При наличии LLM — персонализация; иначе правила + каталог/путь обучения.
     """
-    from wibe_work.services.career_analysis import _PAIN_FIRST_STEP, _resolve_effective_interest
+    from wibe_work.services.career_analysis import _resolve_effective_interest
 
     plans = scenarios.get("plans") or []
     sphere = _resolve_effective_interest(profile, interest)
     pain_id = (profile.get("primary_pain") or "").strip()
-    pain_step = _PAIN_FIRST_STEP.get(pain_id) if pain_id else None
     priority = _priority_skills(gap)
 
     if learning_path is None and user_id is not None:
@@ -365,16 +485,19 @@ def build_individual_advice(
     if llm_configured() and plans and profile_summary:
         mat_lines = []
         for i, m in enumerate(materials_global[:12], 1):
-            mat_lines.append(
-                f"{i}. [{m.get('kind')}] {m.get('title')} — {m.get('url')} ({m.get('provider')})"
-            )
+            desc = str(m.get("description") or "").strip()[:100]
+            line = f"{i}. [{m.get('kind')}] {m.get('title')} — {m.get('url')} ({m.get('provider')})"
+            if desc:
+                line += f" — {desc}"
+            mat_lines.append(line)
+        pain_hint = _PAIN_INTRO.get(pain_id, "") if pain_id else ""
         prompt = build_advice_user_prompt(
             profile_summary=profile_summary,
             preparation_level=preparation_level,
             priority_skills=priority,
             plans=plans,
             materials_list="\n".join(mat_lines) or "—",
-            pain_hint=pain_step or "",
+            pain_hint=pain_hint,
         )
         raw, _ = fetch_llm_completion(
             prompt,
@@ -402,7 +525,7 @@ def build_individual_advice(
             gap=gap,
             sphere=sphere,
             materials=mats,
-            pain_step=pain_step if pid == "A" else None,
+            pain_id=pain_id if pid == "A" else None,
             priority=priority,
         )
         llm_block = llm_by_plan.get(pid) if isinstance(llm_by_plan, dict) else None

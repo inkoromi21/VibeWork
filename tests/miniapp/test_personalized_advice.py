@@ -35,10 +35,14 @@ def test_rule_based_advice_has_materials_for_weak_prep() -> None:
                 "provider": "stepik",
             }
         ],
-        pain_step=None,
+        pain_id=None,
         priority=["python", "git"],
     )
+    assert block["intro"]
+    assert block["sections"]
     assert block["steps"]
+    texts = " ".join(s.get("text", "") for s in block["steps"])
+    assert "Шейна" not in texts and "Голланд" not in texts
     first = block["steps"][0]
     assert first.get("text")
     assert isinstance(first.get("materials"), list)
@@ -63,5 +67,8 @@ def test_build_individual_advice_structure() -> None:
     )
     assert "by_plan" in out
     assert "A" in out["by_plan"]
-    steps = out["by_plan"]["A"]["steps"]
+    block_a = out["by_plan"]["A"]
+    assert block_a.get("intro")
+    assert block_a.get("sections")
+    steps = block_a["steps"]
     assert steps and steps[0].get("text")

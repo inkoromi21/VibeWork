@@ -10,9 +10,13 @@ from wibe_work.miniapp_paths import data_file
 from wibe_work.services.llm_client import fetch_llm_completion, llm_configured
 from wibe_work.services.llm_prompts import ANALYSIS_NARRATIVE_SYSTEM, build_analysis_user_prompt
 from wibe_work.services.aptitude_quiz import get_pro_weights_matrix_for_interest, letter_to_index
+from wibe_work.questionnaire_fields import INTEREST_SPHERES
 from wibe_work.services.user_context import (
     _PAIN_LABELS,
+    _PRIORITY_RU,
+    _WORK_FORMAT_RU,
     coach_profile_snippet,
+    parse_interest_spheres,
     profile_skill_blob,
 )
 from wibe_work.services.user_pain_mapping import align_pains
@@ -48,6 +52,14 @@ _MINIAPP_TO_WEBSITE_INTEREST = {
     "creative": "дизайн",
     "sport": "бизнес",
     "other": "IT",
+}
+
+_SPHERE_LABELS: Dict[str, str] = {s["id"]: s["label"] for s in INTEREST_SPHERES}
+
+_PREP_LABELS: Dict[str, str] = {
+    "weak": "начальный",
+    "medium": "средний",
+    "strong": "уверенный",
 }
 
 _PAIN_FIRST_STEP: Dict[str, str] = {
@@ -97,6 +109,76 @@ def _readiness_percent(vec: List[int], preparation: str) -> int:
     avg = sum(scores) / len(scores)
     prep_bonus = {"weak": -6, "medium": 0, "strong": 10}.get(preparation, 0)
     return int(max(12, min(100, round(avg * 0.82 + prep_bonus))))
+
+
+def _build_readiness_insight(
+    readiness: int,
+    preparation_level: str,
+    axes: List[Dict[str, Any]],
+    gap: Optional[Dict[str, Any]],
+    scenarios: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Краткое «почему столько» и плюсы/минусы для карточки готовности."""
+    prep = {"weak": "начальный", "medium": "средний", "strong": "уверенный"}.get(
+        preparation_level, "средний"
+    )
+    pros: List[str] = []
+    cons: List[str] = []
+
+    if axes:
+        by_val = sorted(axes, key=lambda a: int(a.get("value_percent") or 0), reverse=True)
+        for a in by_val[:2]:
+            pct = int(a.get("value_percent") or 0)
+            if pct >= 55:
+                pros.append(f"{a.get('label', 'Ось')}: {pct}%")
+        for a in list(reversed(by_val))[:2]:
+            pct = int(a.get("value_percent") or 0)
+            if pct < 52:
+                cons.append(f"{a.get('label', 'Ось')} — {pct}%")
+
+    if gap:
+        hp = gap.get("overall_hp")
+        if hp is not None and int(hp) >= 68:
+            pros.append(f"Навыки близки к цели трека (~{int(hp)}%)")
+        for label in (gap.get("closing_skills") or [])[:2]:
+            cons.append(f"Подтянуть: {label}")
+
+    best = (scenarios or {}).get("best_avg_percent")
+    if best is not None and int(best) >= 58:
+        pros.append(f"Сценарий плана ~{int(best)}%")
+
+    if readiness < 40:
+        why = (
+            f"{readiness}% — стартовая зона: до цели трека ещё путь, "
+            "опирайтесь на план из разбора и навыки из разрыва."
+        )
+    elif readiness < 55:
+        why = (
+            f"{readiness}% — смешанный профиль: сильные стороны есть, "
+            "узкие места по осям и навыкам снижают индекс."
+        )
+    elif readiness < 70:
+        why = (
+            f"{readiness}% — рабочий уровень: к цели близко, "
+            "добейте пункты «закрыть в первую очередь»."
+        )
+    else:
+        why = (
+            f"{readiness}% — сильная база: упор на практику, "
+            "кейсы и отклики, а не на повтор теста."
+        )
+    why += f" Уровень подготовки в анкете: {prep}."
+
+    if not pros:
+        pros.append("Пройден полный тест — картина устойчивее разовых ответов")
+    if not cons:
+        cons.append(
+            "Закрепляйте навыки практикой"
+            if readiness >= 60
+            else "Доберите 1–2 навыка из блока «разрыв»"
+        )
+
+    return {"why": why, "pros": pros[:3], "cons": cons[:3]}
 
 
 _RADAR_META = [
@@ -778,25 +860,81 @@ def _behavioral_hint(question_timings_ms: Optional[List[int]]) -> Optional[str]:
     return " ".join(parts)
 
 
+def _clean_scenario_name(name: str) -> str:
+    return re.sub(r"^План\s+[ABC]:\s*", "", (name or "").strip(), flags=re.IGNORECASE)
+
+
+def _axis_plain_explanation(dom: str) -> str:
+    return {
+        "structure_mastery": "вам близки порядок, логика и разбор задач по шагам",
+        "people_service": "важны люди, общение и ощущение пользы другим",
+        "self_insight": "вы опираетесь на самопознание и понимание своих мотивов",
+        "balance_autonomy": "для вас важны баланс жизни и свобода в решениях",
+    }.get(dom, "по тесту виден свой устойчивый стиль работы")
+
+
 def _mock_ai_narrative(
+    profile: Dict[str, Any],
     interest: str,
-    education: str,
     preparation_level: str,
     scenarios: Dict[str, Any],
     axes: List[Dict[str, Any]],
     fp: int,
+    *,
+    readiness_percent: int = 0,
+    gap: Optional[Dict[str, Any]] = None,
 ) -> str:
+    """Человеческий вывод без LLM — из анкеты, теста и сценариев."""
     dom = _dominant_radar_key(axes)
-    axis_labels = {a.get("key"): a.get("label") for a in axes}
-    tilt = axis_labels.get(dom, "профиль по осям методики")
-    plans = scenarios.get("plans") or []
-    names = ", ".join(f"{p.get('id', '?')}: {p.get('name', '')}" for p in plans[:3])
-    variants = (
-        f"По радару сильнее выражена ось «{tilt}». Сценарии: {names}. Держите один трек главным на квартал, второй — для короткого эксперимента.",
-        f"Профиль: «{tilt}» и сфера «{interest}», подготовка «{preparation_level}». Варианты {names}: фиксируйте результат каждую неделю.",
-        f"Образование: {education}. Оси методики указывают на «{tilt}». Маршруты {names}: портфолио и практика убедительнее любого теста.",
+    axis_human = _axis_plain_explanation(dom)
+    spheres = _sphere_display_labels(profile)
+    sphere = ", ".join(spheres[:3]) if spheres else (interest or "ваше направление")
+    like = (profile.get("like_to_do") or "").strip()
+    city = (profile.get("city") or "").strip()
+    prep = _PREP_LABELS.get((preparation_level or "").strip(), "средний")
+
+    plans = sorted(
+        list(scenarios.get("plans") or []),
+        key=lambda p: -(int(p.get("score_percent") or 0)),
     )
-    return variants[fp % len(variants)]
+    best_name = _clean_scenario_name(str(plans[0].get("name") or "")) if plans else ""
+    best_pct = int(plans[0].get("score_percent") or 0) if plans else None
+    alt = [
+        _clean_scenario_name(str(p.get("name") or ""))
+        for p in plans[1:3]
+        if _clean_scenario_name(str(p.get("name") or ""))
+    ]
+
+    intro = f"По анкете и тесту у вас сфера: {sphere}."
+    if like:
+        intro += f" Вы писали, что нравится: {like[:120]}."
+    if city:
+        intro += f" Город: {city}."
+    intro += f" Сильнее других — сторона, где {axis_human}; на это логично опираться в учёбе и в задачах."
+
+    mid = (
+        f"Индекс готовности сейчас около {readiness_percent}% — "
+        "это не «оценка личности», а отправная точка перед практикой и откликами."
+    )
+    if best_name and best_pct is not None:
+        mid += f" Ближе всего к вам сценарий «{best_name}» (около {best_pct}% по модели)."
+    if alt:
+        mid += f" «{'» и «'.join(alt)}» можно попробовать коротким экспериментом, если тянет, но не распыляйтесь."
+
+    closing = list((gap or {}).get("closing_skills") or [])[:2]
+    if closing:
+        mid += f" Из навыков сейчас полезнее всего подтянуть: {', '.join(closing)}."
+
+    closings = (
+        f"На 2–3 месяца возьмите один главный трек"
+        + (f" — «{best_name}»" if best_name else "")
+        + " и раз в неделю фиксируйте маленький результат: задача, урок, кусок портфолио.",
+        f"Уровень подготовки в анкете — {prep}: не гонитесь за идеалом, "
+        "делайте по одному шагу из плана роста и раздела «Обучение».",
+        "Если сомневаетесь — две недели практики по главному треку и снова посмотрите на разбор; "
+        "цифры обновятся, когда пройдёте тест ещё раз.",
+    )
+    return " ".join((intro, mid, closings[fp % len(closings)]))
 
 
 def _format_axes_for_llm(axes: List[Dict[str, Any]]) -> str:
@@ -996,74 +1134,501 @@ def _build_gap_analysis(
     }
 
 
-def _pain_focus(profile: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _sphere_display_labels(profile: Dict[str, Any]) -> List[str]:
+    ids = parse_interest_spheres(profile)
+    if not ids and (profile.get("main_sphere") or "").strip():
+        ids = [str(profile.get("main_sphere")).strip()]
+    return [_SPHERE_LABELS.get(s, s) for s in ids if s]
+
+
+def _profile_skill_hints(profile: Dict[str, Any], limit: int = 4) -> List[str]:
+    hints: List[str] = []
+    for key in (
+        "like_to_do",
+        "programming_skills",
+        "software_skills",
+        "experience_projects",
+        "extra_education",
+    ):
+        raw = (profile.get(key) or "").strip()
+        if not raw:
+            continue
+        chunk = raw.replace("\n", ", ")[:140]
+        if chunk and chunk not in hints:
+            hints.append(chunk)
+        if len(hints) >= limit:
+            break
+    return hints
+
+
+def _pain_context(
+    profile: Dict[str, Any],
+    *,
+    gap: Optional[Dict[str, Any]],
+    scenarios: Optional[Dict[str, Any]],
+    axes: Optional[List[Dict[str, Any]]],
+    readiness_percent: Optional[int],
+    top_track: str,
+) -> Dict[str, Any]:
+    sc = scenarios or {}
+    g = gap or {}
+    plans = sc.get("plans") or []
+    best_name = str(sc.get("best_plan_name") or (plans[0].get("name") if plans else "") or "")
+    best_pct = sc.get("best_avg_percent")
+    closing = list(g.get("closing_skills") or [])[:3]
+    weak_axes: List[str] = []
+    strong_axes: List[str] = []
+    for a in axes or []:
+        lbl = str(a.get("label") or "")
+        pct = int(a.get("value_percent") or 0)
+        if pct >= 58 and lbl:
+            strong_axes.append(f"{lbl} ({pct}%)")
+        elif pct < 50 and lbl:
+            weak_axes.append(lbl)
+    wf_raw = (
+        profile.get("work_format_preference")
+        or profile.get("work_format_pref")
+        or ""
+    )
+    wf = str(wf_raw).strip()
+    pr = (profile.get("career_priority") or "").strip().lower()
+    return {
+        "city": (profile.get("city") or "").strip(),
+        "like": (profile.get("like_to_do") or "").strip(),
+        "dislike": (profile.get("dislike_to_do") or "").strip(),
+        "edu": (
+            profile.get("education_detail") or profile.get("education_level") or ""
+        ).strip(),
+        "course": (profile.get("course_grade") or profile.get("course_or_grade") or "").strip(),
+        "spheres": _sphere_display_labels(profile),
+        "prep": _PREP_LABELS.get(
+            (profile.get("preparation_level") or "").strip(), "средний"
+        ),
+        "work_format": _WORK_FORMAT_RU.get(wf, wf) if wf else "",
+        "priority": _PRIORITY_RU.get(pr, pr) if pr else "",
+        "salary": profile.get("target_salary"),
+        "skill_hints": _profile_skill_hints(profile),
+        "readiness": readiness_percent,
+        "top_track": (top_track or "").strip(),
+        "best_plan": best_name,
+        "best_pct": best_pct,
+        "closing": closing,
+        "gap_hp": g.get("overall_hp"),
+        "weak_axes": weak_axes[:2],
+        "strong_axes": strong_axes[:2],
+    }
+
+
+def _join_natural(parts: List[str]) -> str:
+    clean = [p.strip() for p in parts if p and str(p).strip()]
+    if not clean:
+        return ""
+    if len(clean) == 1:
+        return clean[0]
+    return clean[0] + " " + " ".join(clean[1:])
+
+
+def _pain_summary_for(pain_id: str, ctx: Dict[str, Any]) -> str:
+    label = _PAIN_LABELS.get(pain_id, "")
+    lead = f"В анкете главная сложность — «{label}»."
+    bits: List[str] = [lead]
+
+    if ctx["spheres"]:
+        bits.append(f"Сферы, которые вы выбрали: {', '.join(ctx['spheres'][:4])}.")
+    if ctx["city"]:
+        loc = ctx["city"]
+        if ctx["work_format"]:
+            loc += f", формат работы — {ctx['work_format']}"
+        bits.append(f"Локация и условия: {loc}.")
+    if ctx["like"]:
+        bits.append(f"Вам нравится: {ctx['like'][:160]}.")
+    if ctx["readiness"] is not None:
+        bits.append(f"По тесту индекс готовности — {ctx['readiness']}%.")
+    if ctx["best_plan"] and ctx["best_pct"] is not None:
+        bits.append(
+            f"Ближе всего сценарий «{ctx['best_plan']}» (~{ctx['best_pct']}%)."
+        )
+    if ctx["closing"]:
+        bits.append(f"Из разрыва навыков в приоритете: {', '.join(ctx['closing'][:2])}.")
+
+    tail = {
+        "pain_career": (
+            "Это не приговор: опирайтесь на сценарии A/B/C ниже и проверьте одно направление "
+            "маленьким делом, а не бесконечным «выбором профессии»."
+        ),
+        "pain_no_exp": (
+            "Опыта в резюме может не быть — но в анкете уже есть зацепки для первого кейса "
+            "(учёба, проекты, подработки)."
+        ),
+        "pain_region": (
+            "Вакансий в городе может быть меньше — зато в профиле можно целиться в удалёнку "
+            "и смотреть соседние города."
+        ),
+        "pain_money_courses": (
+            "Платные курсы не обязательны: в разделе «Обучение» есть бесплатные треки под вашу сферу."
+        ),
+        "pain_interview": (
+            "Страх собеседований часто сильнее реальных требований — тренируйте ответы по своей сфере, "
+            "а не «вообще про работу»."
+        ),
+        "pain_overload": (
+            "Информации много — поэтому ниже план по неделям и этапы роста; берите один шаг, не всё сразу."
+        ),
+        "pain_low_confidence": (
+            "Ощущение «ничего не умею» расходится с данными анкеты и теста: навыки есть, "
+            "их нужно назвать вслух и оформить, а не сравнивать себя с чужим идеалом."
+        ),
+        "pain_gap_skills": (
+            "Скорее всего, не «вас не берут», а не совпадает подача с требованиями вакансий — "
+            "это видно по разрыву навыков и сценариям плана."
+        ),
+    }
+    bits.append(tail.get(pain_id, ""))
+    return _join_natural(bits)
+
+
+def _pain_tips_for(pain_id: str, ctx: Dict[str, Any]) -> List[str]:
+    tips: List[str] = []
+    skills = ctx["skill_hints"]
+    closing = ctx["closing"]
+    like = ctx["like"]
+    city = ctx["city"]
+    wf = ctx["work_format"]
+
+    if pain_id == "pain_low_confidence":
+        if skills:
+            tips.append(
+                f"Выпишите 5 конкретных дел из вашей жизни по мотивам «{skills[0][:80]}» — "
+                "срок, что сделали, кому помогли. Это и есть навыки для резюме."
+            )
+        elif like:
+            tips.append(
+                f"Составьте список из 5 задач, связанных с «{like[:80]}», где вы уже что-то умеете — "
+                "без сравнения с senior-специалистами."
+            )
+        if ctx["strong_axes"]:
+            tips.append(
+                f"Опирайтесь на сильные стороны по тесту: {', '.join(ctx['strong_axes'])}."
+            )
+        if closing:
+            tips.append(
+                f"На этой неделе — один маленький шаг по «{closing[0]}», не «стать идеалом за месяц»."
+            )
+    elif pain_id == "pain_no_exp":
+        proj = (skills[2] if len(skills) > 2 else skills[0] if skills else like)
+        if proj:
+            tips.append(
+                f"Оформите один кейс из анкеты ({proj[:90]}): задача → ваши действия → результат в цифрах."
+            )
+        if ctx["best_plan"]:
+            tips.append(
+                f"В откликах укажите цель «{ctx['best_plan'][:60]}» и 2–3 навыка из раздела «Разрыв навыков»."
+            )
+        if wf or city:
+            tips.append(
+                f"В «Вакансиях» включите фильтр: {wf or 'удобный формат'}"
+                + (f", город {city}" if city else "")
+                + ", уровень «без опыта» / стажировка."
+            )
+    elif pain_id == "pain_career":
+        if ctx["best_plan"]:
+            tips.append(
+                f"Выберите для проверки сценарий «{ctx['best_plan'][:70]}» — "
+                "2 недели мини-проекта или стажировки, потом сравните ощущения."
+            )
+        if ctx["spheres"]:
+            tips.append(
+                f"Сузьте выбор до 2 сфер: {', '.join(ctx['spheres'][:2])} — остальное в «потом»."
+            )
+        tips.append("Запишите, что из «нравится» и «не нравится» в анкете важнее денег vs обучения — это ваш фильтр.")
+    elif pain_id == "pain_region":
+        if wf:
+            tips.append(f"Ищите вакансии с форматом «{wf}» — вы сами так указали в анкете.")
+        if city:
+            tips.append(
+                f"Добавьте 2–3 города рядом с {city} или удалённые позиции по сфере "
+                f"{', '.join(ctx['spheres'][:2]) or 'из анкеты'}."
+            )
+    elif pain_id == "pain_money_courses":
+        track = ctx["top_track"] or (ctx["spheres"][0] if ctx["spheres"] else "ваше направление")
+        tips.append(
+            f"В «Обучение» откройте бесплатный трек под {track} — одна неделя, один артефакт (конспект или мини-проект)."
+        )
+        if closing:
+            tips.append(f"Параллельно закройте один пункт разрыва: {closing[0]}.")
+    elif pain_id == "pain_interview":
+        sphere = ", ".join(ctx["spheres"][:2]) or ctx["top_track"] or "вашей сфере"
+        tips.append(
+            f"Три ответа вслух (по 2 мин) на типовые вопросы по {sphere} — опирайтесь на «{like[:60]}»"
+            if like
+            else f"Три ответа вслух (по 2 мин) на типовые вопросы по {sphere}."
+        )
+        if ctx["weak_axes"]:
+            tips.append(
+                f"Подготовьте пример по слабой оси теста: {ctx['weak_axes'][0]} — один кейс из учёбы или хобби."
+            )
+    elif pain_id == "pain_overload":
+        tips.append("На эту неделю — только первый пункт из «Этапов роста» ниже; остальное в заметку «потом».")
+        if closing:
+            tips.append(f"Из разрыва навыков — один фокус: {closing[0]}.")
+    elif pain_id == "pain_gap_skills":
+        if closing:
+            tips.append(
+                f"Откройте одну вакансию мечты и сравните с разрывом: начните с «{closing[0]}» на 3–4 недели."
+            )
+        if ctx["best_pct"] is not None:
+            tips.append(
+                f"Сценарий плана уже ~{ctx['best_pct']}% — упакуйте это в резюме и сопроводительное, а не добавляйте новые курсы."
+            )
+        if skills:
+            tips.append(f"В резюме явно перечислите: {skills[0][:100]}.")
+
+    if not tips:
+        tips.append(_PAIN_LABELS.get(pain_id, "Сделайте один шаг из плана ниже на этой неделе."))
+    if ctx["priority"] and len(tips) < 3:
+        tips.append(f"Учитывайте приоритет из анкеты — сейчас для вас важнее: {ctx['priority']}.")
+    return [t for t in tips if t][:3]
+
+
+def _pain_focus(
+    profile: Dict[str, Any],
+    *,
+    gap: Optional[Dict[str, Any]] = None,
+    scenarios: Optional[Dict[str, Any]] = None,
+    axes: Optional[List[Dict[str, Any]]] = None,
+    readiness_percent: Optional[int] = None,
+    top_track: str = "",
+) -> Optional[Dict[str, Any]]:
     pain_id = (profile.get("primary_pain") or "").strip()
     if pain_id and pain_id in _PAIN_LABELS:
-        tips = align_pains(profile).get("matched_pains") or []
-        extra = [t.get("bot_value", [""])[0] for t in tips[:2] if t.get("bot_value")]
+        ctx = _pain_context(
+            profile,
+            gap=gap,
+            scenarios=scenarios,
+            axes=axes,
+            readiness_percent=readiness_percent,
+            top_track=top_track,
+        )
         return {
             "pain_id": pain_id,
             "label": _PAIN_LABELS[pain_id],
-            "tips": [_PAIN_FIRST_STEP.get(pain_id, "")] + extra,
+            "summary": _pain_summary_for(pain_id, ctx),
+            "tips": _pain_tips_for(pain_id, ctx),
         }
     aligned = align_pains(profile)
     matched = aligned.get("matched_pains") or []
-    if matched:
-        m = matched[0]
+    if not matched:
+        return None
+    m = matched[0]
+    inferred = {
+        "Я не знаю, кем стать": "pain_career",
+        "У меня нет опыта, меня никуда не возьмут": "pain_no_exp",
+        "Я из маленького города": "pain_region",
+        "У меня нет денег на курсы": "pain_money_courses",
+        "Я боюсь собеседований": "pain_interview",
+        "Слишком много информации, не знаю с чего начать": "pain_overload",
+        "Я ничего не умею": "pain_low_confidence",
+        "Всё умею, но работу не дают": "pain_gap_skills",
+    }.get(str(m.get("pain") or ""))
+    if inferred:
+        ctx = _pain_context(
+            profile,
+            gap=gap,
+            scenarios=scenarios,
+            axes=axes,
+            readiness_percent=readiness_percent,
+            top_track=top_track,
+        )
         return {
-            "pain_id": None,
-            "label": m.get("pain", ""),
-            "tips": (m.get("bot_value") or [])[:3],
+            "pain_id": inferred,
+            "label": _PAIN_LABELS[inferred],
+            "summary": _pain_summary_for(inferred, ctx),
+            "tips": _pain_tips_for(inferred, ctx),
         }
-    return None
+    return {
+        "pain_id": None,
+        "label": str(m.get("pain") or ""),
+        "summary": (
+            "По тексту анкеты мы видим эту сложность — ниже шаги с опорой на ваши ответы и разбор теста."
+        ),
+        "tips": _pain_tips_for("pain_overload", _pain_context(
+            profile,
+            gap=gap,
+            scenarios=scenarios,
+            axes=axes,
+            readiness_percent=readiness_percent,
+            top_track=top_track,
+        )),
+    }
 
 
-def _weekly_roadmap(top_track: str, interest: str) -> List[Dict[str, Any]]:
+def _week_mini_plan(
+    week_range: str,
+    learn: str,
+    practice: str,
+    outcome: str,
+) -> Dict[str, str]:
+    """Мини-план на блок недель: изучи → потренируй → в итоге."""
+    return {
+        "week_range": week_range,
+        "learn": learn,
+        "practice": practice,
+        "outcome": outcome,
+    }
+
+
+def _weekly_roadmap(
+    top_track: str,
+    interest: str,
+    *,
+    preparation: str = "medium",
+) -> List[Dict[str, Any]]:
     pack = _resolve_profession_pack(interest)
     pk = pack.key if pack else "tech"
     low = (top_track or "").lower()
-    if pk == "tech" and any(x in low for x in ("python", "java", "данн", "sql", "backend")):
+    direction = (top_track or "").strip() or "ваше направление"
+    prep = preparation if preparation in ("weak", "medium", "strong") else "medium"
+
+    if pk == "tech" and any(x in low for x in ("python", "java", "данн", "sql", "backend", "devops", "frontend")):
+        if prep == "weak":
+            return [
+                _week_mini_plan(
+                    "Недели 1–2",
+                    learn="Поставьте рабочее окружение: редактор, Git, первый репозиторий — без этого дальше будет путаница.",
+                    practice="Пройдите вводный модуль по языку или SQL: 5–7 коротких задач, по 20–30 минут в день.",
+                    outcome="Поймёте, как устроен обычный день разработчика, и перестанете бояться «сломать» проект.",
+                ),
+                _week_mini_plan(
+                    "Недели 3–4",
+                    learn="Соберите самый простой мини-проект по теме «"
+                    + direction
+                    + "» — главное, чтобы он был доведён до конца.",
+                    practice="Напишите черновик резюме: три пункта «что сделал» под вакансии, которые смотрели в начале.",
+                    outcome="Появится один кейс для портфолио и понятная история для первого отклика.",
+                ),
+            ]
+        if prep == "strong":
+            return [
+                _week_mini_plan(
+                    "Недели 1–2",
+                    learn="Сверьте 5 вакансий по «" + direction + "» и выпишите, какие навыки повторяются чаще всего.",
+                    practice="Сделайте pet-проект или доработайте учебный — с фокусом на один навык из разрыва.",
+                    outcome="Резюме и портфолио будут бить в реальный спрос, а не в абстрактное «я учусь».",
+                ),
+                _week_mini_plan(
+                    "Недели 3–4",
+                    learn="Оформите проект: README, скрин или демо — чтобы рекрутеру было что открыть за 30 секунд.",
+                    practice="Отправьте 3–5 точечных откликов с коротким сопроводительным под конкретную вакансию.",
+                    outcome="Начнёте получать обратную связь с рынка и поймёте, что докрутить дальше.",
+                ),
+            ]
         return [
-            {
-                "week_range": "Недели 1–2",
-                "topics": ["Git и окружение", "основы языка или SQL + 5 задач"],
-            },
-            {
-                "week_range": "Недели 3–4",
-                "topics": ["мини-проект в портфолио", "черновик резюме под отклики"],
-            },
+            _week_mini_plan(
+                "Недели 1–2",
+                learn="Разберитесь с Git и окружением: коммиты, ветки, запуск проекта локально.",
+                practice="Закрепите основы языка или SQL — 5–10 задач, без марафона на десятки часов.",
+                outcome="Будет привычный рабочий ритм: учиться → сразу применять → фиксировать результат.",
+            ),
+            _week_mini_plan(
+                "Недели 3–4",
+                learn="Соберите мини-проект по «" + direction + "» — пусть простой, но законченный.",
+                practice="Обновите резюме и напишите сопроводительное под одну реальную вакансию.",
+                outcome="Сможете откликнуться с примером работы, а не только с желанием «войти в IT».",
+            ),
         ]
-    if pk == "design" or "дизайн" in low:
+
+    if pk == "design" or "дизайн" in low or "ux" in low:
         return [
-            {
-                "week_range": "Недели 1–2",
-                "topics": ["Figma: auto-layout", "редизайн одного экрана"],
-            },
-            {
-                "week_range": "Недели 3–4",
-                "topics": ["мини-кейс в портфолио", "3 работы с контекстом задачи"],
-            },
+            _week_mini_plan(
+                "Недели 1–2",
+                learn="Освойте Figma на уровне auto-layout и компонентов — это база для любого UI.",
+                practice="Сделайте редизайн одного экрана приложения или сайта, который вам нравится.",
+                outcome="Появится первая работа, которую не стыдно положить в портфолио.",
+            ),
+            _week_mini_plan(
+                "Недели 3–4",
+                learn="Опишите мини-кейс: задача → что сделали → чем помогло пользователю (хотя бы в учебной форме).",
+                practice="Соберите 2–3 работы в одном файле или на Behance/Dribbble с коротким контекстом.",
+                outcome="Портфолио начнёт отвечать на вопрос «а что вы умеете на практике?», а не только «смотрите картинки».",
+            ),
         ]
-    if pk in ("sales", "marketing"):
+
+    if pk == "marketing":
         return [
-            {
-                "week_range": "Недели 1–2",
-                "topics": ["воронка и метрики", "один учебный креатив или скрипт"],
-            },
-            {
-                "week_range": "Недели 3–4",
-                "topics": ["кейс с цифрами", "10 целевых откликов"],
-            },
+            _week_mini_plan(
+                "Недели 1–2",
+                learn="Разберитесь, как устроена воронка и какие метрики смотрят в «" + direction + "».",
+                practice="Сделайте один учебный креатив или пост — с гипотезой «кому и зачем это».",
+                outcome="Поймёте язык маркетинга на примере, а не по сухой теории.",
+            ),
+            _week_mini_plan(
+                "Недели 3–4",
+                learn="Соберите мини-отчёт: что запускали, какие цифры (пусть учебные), что бы улучшили.",
+                practice="Подготовьте 3–5 откликов или стажировок с кейсом в сопроводительном.",
+                outcome="В резюме появится история с цифрами — это сильно отличает от «просто интересуюсь SMM».",
+            ),
         ]
+
+    if pk == "sales":
+        return [
+            _week_mini_plan(
+                "Недели 1–2",
+                learn="Изучите продукт сферы и типовые возражения — 5–10 реальных диалогов из интервью или кейсов.",
+                practice="Отработайте 10–15 учебных звонков или переписок по скрипту, вслух или с другом.",
+                outcome="Снизится страх «что сказать клиенту» и появится базовая уверенность в разговоре.",
+            ),
+            _week_mini_plan(
+                "Недели 3–4",
+                learn="Разберите один продукт, который хотите продавать: кому, какая выгода, чем отличается.",
+                practice="Сделайте 5 целевых откликов или питчей — с одной конкретной компанией в фокусе.",
+                outcome="Сможете показать работодателю, что понимаете продукт, а не только «умею звонить».",
+            ),
+        ]
+
+    if pk in ("office_finance", "hr", "legal"):
+        return [
+            _week_mini_plan(
+                "Недели 1–2",
+                learn="Разберите типовые регламенты и шаблоны в «" + direction + "» — что делают каждый день.",
+                practice="Пройдите учебный кейс в таблицах или документе: сверка, заявка, карточка кандидата.",
+                outcome="Поймёте ритм работы и перестанете воспринимать сферу как набор непонятных аббревиатур.",
+            ),
+            _week_mini_plan(
+                "Недели 3–4",
+                learn="Оформите один законченный кейс с выводом: что проверили, что нашли, что предложили.",
+                practice="Обновите резюме под 3 вакансии и попросите обратную связь у знакомого из сферы.",
+                outcome="Будет готовый пример для собеседования: «вот задача — вот как я её решал».",
+            ),
+        ]
+
+    # Универсальный мини-план (по умолчанию)
+    if prep == "weak":
+        learn_12 = (
+            "Откройте 5 вакансий по «" + direction + "» и выпишите: что от вас просят чаще всего."
+        )
+        practice_12 = (
+            "Выберите один бесплатный вводный курс или урок — 20–30 минут в день, без перегруза."
+        )
+    else:
+        learn_12 = (
+            "Посмотрите рынок: 5 вакансий-ориентиров по «" + direction + "» и список повторяющихся навыков."
+        )
+        practice_12 = (
+            "Освойте один главный инструмент сферы на учебной задаче — 2–3 часа в неделю для старта хватит."
+        )
     return [
-        {
-            "week_range": "Недели 1–2",
-            "topics": ["рынок и 5 вакансий-ориентиров", "один ключевой инструмент сферы"],
-        },
-        {
-            "week_range": "Недели 3–4",
-            "topics": ["учебный кейс или проект", "резюме и сопроводительное"],
-        },
+        _week_mini_plan(
+            "Недели 1–2",
+            learn=learn_12,
+            practice=practice_12,
+            outcome="Станет ясно, куда целиться, и вы перестанете учить всё подряд без связи с работой.",
+        ),
+        _week_mini_plan(
+            "Недели 3–4",
+            learn="Сделайте учебный кейс или мини-проект — то, что можно описать в резюме одним абзацом.",
+            practice="Соберите резюме и короткое сопроводительное под одну реальную вакансию из первых двух недель.",
+            outcome="Сможете откликнуться не «в пустоту», а с примером и понятной историей о себе.",
+        ),
     ]
 
 
@@ -1226,8 +1791,15 @@ def build_analysis_result(
         individual_advice=advice,
         learning_path=learning_path,
     )
-    pain_focus = _pain_focus(profile)
-    weekly = _weekly_roadmap(top_track, interest)
+    pain_focus = _pain_focus(
+        profile,
+        gap=gap,
+        scenarios=scenarios,
+        axes=axes,
+        readiness_percent=readiness,
+        top_track=top_track,
+    )
+    weekly = _weekly_roadmap(top_track, interest, preparation=preparation_level)
 
     profile_summary = profile_summary_pre
     directions_hint = ", ".join(
@@ -1247,11 +1819,21 @@ def build_analysis_result(
         ai_narrative_notice = None
     else:
         narrative = _mock_ai_narrative(
-            interest, education, preparation_level, scenarios, axes, fp
+            profile,
+            interest,
+            preparation_level,
+            scenarios,
+            axes,
+            fp,
+            readiness_percent=readiness,
+            gap=gap,
         )
         ai_narrative_source = "mock"
-        ai_narrative_notice = narr_notice
+        ai_narrative_notice = None
     behavioral = _behavioral_hint(question_timings_ms)
+    readiness_insight = _build_readiness_insight(
+        readiness, preparation_level, axes, gap, scenarios
+    )
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
@@ -1266,6 +1848,7 @@ def build_analysis_result(
                 {"from": 60, "to": 80, "color": "#84cc16"},
                 {"from": 80, "to": 100, "color": "#22c55e"},
             ],
+            **readiness_insight,
         },
         "style_radar": {"axes": axes},
         "scenarios": scenarios,

@@ -47,6 +47,9 @@ def test_growth_stages_links_advice_and_path() -> None:
     )
     assert len(stages) == 3
     assert stages[0]["materials"]
-    assert stages[0]["advice_refs"]
+    assert stages[0]["plan"]
+    assert stages[0]["checklist"]
     assert stages[1]["continues_from"]
-    assert "42%" in stages[0]["body"]
+    assert "42%" in stages[0]["intro"]
+    assert "трио" not in " ".join(stages[0].get("focus_tags") or []).lower()
+    assert "голланд" not in stages[2]["body"].lower()
