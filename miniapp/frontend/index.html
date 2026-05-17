@@ -5401,14 +5401,34 @@
         }
     }
 
+    async function validateStoredSession() {
+        const tok = localStorage.getItem(ACCESS_TOKEN_KEY);
+        if (!userId || !tok) return false;
+        try {
+            const res = await fetch(apiUrl('/auth/session'), { headers: apiFetchHeaders() });
+            if (!res.ok) return false;
+            const data = await res.json().catch(function () { return {}; });
+            if (data.user_id) userId = data.user_id;
+            if (data.email) localStorage.setItem(USER_EMAIL_KEY, data.email);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
     (async function bootstrap() {
         if (await tryTelegramWebAppAuth()) {
             await renderShell();
             return;
         }
         const tok = localStorage.getItem(ACCESS_TOKEN_KEY);
-        if (userId && tok) await renderShell();
-        else showAuthScreen();
+        if (userId && tok) {
+            if (await validateStoredSession()) await renderShell();
+            else {
+                clearAuth();
+                showAuthScreen();
+            }
+        } else showAuthScreen();
     })();
 })();
 </script>

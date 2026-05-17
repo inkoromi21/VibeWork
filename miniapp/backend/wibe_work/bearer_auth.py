@@ -3,6 +3,15 @@
 from fastapi import HTTPException, Request
 
 from wibe_work.jwt_service import decode_token_subject
+from wibe_work.services.user_accounts import account_exists
+
+
+def _reject_missing_account(user_id: str) -> None:
+    if not account_exists(user_id):
+        raise HTTPException(
+            status_code=401,
+            detail="Аккаунт не найден. Войдите или зарегистрируйтесь снова.",
+        )
 
 
 def require_bearer_matches_user(request: Request, user_id: str) -> None:
@@ -21,6 +30,7 @@ def require_bearer_matches_user(request: Request, user_id: str) -> None:
         )
     if sub != user_id:
         raise HTTPException(status_code=403, detail="Нет доступа к этим данным.")
+    _reject_missing_account(sub)
 
 
 def optional_user_id_from_bearer(request: Request) -> str | None:
@@ -30,7 +40,12 @@ def optional_user_id_from_bearer(request: Request) -> str | None:
         return None
     token = auth[7:].strip()
     sub = decode_token_subject(token)
-    return str(sub) if sub else None
+    if not sub:
+        return None
+    uid = str(sub)
+    if not account_exists(uid):
+        return None
+    return uid
 
 
 def get_current_user_id_from_bearer(request: Request) -> str:
@@ -48,4 +63,6 @@ def get_current_user_id_from_bearer(request: Request) -> str:
             status_code=401,
             detail="Сессия истекла или недействительна. Войдите снова.",
         )
-    return str(sub)
+    uid = str(sub)
+    _reject_missing_account(uid)
+    return uid

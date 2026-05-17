@@ -28,6 +28,7 @@ from wibe_work.routers import (
     telegram_auth_routes,
 )
 from wibe_work.routers.admin_routes import router as admin_router
+from wibe_work.routers.session_routes import router as session_router
 from wibe_work.routers.website_auth_compat_routes import router as website_auth_compat_router
 from wibe_work.routers.website_api_routes import router as website_api_router
 from wibe_work.services.llm_client import get_llm_settings
@@ -66,6 +67,7 @@ if _WEBSITE_FRONTEND_DIR.is_dir():
 
 app.include_router(account_link_routes.router)
 app.include_router(email_auth_routes.router)
+app.include_router(session_router)
 app.include_router(profile_routes.router)
 app.include_router(telegram_auth_routes.router)
 app.include_router(poll_routes.router)
