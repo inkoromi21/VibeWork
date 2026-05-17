@@ -22,6 +22,7 @@ from wibe_work.telegram_init_data import (
 )
 from wibe_work.routers.telegram_auth_routes import _get_or_create_user_id_for_telegram_id
 from wibe_work.user_merge import merge_users_into_transaction
+from wibe_work.services.telegram_bot_info import get_telegram_bot_username
 
 router = APIRouter(prefix="/auth/account", tags=["account"])
 
@@ -68,7 +69,7 @@ CurrentUser = Annotated[str, Depends(get_current_user_id_from_bearer)]
 @router.get("/status")
 async def account_status(current: CurrentUser):
     """Для UI: есть ли почта и привязан ли Telegram."""
-    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "").strip() or None
+    bot_username = get_telegram_bot_username()
     with get_db() as conn:
         em = conn.execute(
             "SELECT email FROM email_users WHERE user_id = ?", (current,)

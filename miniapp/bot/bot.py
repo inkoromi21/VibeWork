@@ -218,7 +218,7 @@ def main():
 
             "в .env нет TELEGRAM_BOT_TOKEN",
 
-            hint=f"Файл: {ROOT / '.env'} · шаблон: miniapp/.env.example · токен: @BotFather",
+            hint=f"Файл: {ROOT / '.env'} · см. docs/ENV.md · токен: @BotFather",
 
         )
 

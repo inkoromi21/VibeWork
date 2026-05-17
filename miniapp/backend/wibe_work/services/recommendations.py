@@ -190,7 +190,7 @@ def _skill_plan_for_direction(
         )
         free_track = None
         if not have and i <= 3:
-            free_track = "Бесплатно: документация инструмента, Stepik/YouTube по теме (методич. «нет денег на курсы»)."
+            free_track = "Бесплатно: документация инструмента, Stepik/Rutube по теме (методич. «нет денег на курсы»)."
         actions = (
             ["Закрепить в проекте или пет-проекте"]
             if not have

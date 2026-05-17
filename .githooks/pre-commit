@@ -1,0 +1,4 @@
+#!/bin/sh
+# Включить один раз: git config core.hooksPath .githooks
+python scripts/guard_deploy_secrets.py $(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | tr '\n' ' ')
+exit $?

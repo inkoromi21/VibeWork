@@ -120,17 +120,14 @@ def _map_schedule(profile: Dict[str, Any]) -> Optional[str]:
 
 
 def _map_employment(profile: Dict[str, Any]) -> Optional[str]:
+    """
+    Частичная занятость на hh.ru сильно режет выдачу (особенно в регионах).
+    Передаём только при явном графике «выходные / неполный день», не из hours_per_week.
+    """
     sched = (profile.get("work_schedule") or "").lower()
-    hours = profile.get("hours_per_week")
-    try:
-        h = int(hours) if hours is not None else None
-    except (TypeError, ValueError):
-        h = None
-    if h is not None and h <= 24:
+    if sched in ("weekends",) or "выходн" in sched or "неполн" in sched or "частич" in sched:
         return "part"
-    if "выходн" in sched or "после пар" in sched or "неполн" in sched:
-        return "part"
-    return "full"
+    return None
 
 
 # Паттерны для извлечения стека из анкеты (не использовать «навыки к первому офферу» — там учебные фразы).
@@ -230,8 +227,61 @@ def _extract_stack_labels(profile: Dict[str, Any], competencies: List[Dict[str, 
 
 
 # id сферы в анкете → поисковая фраза на hh.ru
+_IT_TRACK_HH_PHRASE: Dict[str, str] = {
+    "backend": "backend разработчик",
+    "frontend": "frontend разработчик",
+    "devops": "devops инженер",
+    "data": "аналитик данных SQL",
+    "qa": "тестировщик QA",
+}
+
+
+def hh_search_phrase_for_it_track(track: str, stack: List[str]) -> str:
+    """Поисковая фраза hh.ru по специализации из теста (не общий «программист»)."""
+    tid = (track or "").strip().lower()
+    labels = stack[:2] if stack else []
+    if tid == "backend":
+        for lab in labels:
+            ll = lab.lower()
+            if ll == "python":
+                return "python backend разработчик"
+            if ll == "java":
+                return "java backend разработчик"
+            if ll in ("go", "golang"):
+                return "golang backend разработчик"
+        return _IT_TRACK_HH_PHRASE["backend"]
+    if tid == "frontend":
+        for lab in labels:
+            if lab.lower() in ("react", "vue", "javascript", "typescript"):
+                return f"frontend {lab.lower()} разработчик"
+        return _IT_TRACK_HH_PHRASE["frontend"]
+    if tid == "data":
+        if any(l.lower() == "python" for l in labels):
+            return "аналитик данных python"
+        return _IT_TRACK_HH_PHRASE["data"]
+    return _IT_TRACK_HH_PHRASE.get(tid, "разработчик")
+
+
+def _load_inferred_profession(user_id: str) -> Optional[Dict[str, Any]]:
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM vibework_snapshots WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        if not row:
+            return None
+        data = json.loads(row["payload_json"])
+        inf = (data.get("scenarios") or {}).get("inferred_profession")
+        if isinstance(inf, dict) and inf.get("track_id"):
+            return inf
+    except (json.JSONDecodeError, TypeError, KeyError):
+        pass
+    return None
+
+
 _SPHERE_ID_TO_HH_PHRASE: Dict[str, str] = {
-    "it_dev": "разработчик программист",
+    "it_dev": "backend разработчик",
     "data": "аналитик данных",
     "design": "UX дизайнер",
     "creative": "дизайнер креатив",
@@ -279,9 +329,11 @@ def _hh_search_phrase(
     dl = d.lower()
     if "it" in d or "разработ" in dl:
         if stack:
+            sl = stack[0].lower()
+            if sl in ("python", "java", "javascript", "typescript", "go", "kotlin"):
+                return f"{sl} разработчик"
             return f"{stack[0]} разработчик"
-        # Без «junior/начинающий» в text: иначе hh матчит по «начинающий» и тянет нерелевантные вакансии.
-        return "разработчик программист"
+        return "backend разработчик"
     if "аналит" in dl:
         if "Python" in stack[:2]:
             return "аналитик данных Python"
@@ -332,12 +384,20 @@ def _build_search_text(
     direction = (search_direction_override or "").strip() or str(
         rec.get("primary_direction") or ""
     )
+    if _is_it_search_direction(direction) and user_id:
+        inf = _load_inferred_profession(user_id)
+        if inf:
+            phrase = str(inf.get("hh_search_phrase") or "").strip()
+            if phrase:
+                return phrase[:120]
     if not search_direction_override and user_id:
         track = _load_analysis_best_track(user_id)
         if track and len(track) > 3:
-            text = track[:80]
+            text = re.sub(r"^План [ABC]:\s*", "", track).strip()[:80]
             if stack and _is_it_search_direction(direction):
-                text = f"{stack[0]} {text}"[:120]
+                sl = stack[0].lower()
+                if sl in ("python", "java", "react", "javascript"):
+                    return f"{sl} {text}"[:120]
             return re.sub(r"\s+", " ", text).strip()
     text = _hh_search_phrase(direction, stack, spheres)
     text = re.sub(r"\s+", " ", text).strip()
@@ -373,6 +433,25 @@ def apply_user_experience_filter(
         params["experience"] = s
 
 
+def _search_vacancies_relaxed(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Если строгие фильтры дали 0 — повтор без employment/schedule/search_field."""
+    raw = search_vacancies(params)
+    if int(raw.get("found") or 0) > 0:
+        return raw
+    relaxed = dict(params)
+    changed = False
+    for key in ("search_field", "employment", "schedule"):
+        if key in relaxed:
+            relaxed.pop(key, None)
+            changed = True
+    if not changed:
+        return raw
+    raw2 = search_vacancies(relaxed)
+    if int(raw2.get("found") or 0) > 0:
+        return raw2
+    return raw
+
+
 def build_hh_query_params(
     profile: Dict[str, Any],
     rec: Dict[str, Any],
@@ -381,6 +460,7 @@ def build_hh_query_params(
     *,
     user_id: Optional[str] = None,
     search_direction_override: Optional[str] = None,
+    use_profile_salary: bool = True,
 ) -> Dict[str, Any]:
     comps = competencies if competencies is not None else []
     text = _build_search_text(
@@ -399,13 +479,14 @@ def build_hh_query_params(
     }
     if area_id:
         params["area"] = area_id
-    sal = profile.get("target_salary")
-    if sal:
-        try:
-            params["salary"] = int(sal)
-            params["only_with_salary"] = "true"
-        except (TypeError, ValueError):
-            pass
+    if use_profile_salary:
+        sal = profile.get("target_salary")
+        if sal:
+            try:
+                params["salary"] = int(sal)
+                params["only_with_salary"] = "true"
+            except (TypeError, ValueError):
+                pass
     params["experience"] = _map_experience(profile)
     emp = _map_employment(profile)
     if emp:
@@ -413,9 +494,7 @@ def build_hh_query_params(
     sch = _map_schedule(profile)
     if sch:
         params["schedule"] = sch
-    direction = str(rec.get("primary_direction") or "")
-    if _is_it_search_direction(direction):
-        params["search_field"] = "name"
+    # Поиск по всему тексту вакансии (как на hh.ru), IT-роли отсекаем по заголовку ниже.
     return params
 
 
@@ -452,6 +531,7 @@ def fetch_live_hh_vacancies(
         competencies,
         user_id=user_id,
         search_direction_override=sd or None,
+        use_profile_salary=False,
     )
 
     if only_remote:
@@ -472,7 +552,7 @@ def fetch_live_hh_vacancies(
     params["page"] = max(0, page)
     params["per_page"] = min(50, max(5, per_page))
 
-    raw = search_vacancies(params)
+    raw = _search_vacancies_relaxed(params)
     items = slim_vacancy_items(raw)
     direction = str(rec.get("primary_direction") or "")
     if _is_it_search_direction(direction):

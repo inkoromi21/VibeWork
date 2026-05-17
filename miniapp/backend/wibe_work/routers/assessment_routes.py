@@ -9,10 +9,16 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from wibe_work.sqlite_db import get_db
-from wibe_work.bearer_auth import require_bearer_matches_user
+from wibe_work.bearer_auth import optional_user_id_from_bearer, require_bearer_matches_user
 from wibe_work.questionnaire_fields import get_profile_schema
 from wibe_work.services.user_context import coach_profile_snippet, load_profile, parse_interest_spheres
-from wibe_work.services.career_analysis import build_analysis_result, public_analysis_payload
+from wibe_work.services.career_analysis import (
+    build_analysis_result,
+    public_analysis_payload,
+    refresh_mts_matrix_in_snapshot,
+)
+from wibe_work.services.learning.engine import build_learning_path_payload
+from wibe_work.services.learning.progress import set_step_status
 from wibe_work.services.llm_client import career_coach_chat_reply
 from wibe_work.services.aptitude_quiz import get_questions_for_interest
 from wibe_work.services.aptitude_quiz_grading import (
@@ -20,6 +26,7 @@ from wibe_work.services.aptitude_quiz_grading import (
     quiz_grade_hint,
     quiz_grade_label,
 )
+from wibe_work.services.simulator_progress import save_progress as save_simulator_progress
 from wibe_work.services.workday_simulator import (
     list_simulator_options,
     start as sim_start,
@@ -167,6 +174,8 @@ async def quiz_analyze(user_id: str, request: Request, body: AnalyzeRequest):
         "city": profile.get("city"),
         "age": profile.get("age"),
     }
+    profile = dict(profile)
+    profile["_user_id"] = user_id
     full = build_analysis_result(
         profile,
         profile_extra,
@@ -186,7 +195,74 @@ async def get_saved_analysis(user_id: str, request: Request):
     snap = _load_analysis_snapshot(user_id)
     if not snap:
         raise HTTPException(status_code=404, detail="Сначала пройдите тест и разбор")
-    return public_analysis_payload(snap)
+    profile = load_profile(user_id)
+    profile_extra = {
+        "city": profile.get("city"),
+        "age": profile.get("age"),
+    }
+    refreshed = refresh_mts_matrix_in_snapshot(snap, profile, profile_extra)
+    if refreshed is not snap:
+        _save_analysis_snapshot(user_id, refreshed)
+    # обновить путь обучения с прогрессом
+    eff = str(refreshed.get("_analysis_interest") or _interest_for_user(profile, None))
+    prep = _prep_for_user(profile, None)
+    lp = build_learning_path_payload(
+        user_id=user_id,
+        profile=profile,
+        interest=eff,
+        preparation_level=prep,
+        scenarios=refreshed.get("scenarios"),
+        gap=refreshed.get("gap_analysis"),
+    )
+    from wibe_work.services.learning.engine import build_learning_for_analysis
+
+    pack = build_learning_for_analysis(
+        user_id=user_id,
+        profile=profile,
+        interest=eff,
+        preparation_level=prep,
+        scenarios=refreshed.get("scenarios"),
+        gap=refreshed.get("gap_analysis"),
+    )
+    refreshed = dict(refreshed)
+    refreshed["learning_path"] = pack.get("learning_path") or lp
+    refreshed["learning"] = pack.get("learning")
+    return public_analysis_payload(refreshed)
+
+
+class LearningStepBody(BaseModel):
+    path_id: str
+    step_id: str
+    status: str = Field(description="pending | in_progress | done")
+
+
+@miniapp_prefixed_router.post("/learning/progress/{user_id}")
+async def learning_progress_update(
+    user_id: str, request: Request, body: LearningStepBody
+):
+    require_bearer_matches_user(request, user_id)
+    set_step_status(user_id, body.path_id.strip(), body.step_id.strip(), body.status.strip())
+    profile = load_profile(user_id)
+    snap = _load_analysis_snapshot(user_id)
+    eff = _interest_for_user(profile, None)
+    if snap and snap.get("_analysis_interest"):
+        eff = str(snap["_analysis_interest"])
+    lp = build_learning_path_payload(
+        user_id=user_id,
+        profile=profile,
+        interest=eff,
+        preparation_level=_prep_for_user(profile, None),
+        scenarios=(snap or {}).get("scenarios"),
+        gap=(snap or {}).get("gap_analysis"),
+    )
+    return {"ok": True, "learning_path": lp}
+
+
+@miniapp_prefixed_router.get("/learning/status")
+async def learning_integration_status():
+    from wibe_work.services.learning import get_integration_status
+
+    return get_integration_status()
 
 
 class ChatMessage(BaseModel):
@@ -265,8 +341,12 @@ async def simulator_options():
 
 
 @miniapp_prefixed_router.post("/simulator/start")
-async def simulator_start(body: SimulatorStartBody):
-    return sim_start(body.role)
+async def simulator_start(body: SimulatorStartBody, request: Request):
+    result = sim_start(body.role)
+    uid = optional_user_id_from_bearer(request)
+    if uid:
+        save_simulator_progress(uid, result)
+    return result
 
 
 class SimulatorStepBody(BaseModel):
@@ -278,11 +358,15 @@ class SimulatorStepBody(BaseModel):
 
 
 @miniapp_prefixed_router.post("/simulator/step")
-async def simulator_step(body: SimulatorStepBody):
-    return sim_step(
+async def simulator_step(body: SimulatorStepBody, request: Request):
+    result = sim_step(
         body.role,
         body.step_index,
         body.career_points,
         body.choice_id,
         body.day_path,
     )
+    uid = optional_user_id_from_bearer(request)
+    if uid:
+        save_simulator_progress(uid, result)
+    return result

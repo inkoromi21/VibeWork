@@ -6,11 +6,14 @@ import json
 import logging
 import os
 import threading
-from functools import lru_cache
 from typing import List, Literal, Optional, Tuple
 
 import requests
 
+from wibe_work.services.chat_context import (
+    build_comprehensive_chat_context,
+    build_context_aware_fallback,
+)
 from wibe_work.services.llm_prompts import (
     DEFAULT_GENERIC_SYSTEM,
     build_chat_system_prompt,
@@ -35,7 +38,6 @@ def _http_session() -> requests.Session:
     return s
 
 
-@lru_cache(maxsize=1)
 def get_llm_settings() -> Optional[Tuple[str, str, str]]:
     """
     (url, api_key, model). Провайдер с POST .../v1/chat/completions.
@@ -148,6 +150,12 @@ def fetch_llm_completion(
             notice = "На счёте провайдера нет средств (402). Пополните баланс или смените ключ."
         elif code == 401:
             notice = "Ключ API отклонён (401). Проверьте CHAT_API_KEY в .env."
+        elif code == 403:
+            notice = (
+                "Доступ запрещён (403). Для Groq нужен ключ gsk_… с console.groq.com; "
+                "если ключ DeepSeek (sk-…) — укажите CHAT_API_URL=https://api.deepseek.com/v1/chat/completions "
+                "и CHAT_MODEL=deepseek-chat."
+            )
         elif code == 429:
             notice = "Слишком много запросов (429). Подождите и повторите."
         else:
@@ -161,14 +169,6 @@ def fetch_llm_completion(
                 "Нет ответа от локального LLM. Проверьте CHAT_API_URL и что сервер слушает этот адрес.",
             )
         return None, "Не удалось связаться с API модели. Проверьте интернет и настройки URL."
-
-
-def _mock_career_chat_reply(_last_user: str) -> str:
-    return (
-        "Опираясь на сохранённый разбор: уточните в анкете город, желаемый формат работы и что сейчас важнее — "
-        "обучение, стабильный доход или баланс. Для ответов ИИ настройте LLM в .env и перезапустите API "
-        "(см. подсказку ниже)."
-    )
 
 
 def career_coach_chat_reply(
@@ -188,33 +188,44 @@ def career_coach_chat_reply(
     if not last_user and messages:
         last_user = str(messages[-1].get("content", "")).strip()
 
+    context_pack = build_comprehensive_chat_context(
+        analysis_snap=analysis_snap,
+        profile_snippet=profile_snippet,
+        directions_hint=directions_hint or context_summary,
+    )
     addenda = select_chat_addenda(last_user, profile, analysis_snap)
-    system_prompt = build_chat_system_prompt(addenda)
+    system_prompt = build_chat_system_prompt(addenda, context_pack=context_pack)
     user_prompt = build_chat_user_prompt(
         messages,
-        profile_snippet=profile_snippet,
+        profile_snippet="",  # анкета уже в context_pack (system)
         analysis_snap=analysis_snap,
-        directions_hint=directions_hint,
-        legacy_context_summary=context_summary,
+        directions_hint="",
+        legacy_context_summary=context_summary if not analysis_snap else "",
     )
-    mock = _mock_career_chat_reply(last_user or "ваш вопрос")
+    fallback = build_context_aware_fallback(
+        last_user or "ваш вопрос",
+        analysis_snap=analysis_snap,
+        profile_snippet=profile_snippet,
+    )
 
     if not llm_configured():
         hint = (
-            "Задайте CHAT_API_KEY и CHAT_API_URL (или DEEPSEEK_* / OPENAI_*) в .env. Перезапустите API после правок."
+            "ИИ не настроен: задайте CHAT_API_KEY и CHAT_API_URL в корневом .env "
+            "(Groq: api.groq.com, ключ gsk_…). Перезапустите API."
         )
-        return (mock, "mock", hint)
+        return (fallback + " " + hint, "mock", hint)
 
     out, api_notice = fetch_llm_completion(
         user_prompt,
-        max_tokens=900,
-        temperature=0.25,
+        max_tokens=1100,
+        temperature=0.35,
         system_prompt=system_prompt,
     )
     if out:
         return out, "llm", None
-    logger.warning("Чат: LLM не вернул ответ — заглушка.")
-    return mock, "mock", api_notice
+    logger.warning("Чат: LLM не вернул ответ — контекстная заглушка. %s", api_notice)
+    notice = api_notice or "Модель не ответила; проверьте CHAT_API_KEY и лимиты провайдера."
+    return fallback, "mock", notice
 
 
 def chat_completion(

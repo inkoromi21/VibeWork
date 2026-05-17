@@ -43,9 +43,53 @@ REQUIRE_TELEGRAM_BOT_TOKEN = os.environ.get("REQUIRE_TELEGRAM_BOT_TOKEN", "").st
 # Публичный URL сайта (для ссылок в письмах сброса пароля). Без завершающего слэша.
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:8000").strip().rstrip("/")
 
+# Админ-панель: /admin (отдельный вход, не связан с аккаунтами пользователей)
+ADMIN_LOGIN = os.environ.get("ADMIN_LOGIN", "").strip()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+ADMIN_SESSION_HOURS = int(os.environ.get("ADMIN_SESSION_HOURS", "12") or "12")
+
+
+def cookie_secure() -> bool:
+    """Secure-флаг для httponly-cookie (сессии сайта и админки)."""
+    if COOKIE_SECURE:
+        return COOKIE_SECURE.strip().lower() in ("1", "true", "yes", "y", "on")
+    return PUBLIC_BASE_URL.lower().startswith("https://")
+
 # Отправитель: "VibeWork <noreply@your-domain.ru>" (домен должен быть верифицирован в Resend).
 EMAIL_FROM = os.environ.get("EMAIL_FROM", "").strip()
 
 # Resend: https://resend.com/docs/api-reference/emails/send-email
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
 RESEND_BASE_URL = os.environ.get("RESEND_BASE_URL", "https://api.resend.com").strip()
+
+# Обучение: внешние API (опционально; без ключей работают каталог, Rutube, Exercism/Codewars)
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "").strip()
+ONET_USERNAME = os.environ.get("ONET_USERNAME", "").strip()
+ONET_PASSWORD = os.environ.get("ONET_PASSWORD", "").strip()
+ESCO_API_ENABLED = os.environ.get("ESCO_API_ENABLED", "1").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+# VK Video API (https://dev.vk.com/ru/method/video.search, video.get)
+# Сервисный ключ приложения: vk.com/apps → ваше приложение → «Сервисный ключ доступа»
+VK_ACCESS_TOKEN = os.environ.get("VK_ACCESS_TOKEN", "").strip()
+VK_API_VERSION = os.environ.get("VK_API_VERSION", "5.199").strip() or "5.199"
+
+
+def _parse_vk_owner_ids(raw: str) -> list[int]:
+    out: list[int] = []
+    for part in (raw or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            out.append(int(part))
+        except ValueError:
+            continue
+    return out
+
+
+# Сообщества с учебными плейлистами (owner_id со знаком «-», через запятую)
+VK_VIDEO_OWNER_IDS = _parse_vk_owner_ids(os.environ.get("VK_VIDEO_OWNER_IDS", ""))

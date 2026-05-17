@@ -82,12 +82,9 @@ pip install -r miniapp/requirements.txt
 
 Из корня репозитория:
 
-```bash
-cp miniapp/.env.example .env   # Linux/macOS
-# Windows (CMD):  copy miniapp\.env.example .env
-```
+Создайте **`.env` в корне репозитория** (файл в git не коммитится). Список переменных: [docs/ENV.md](docs/ENV.md).
 
-Отредактируйте `.env`. Ключевые параметры:
+Ключевые параметры:
 
 | Переменная | Назначение |
 |------------|------------|
@@ -114,7 +111,7 @@ python miniapp/run.py
 ## Конфигурация
 
 Подробности по окружению для веб-пакета изолированно — в [website/README.md](website/README.md).  
-Шаблон переменных мини-приложения — **`miniapp/.env.example`** (копируется в корневой `.env`).
+Все секреты — только в **`.env`** в корне; описание полей — [docs/ENV.md](docs/ENV.md).
 
 ---
 

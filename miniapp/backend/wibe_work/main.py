@@ -3,7 +3,7 @@ from pathlib import Path
 
 from dotenv import dotenv_values, load_dotenv
 
-from wibe_work.miniapp_paths import MINIAPP_HTML, PROJECT_ROOT, RESET_PASSWORD_HTML
+from wibe_work.miniapp_paths import ADMIN_HTML, MINIAPP_HTML, PROJECT_ROOT, RESET_PASSWORD_HTML
 
 # Сначала корневой .env репозитория (рядом с miniapp/), затем при необходимости — отдельный файл (systemd: VIBEWORK_ENV_FILE=/opt/.../.env).
 load_dotenv(PROJECT_ROOT / ".env")
@@ -27,6 +27,7 @@ from wibe_work.routers import (
     profile_routes,
     telegram_auth_routes,
 )
+from wibe_work.routers.admin_routes import router as admin_router
 from wibe_work.routers.website_auth_compat_routes import router as website_auth_compat_router
 from wibe_work.routers.website_api_routes import router as website_api_router
 from wibe_work.services.llm_client import get_llm_settings
@@ -73,6 +74,7 @@ app.include_router(assessment_routes.router)
 app.include_router(assessment_routes.miniapp_prefixed_router)
 app.include_router(website_auth_compat_router)
 app.include_router(website_api_router)
+app.include_router(admin_router)
 
 init_db()
 
@@ -151,6 +153,14 @@ def _read_reset_password_html() -> str:
     path = RESET_PASSWORD_HTML
     if not path.is_file():
         raise HTTPException(status_code=404, detail=f"Reset password HTML not found: {path}")
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def _read_admin_html() -> str:
+    path = ADMIN_HTML
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail=f"Admin HTML not found: {path}")
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
@@ -276,6 +286,13 @@ async def website_index():
 async def reset_password_page():
     """Сброс пароля по ссылке из письма (Resend)."""
     return _read_reset_password_html()
+
+
+@app.get("/admin", response_class=HTMLResponse)
+@app.get("/admin/", response_class=HTMLResponse)
+async def admin_page():
+    """Панель администратора (отдельный вход из .env)."""
+    return _read_admin_html()
 
 
 if __name__ == "__main__":

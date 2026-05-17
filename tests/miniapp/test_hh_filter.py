@@ -11,8 +11,10 @@ sys.path.insert(0, str(_REPO / "miniapp" / "backend"))
 from wibe_work.services.hh_filter import (
     _build_search_text,
     _hh_search_phrase,
+    _map_employment,
     _map_experience,
     build_hh_query_params,
+    hh_search_phrase_for_it_track,
 )
 from wibe_work.services.recommendations import run_recommendations
 
@@ -65,3 +67,27 @@ def test_map_experience_school_detail() -> None:
         _map_experience({"education_detail": "school_11", "preparation_level": "medium"})
         == "noExperience"
     )
+
+
+def test_map_employment_not_from_hours_only() -> None:
+    assert _map_employment({"hours_per_week": 15, "work_schedule": "after_classes"}) is None
+    assert _map_employment({"work_schedule": "weekends"}) == "part"
+
+
+def test_hh_phrase_for_backend_not_generic_programmist() -> None:
+    phrase = hh_search_phrase_for_it_track("backend", ["Python"])
+    assert "python" in phrase.lower()
+    assert "backend" in phrase.lower()
+    assert phrase != "разработчик программист"
+
+
+def test_it_query_no_search_field_name() -> None:
+    profile = {
+        "main_sphere": "it_dev",
+        "city": "Кемерово",
+        "primary_pain": "pain_no_exp",
+    }
+    rec = run_recommendations(profile, [])
+    params = build_hh_query_params(profile, rec, "47", [], use_profile_salary=False)
+    assert "search_field" not in params
+    assert params.get("employment") is None

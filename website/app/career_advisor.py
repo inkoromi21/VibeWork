@@ -1186,7 +1186,7 @@ def build_learning_resources(directions: list[str], interest: Interest) -> list[
             LearningResource(
                 title="Кейсы CMO и разборы рекламных кампаний",
                 type="ресурс",
-                description="YouTube-каналы маркетологов и sales-тренеры.",
+                description="Видео и каналы маркетологов, sales-тренеры.",
             ),
         ]
     if pk == "engineering":
@@ -1311,7 +1311,7 @@ def build_learning_resources(directions: list[str], interest: Interest) -> list[
             description="Про навыки и карьерный капитал для молодых специалистов.",
         ),
         LearningResource(
-            title="YouTube / конференции отрасли",
+            title="Видео / конференции отрасли",
             type="ресурс",
             description="Регулярно смотрите доклады и разборы кейсов по выбранному направлению.",
         ),

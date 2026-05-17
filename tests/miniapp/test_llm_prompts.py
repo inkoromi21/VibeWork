@@ -36,22 +36,32 @@ def test_addenda_jobs_topic() -> None:
 
 
 def test_build_user_prompt_includes_blocks() -> None:
+    from wibe_work.services.chat_context import build_comprehensive_chat_context
+
     snap = {
         "profile_summary": "Возраст: 20; сфера: it_dev",
         "readiness": {"value_percent": 65},
         "ai_narrative": "Фокус на разработку.",
         "scenarios": {"plans": [{"id": "A", "name": "План A: Python", "score_percent": 80}]},
+        "learning_path": {
+            "title": "Backend",
+            "metrics": {"coverage_percent": 0, "current_step_index": 0, "total_steps": 3},
+            "steps": [{"title": "Python basics", "goal": "Синтаксис", "status": "pending", "resources": []}],
+        },
     }
     ctx = build_analysis_context_for_chat(snap)
     assert "готовности" in ctx
     assert "Python" in ctx
+    pack = build_comprehensive_chat_context(
+        analysis_snap=snap, profile_snippet="Город: Москва"
+    )
+    sys_p = build_chat_system_prompt([], context_pack=pack)
+    assert "Москва" in sys_p
+    assert "готовности" in sys_p.lower() or "65" in sys_p
     prompt = build_chat_user_prompt(
         [{"role": "user", "content": "С чего начать?"}],
-        profile_snippet="Город: Москва",
         analysis_snap=snap,
     )
-    assert "Анкета" in prompt
-    assert "Разбор и тест" in prompt
     assert "С чего начать" in prompt
 
 

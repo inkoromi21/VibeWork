@@ -47,6 +47,11 @@ CAREER_COACH_CHAT_SYSTEM = """ТЫ И РОЛЬ
 - Не выдавай себя за сотрудника hh.ru, вуза или конкретной фирмы, если пользователь этого не просил для ролевого упражнения — по умолчанию ты нейтральный консультант.
 - Не придумывай факты о пользователе (город, опыт, образование), если их нет в переданных блоках или в его сообщениях.
 
+ОПОРА НА ДАННЫЕ (обязательно, если блок «ДАННЫЕ ПОЛЬЗОВАТЕЛЯ» передан в этом сообщении)
+- В system ниже может быть полный пакет: анкета, метрики, планы A/B/C, путь обучения, материалы, советы, этапы роста. Используй его в каждом ответе.
+- Если пользователь спрашивает «с чего начать» — отталкивайся от текущего шага пути обучения и лучшего плана A/B/C.
+- Можно ссылаться на конкретные материалы по названию и смыслу (URL давать только если уместно, без спама ссылками).
+
 ОПОРА НА ДАННЫЕ (если они есть в запросе пользователя)
 В запрос к тебе могут быть включены фрагменты:
 - «Анкета (уже заполнено)» — поля профиля: возраст, город, сферы, образование, что нравится/не нравится, формат работы, приоритет (обучение/деньги/баланс), главная сложность (боль).
@@ -212,7 +217,7 @@ CHAT_ADDENDUM_PAIN_REGION = """ДОПОЛНИТЕЛЬНО (главная сло
 Учитывай удалёнку, гибрид, релокацию как опции. Если в анкете указан город — не предлагай только офис в другом городе без обсуждения переезда."""
 
 CHAT_ADDENDUM_PAIN_MONEY = """ДОПОЛНИТЕЛЬНО (главная сложность: нет денег на курсы)
-Рекомендуй бесплатные треки: документация, Stepik, YouTube, open-source, учебные проекты. Не навязывай платные школы как единственный путь."""
+Рекомендуй бесплатные треки: документация, Stepik, Rutube, open-source, учебные проекты. Не навязывай платные школы как единственный путь."""
 
 CHAT_ADDENDUM_PAIN_INTERVIEW = """ДОПОЛНИТЕЛЬНО (главная сложность: страх собеседований)
 Структура ответа STAR, тренировка вслух, список типовых вопросов по сфере, разбор тревоги без медицинских диагнозов. Маленькие шаги: 3 пробных ответа записать на диктофон."""
@@ -294,66 +299,33 @@ def select_chat_addenda(
 
 def build_chat_system_prompt(
     addenda: list[str] | None = None,
+    *,
+    context_pack: str = "",
 ) -> str:
-    """Базовый system + ситуационные дополнения."""
-    if not addenda:
-        return CAREER_COACH_CHAT_SYSTEM
-    unique = []
-    seen: set[str] = set()
-    for a in addenda:
-        if a not in seen:
-            seen.add(a)
-            unique.append(a)
-    return CAREER_COACH_CHAT_SYSTEM + "\n\n" + "\n\n".join(unique)
+    """Базовый system + полный контекст пользователя + ситуационные дополнения."""
+    parts = [CAREER_COACH_CHAT_SYSTEM]
+    ctx = (context_pack or "").strip()
+    if ctx:
+        parts.append(
+            "=== ДАННЫЕ ПОЛЬЗОВАТЕЛЯ (анкета, разбор, материалы — используй при каждом ответе) ===\n"
+            + ctx
+        )
+    if addenda:
+        unique = []
+        seen: set[str] = set()
+        for a in addenda:
+            if a not in seen:
+                seen.add(a)
+                unique.append(a)
+        parts.append("\n\n".join(unique))
+    return "\n\n".join(parts)
 
 
 def build_analysis_context_for_chat(analysis_snap: dict | None) -> str:
-    """Текстовый блок разбора для user-prompt чата."""
-    if not analysis_snap:
-        return ""
-    lines: list[str] = []
-    ps = (analysis_snap.get("profile_summary") or "").strip()
-    if ps:
-        lines.append("Профиль (из расчёта): " + ps[:600])
-    readiness = analysis_snap.get("readiness") or {}
-    if readiness.get("value_percent") is not None:
-        lines.append(f"Индекс готовности: {readiness['value_percent']}%")
-    axes = (analysis_snap.get("style_radar") or {}).get("axes") or []
-    if axes:
-        ax = "; ".join(
-            f"{a.get('label', '?')}: {a.get('value_percent', '?')}%"
-            for a in axes[:6]
-        )
-        lines.append("Оси методики: " + ax)
-    narrative = (analysis_snap.get("ai_narrative") or "").strip()
-    if narrative:
-        lines.append("Краткий вывод разбора: " + narrative[:700])
-    scenarios = analysis_snap.get("scenarios") or {}
-    plans = scenarios.get("plans") or []
-    if plans:
-        pl = ", ".join(
-            f"{p.get('id')}: {p.get('name', '')} (~{p.get('score_percent', '?')}%)"
-            for p in plans[:3]
-        )
-        lines.append("Сценарии A/B/C: " + pl)
-    gap = analysis_snap.get("gap_analysis") or {}
-    closing = gap.get("closing_skills") or []
-    if closing:
-        lines.append("Навыки закрыть в первую очередь: " + ", ".join(str(x) for x in closing[:5]))
-    pain = analysis_snap.get("pain_focus") or {}
-    if pain.get("label"):
-        tips = pain.get("tips") or []
-        tip_s = ("; ".join(str(t) for t in tips[:2] if t)) if tips else ""
-        lines.append(f"Фокус по ситуации: {pain['label']}" + (f" — {tip_s}" if tip_s else ""))
-    weekly = analysis_snap.get("weekly_roadmap") or []
-    if weekly:
-        wk = weekly[0]
-        topics = wk.get("topics") or []
-        if topics:
-            lines.append(
-                f"План (старт): {wk.get('week_range', '')} — {', '.join(str(t) for t in topics[:3])}"
-            )
-    return "\n".join(lines)
+    """Краткий блок разбора (обратная совместимость; чат использует build_comprehensive_chat_context)."""
+    from wibe_work.services.chat_context import build_comprehensive_chat_context
+
+    return build_comprehensive_chat_context(analysis_snap=analysis_snap)
 
 
 def build_chat_user_prompt(
@@ -369,13 +341,8 @@ def build_chat_user_prompt(
     parts: list[str] = []
     if (profile_snippet or "").strip():
         parts.append("Анкета (уже заполнено):\n" + profile_snippet.strip()[:1200])
-    analysis_block = build_analysis_context_for_chat(analysis_snap)
-    if analysis_block:
-        parts.append("Разбор и тест:\n" + analysis_block[:2200])
-    elif (legacy_context_summary or "").strip():
+    if (legacy_context_summary or "").strip() and not analysis_snap:
         parts.append("Контекст разбора:\n" + legacy_context_summary.strip()[:1800])
-    if (directions_hint or "").strip():
-        parts.append("Направления:\n" + directions_hint.strip()[:500])
     transcript = "\n".join(
         f"{m.get('role', 'user')}: {str(m.get('content', ''))[:900]}" for m in messages[-10:]
     )
@@ -385,3 +352,71 @@ def build_chat_user_prompt(
     )
     prompt = "\n\n".join(parts + [f"История диалога:\n{transcript}", user_tail])
     return prompt + build_chat_user_instruction_suffix()
+
+
+# ---------------------------------------------------------------------------
+# Индивидуальные советы (планы A/B/C + материалы)
+# ---------------------------------------------------------------------------
+ADVICE_JSON_SYSTEM = """Ты карьерный наставник VibeWork для молодых людей 14–30 лет в России.
+
+Задача: по данным профиля, уровню подготовки, разрыву навыков и списку материалов сформировать персональные советы для каждого плана A/B/C.
+
+Ответ — ТОЛЬКО валидный JSON без markdown и пояснений до/после:
+{
+  "by_plan": {
+    "A": {
+      "title": "План A: …",
+      "priority_skills": ["навык1", "навык2"],
+      "steps": [
+        {
+          "text": "Конкретный шаг на 1–2 недели, с учётом уровня пользователя",
+          "materials": [
+            {"title": "…", "url": "https://…", "kind": "курс|видео|практика", "provider": "…"}
+          ]
+        }
+      ]
+    },
+    "B": { … },
+    "C": { … }
+  }
+}
+
+Правила:
+- 4–6 шагов на план; каждый шаг — действие, не общая мотивация.
+- Учитывай preparation_level: weak — больше базы и коротких курсов; strong — проекты и углубление.
+- priority_skills бери из переданного разрыва; не выдумывай новые проценты.
+- materials — только из переданного списка URL (не придумывай ссылки); 0–2 материала на шаг.
+- Планы A/B/C — разные направления; советы должны отличаться по фокусу.
+- Только русский язык в text и title."""
+
+
+def build_advice_user_prompt(
+    *,
+    profile_summary: str,
+    preparation_level: str,
+    priority_skills: list[str],
+    plans: list[dict],
+    materials_list: str,
+    pain_hint: str = "",
+) -> str:
+    plan_lines = []
+    for p in plans[:3]:
+        plan_lines.append(
+            f"- {p.get('id')}: {p.get('name', '')} (согласованность ~{p.get('score_percent', '?')}%)"
+        )
+    skills = ", ".join(priority_skills[:5]) or "—"
+    pain = f"\nБоль пользователя (учти в плане A): {pain_hint}" if pain_hint else ""
+    return f"""Профиль:
+{profile_summary[:2000]}
+
+Уровень подготовки: {preparation_level}
+Приоритетные навыки из разрыва: {skills}
+{pain}
+
+Планы:
+{chr(10).join(plan_lines)}
+
+Доступные материалы (используй только их URL):
+{materials_list[:3500]}
+
+Сформируй JSON по схеме из системного сообщения."""

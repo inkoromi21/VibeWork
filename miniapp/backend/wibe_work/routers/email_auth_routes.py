@@ -34,7 +34,10 @@ _log = logging.getLogger(__name__)
 _FORGOT_COOLDOWN_SEC = 90
 _forgot_last_by_email: dict[str, float] = {}
 
-_FORGOT_PUBLIC_MESSAGE = "Ссылка для сброса пароля отправлена."
+_FORGOT_PUBLIC_MESSAGE = (
+    "Ссылка для сброса пароля отправлена. "
+    "Если письма нет во «Входящих», проверьте папку «Спам»."
+)
 
 # Изолированный `website/main.py` (порт 8765) писал сюда; миниаппа — в miniapp/data/*.db
 _LEGACY_ISOLATED_WEB_DB = PROJECT_ROOT / "website" / "data" / "vibework.db"
@@ -268,12 +271,14 @@ async def email_forgot_password(body: EmailForgotPasswordBody):
     text_body = (
         "Здравствуйте.\n\n"
         f"Чтобы задать новый пароль, перейдите по ссылке (действует 1 час):\n{reset_url}\n\n"
+        "Если письма нет во «Входящих», проверьте папку «Спам».\n\n"
         "Если вы не запрашивали сброс, проигнорируйте это письмо.\n"
     )
     html_body = (
         "<p>Здравствуйте.</p>"
         "<p>Чтобы задать новый пароль, нажмите на кнопку ниже (ссылка действует 1 час).</p>"
         f'<p><a href="{reset_url}" style="color:#166534;font-weight:600;">Сбросить пароль</a></p>'
+        "<p style=\"color:#666;font-size:14px;\">Если письма нет во «Входящих», проверьте папку «Спам».</p>"
         "<p style=\"color:#666;font-size:14px;\">Если вы не запрашивали сброс — удалите письмо.</p>"
     )
 

@@ -30,7 +30,7 @@ if not defined HH_USER_AGENT set "HH_USER_AGENT=VibeWork/1.0 (+https://api.hh.ru
 
 if not exist ".env" (
 
-  powershell -NoProfile -Command "& { Write-Host '✗ Нет файла .env в корне' -ForegroundColor Red; Write-Host '  copy miniapp\.env.example .env  → вставьте TELEGRAM_BOT_TOKEN' -ForegroundColor DarkGray }"
+  powershell -NoProfile -Command "& { Write-Host '✗ Нет файла .env в корне' -ForegroundColor Red; Write-Host '  создайте .env — TELEGRAM_BOT_TOKEN (docs/ENV.md)' -ForegroundColor DarkGray }"
 
   pause
 

@@ -457,6 +457,113 @@
             font-weight: 600;
             color: var(--text);
         }
+        .about-you-head {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 12px;
+            margin-bottom: 14px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .about-you-email {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text);
+            word-break: break-all;
+        }
+        .about-you-badge {
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+        }
+        .about-you-badge.ok {
+            background: var(--accent-soft);
+            border-color: var(--accent-border);
+            color: var(--accent-dark);
+        }
+        .about-you-badge.warn {
+            background: #fff8e6;
+            border-color: #f0d78c;
+            color: #8a6d1d;
+        }
+        .about-you-specialty {
+            flex: 1 1 100%;
+            margin: 0;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .about-you-block {
+            margin-bottom: 14px;
+        }
+        .about-you-block:last-of-type {
+            margin-bottom: 0;
+        }
+        .about-you-block-title {
+            margin: 0 0 8px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+        }
+        .about-you-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 14px;
+        }
+        @media (max-width: 420px) {
+            .about-you-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .about-you-label {
+            display: block;
+            margin: 0 0 2px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            line-height: 1.3;
+        }
+        .about-you-value {
+            display: block;
+            margin: 0;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--text);
+            line-height: 1.35;
+        }
+        .about-you-item--wide {
+            grid-column: 1 / -1;
+        }
+        .about-you-item--wide .about-you-value {
+            font-weight: 500;
+            white-space: pre-wrap;
+        }
+        .about-sphere-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 2px;
+        }
+        .about-sphere-chip {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            border: 1px solid var(--accent-border);
+            color: var(--accent-dark);
+        }
+        .about-you-foot {
+            margin: 14px 0 0;
+            font-size: 0.8rem;
+        }
+        .about-you-edit {
+            margin-top: 10px;
+        }
         .topbar-titles h1 {
             margin: 0;
             font-size: 1.05rem;
@@ -882,9 +989,32 @@
             gap: 10px;
             margin-top: 16px;
             flex-wrap: wrap;
+            align-items: stretch;
         }
-        .profile-wizard-nav .btn-secondary { flex: 1; min-width: 120px; }
-        .profile-wizard-nav .btn-primary { flex: 1; min-width: 140px; }
+        .profile-wizard-nav .btn-secondary,
+        .profile-wizard-nav .btn-primary {
+            flex: 1 1 0;
+            min-width: 120px;
+            margin-top: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            line-height: 1.25;
+        }
+        .tg-widget-mount {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 48px;
+            padding: 4px 0 8px;
+        }
+        .profile-card--telegram .section-title {
+            text-align: center;
+        }
+        .profile-card--telegram .muted {
+            text-align: center;
+        }
         .field-help {
             font-size: .78rem;
             line-height: 1.4;
@@ -1052,10 +1182,35 @@
             background: var(--btn-anketa-bg-selected);
             box-shadow: none;
         }
-        .readiness-track-wrap { position: relative; margin: 8px 0 28px; }
+        .readiness-metric__head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        .readiness-metric__title {
+            margin: 0;
+            font-size: .875rem;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+        .readiness-metric__value {
+            flex-shrink: 0;
+            font-family: var(--font-mono);
+            font-size: 1.125rem;
+            font-weight: 800;
+            line-height: 1;
+            color: var(--accent-dark);
+        }
+        .readiness-metric__bar-wrap {
+            position: relative;
+            padding-top: 11px;
+            margin: 0;
+        }
         .readiness-bar {
-            height: 18px;
-            border-radius: 9px;
+            height: 14px;
+            border-radius: 7px;
             overflow: hidden;
             display: flex;
             border: 1px solid var(--border);
@@ -1063,31 +1218,23 @@
         .readiness-seg { flex: 1; min-width: 0; }
         .readiness-pointer {
             position: absolute;
-            top: -6px;
+            top: 0;
             left: 0;
             transform: translateX(-50%);
             width: 0;
             height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-top: 10px solid var(--text);
+            border-left: 7px solid transparent;
+            border-right: 7px solid transparent;
+            border-top: 9px solid var(--text);
             transition: left .3s ease;
         }
-        .readiness-badge {
-            position: absolute;
-            top: 22px;
-            left: 0;
-            transform: translateX(-50%);
-            font-family: var(--font-mono);
-            font-size: .8rem;
-            font-weight: 700;
-            padding: 4px 8px;
-            border-radius: 6px;
-            background: var(--accent);
-            color: #fff;
-            white-space: nowrap;
+        .dash-grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+            align-items: start;
         }
-        .dash-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 16px; }
         .dash-card {
             background: var(--card);
             border: 1px solid var(--border);
@@ -2109,13 +2256,72 @@
         return d;
     }
 
-    function profileFieldFilled(profile, fieldId) {
-        if (!profile) return false;
-        const v = profile[fieldId];
-        if (fieldId === 'interest_spheres') return parseProfileSpheres(profile).length > 0;
+    function profileValueFilled(v) {
         if (v == null || v === '') return false;
+        if (typeof v === 'number') return !isNaN(v);
         if (typeof v === 'string') return !!v.trim();
         return true;
+    }
+
+    function profileFieldFilled(profile, fieldId) {
+        if (!profile) return false;
+        if (fieldId === 'interest_spheres') return parseProfileSpheres(profile).length > 0;
+        if (fieldId === 'course_grade') {
+            return profileValueFilled(profile.course_grade) || profileValueFilled(profile.course_or_grade);
+        }
+        if (fieldId === 'work_format_preference') {
+            return profileValueFilled(profile.work_format_preference) || profileValueFilled(profile.work_format_pref);
+        }
+        if (fieldId === 'education_detail') {
+            return profileValueFilled(profile.education_detail) || profileValueFilled(profile.education_level);
+        }
+        if (fieldId === 'like_to_do') {
+            return profileValueFilled(profile.like_to_do) || profileValueFilled(profile.interests);
+        }
+        return profileValueFilled(profile[fieldId]);
+    }
+
+    function profileFieldLabel(schema, fieldId) {
+        const sections = (schema && schema.sections) || [];
+        for (let si = 0; si < sections.length; si++) {
+            const fields = sections[si].fields || [];
+            for (let fi = 0; fi < fields.length; fi++) {
+                if (fields[fi].id === fieldId) return fields[fi].label || fieldId;
+            }
+        }
+        if (fieldId === 'interest_spheres') return 'Сферы интересов';
+        return fieldId;
+    }
+
+    function listIncompleteProfileFields(schema, profile) {
+        if (!schema || !profile) return [];
+        const p = normalizeProfileDraftFromServer(profile, schema);
+        const missing = [];
+        const comp = schema.completion;
+        if (comp && comp.required) {
+            for (let i = 0; i < comp.required.length; i++) {
+                const fid = comp.required[i];
+                if (!profileFieldFilled(p, fid)) missing.push(profileFieldLabel(schema, fid));
+            }
+            const anyOf = comp.any_of || comp.anyOf || [];
+            for (let g = 0; g < anyOf.length; g++) {
+                const group = anyOf[g];
+                if (!group.some(function (fid) { return profileFieldFilled(p, fid); })) {
+                    missing.push(profileFieldLabel(schema, group[0]));
+                }
+            }
+            return missing;
+        }
+        const sections = schema.sections || [];
+        for (let si = 0; si < sections.length; si++) {
+            const fields = sections[si].fields || [];
+            for (let fi = 0; fi < fields.length; fi++) {
+                const f = fields[fi];
+                if (f.type === 'hidden' || !f.required) continue;
+                if (!profileFieldFilled(p, f.id)) missing.push(f.label || f.id);
+            }
+        }
+        return missing;
     }
 
     function profileQuickChips() {
@@ -2157,15 +2363,16 @@
 
     function isProfileComplete(schema, profile) {
         if (!schema || !profile) return false;
+        const p = normalizeProfileDraftFromServer(profile, schema);
         const comp = schema.completion;
         if (comp && comp.required) {
             for (let i = 0; i < comp.required.length; i++) {
-                if (!profileFieldFilled(profile, comp.required[i])) return false;
+                if (!profileFieldFilled(p, comp.required[i])) return false;
             }
             const anyOf = comp.any_of || comp.anyOf || [];
             for (let g = 0; g < anyOf.length; g++) {
                 const group = anyOf[g];
-                if (!group.some(function (fid) { return profileFieldFilled(profile, fid); })) return false;
+                if (!group.some(function (fid) { return profileFieldFilled(p, fid); })) return false;
             }
             return true;
         }
@@ -2175,7 +2382,7 @@
             for (let fi = 0; fi < fields.length; fi++) {
                 const f = fields[fi];
                 if (f.type === 'hidden' || !f.required) continue;
-                if (!profileFieldFilled(profile, f.id)) return false;
+                if (!profileFieldFilled(p, f.id)) return false;
             }
         }
         return true;
@@ -2590,6 +2797,150 @@
         return String(detailId);
     }
 
+    function findSchemaField(schema, fieldId) {
+        const sections = (schema && schema.sections) || [];
+        for (let si = 0; si < sections.length; si++) {
+            const fields = sections[si].fields || [];
+            for (let fi = 0; fi < fields.length; fi++) {
+                if (fields[fi].id === fieldId) return fields[fi];
+            }
+        }
+        return null;
+    }
+
+    function labelSelectField(schema, field, rawVal) {
+        if (rawVal == null || rawVal === '') return '';
+        const s = String(rawVal).trim();
+        if (!s) return '';
+        if (field && field.id === 'work_format_preference') {
+            if (WORK_FORMAT_PREF_RU[s]) return WORK_FORMAT_PREF_RU[s];
+            const low = s.toLowerCase();
+            for (const k in WORK_FORMAT_PREF_RU) {
+                if (WORK_FORMAT_PREF_RU[k] === low || k === low) return WORK_FORMAT_PREF_RU[k] || s;
+            }
+        }
+        const opts = field ? optionsFromSphere(schema, field) : [];
+        for (let i = 0; i < opts.length; i++) {
+            if (String(opts[i].id) === s) return opts[i].label || s;
+        }
+        return s;
+    }
+
+    function formatSalaryRub(n) {
+        const num = parseInt(String(n), 10);
+        if (isNaN(num)) return '';
+        return String(num).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₽/мес';
+    }
+
+    function profileFieldDisplayForAbout(schema, profile, field) {
+        if (!field || field.type === 'hidden') return null;
+        const id = field.id;
+        if (id === 'interest_spheres') {
+            const arr = parseProfileSpheres(profile);
+            return arr.length ? { chips: arr.map(function (sid) { return labelMainSphere(schema, sid) || sid; }) } : null;
+        }
+        let v = profile[id];
+        if (v == null || v === '') {
+            if (id === 'course_grade' && profile.course_or_grade != null && profile.course_or_grade !== '') {
+                v = profile.course_or_grade;
+            } else if (id === 'work_format_preference') {
+                v = profile.work_format_preference || profile.work_format_pref;
+            } else {
+                return null;
+            }
+        }
+        if (field.type === 'select') {
+            const lbl = labelSelectField(schema, field, v);
+            return lbl ? { text: lbl } : null;
+        }
+        if (field.type === 'number') {
+            if (id === 'target_salary') return { text: formatSalaryRub(v) };
+            if (id === 'age') return { text: String(v) + ' лет' };
+            if (id === 'hours_per_week') return { text: String(v) + ' ч/нед' };
+            return { text: String(v) };
+        }
+        if (field.type === 'textarea' || field.type === 'text') {
+            const t = String(v).trim();
+            return t ? { text: t } : null;
+        }
+        if (field.type === 'scale') {
+            const n = parseInt(String(v), 10);
+            if (isNaN(n)) return null;
+            if (n === (field.default != null ? field.default : 3)) return null;
+            return { text: String(n) + ' / ' + String(field.scale_max || 5) };
+        }
+        return null;
+    }
+
+    function buildAboutYouHtml(schema, profile, emailDisp, options) {
+        options = options || {};
+        const p = normalizeProfileDraftFromServer(profile || {}, schema);
+        const complete = isProfileComplete(schema, p);
+        let html = '<div class="about-you-head">';
+        if (emailDisp) {
+            html += '<div class="about-you-email">' + esc(String(emailDisp)) + '</div>';
+        }
+        html +=
+            '<span class="about-you-badge ' +
+            (complete ? 'ok' : 'warn') +
+            '">' +
+            (complete ? 'Анкета заполнена' : 'Заполните обязательные поля') +
+            '</span>';
+        if (options.inferredProfession) {
+            html +=
+                '<p class="about-you-specialty">Специализация по тесту: <strong>' +
+                esc(String(options.inferredProfession)) +
+                '</strong></p>';
+        }
+        html += '</div>';
+
+        const skipSections = { skills_soft: true };
+        const sections = (schema && schema.sections) || [];
+        let anyBlock = false;
+        for (let si = 0; si < sections.length; si++) {
+            const sec = sections[si];
+            if (skipSections[sec.id]) continue;
+            const fields = sec.fields || [];
+            let blockHtml = '';
+            for (let fi = 0; fi < fields.length; fi++) {
+                const f = fields[fi];
+                const disp = profileFieldDisplayForAbout(schema, p, f);
+                if (!disp) continue;
+                const wide = f.type === 'textarea';
+                blockHtml +=
+                    '<div class="about-you-item' +
+                    (wide ? ' about-you-item--wide' : '') +
+                    '"><span class="about-you-label">' +
+                    esc(f.label || f.id) +
+                    '</span><span class="about-you-value">';
+                if (disp.chips && disp.chips.length) {
+                    blockHtml += '<span class="about-sphere-chips">';
+                    for (let ci = 0; ci < disp.chips.length; ci++) {
+                        blockHtml +=
+                            '<span class="about-sphere-chip">' + esc(disp.chips[ci]) + '</span>';
+                    }
+                    blockHtml += '</span>';
+                } else {
+                    blockHtml += esc(disp.text || '—');
+                }
+                blockHtml += '</span></div>';
+            }
+            if (!blockHtml) continue;
+            anyBlock = true;
+            html += '<div class="about-you-block">';
+            html += '<h4 class="about-you-block-title">' + esc(sec.title || '') + '</h4>';
+            html += '<div class="about-you-grid">' + blockHtml + '</div></div>';
+        }
+        if (!anyBlock) {
+            html +=
+                '<p class="muted" style="margin:0;font-size:0.9rem">Анкета пока пустая — заполните её, чтобы подбор вакансий и разбор были точнее.</p>';
+        }
+        html +=
+            '<p class="muted about-you-foot">Данные из сохранённой анкеты. Изменения применяются к тесту, разбору и вакансиям.</p>' +
+            '<button type="button" class="btn-secondary about-you-edit" onclick="window.__vw.goTab(\'profile\')">Редактировать анкету</button>';
+        return html;
+    }
+
     async function ensureSchema() {
         if (profileSchema) return profileSchema;
         const res = await fetchJson('/api/profile/schema');
@@ -2822,10 +3173,10 @@
         try {
             const schema = await ensureSchema();
             const res = await fetchJson('/profile/' + encodeURIComponent(userId));
-            const profile = await res.json();
+            const profile = normalizeProfileDraftFromServer(await res.json(), schema);
             cachedProfile = Object.assign({}, profile);
             profileFetchDone = true;
-            profileDraft = normalizeProfileDraftFromServer(profile, schema);
+            profileDraft = Object.assign({}, profile);
             const sections = schema.sections || [];
             if (profileWizardStep < 0) profileWizardStep = 0;
             if (profileWizardStep >= sections.length) profileWizardStep = Math.max(0, sections.length - 1);
@@ -2886,6 +3237,16 @@
                         showAppAlert('Заполните обязательные поля на этом шаге.', 'Анкета');
                         return;
                     }
+                    if (!isProfileComplete(schema, profileDraft)) {
+                        const miss = listIncompleteProfileFields(schema, profileDraft);
+                        showAppAlert(
+                            miss.length
+                                ? 'Не хватает: ' + miss.join(', ') + '.'
+                                : 'Заполните обязательные поля во всех шагах (база, интересы, цели).',
+                            'Анкета'
+                        );
+                        return;
+                    }
                     const btn = this;
                     btn.disabled = true;
                     try {
@@ -2939,7 +3300,7 @@
         try {
             const schema = await ensureSchema();
             const pres = await fetchJson('/profile/' + encodeURIComponent(userId));
-            const profile = await pres.json();
+            const profile = normalizeProfileDraftFromServer(await pres.json(), schema);
             cachedProfile = Object.assign({}, profile);
             profileFetchDone = true;
             if (testSphereSelection == null) {
@@ -2960,9 +3321,16 @@
                   });
             const spheres = schema.interest_spheres || [];
             const profileOk = isProfileComplete(schema, profile);
+            const missingProfile = profileOk ? [] : listIncompleteProfileFields(schema, profile);
             const warnBanner = profileOk
                 ? ''
-                : '<div class="banner-warn"><strong>Анкета не заполнена.</strong> Заполните обязательные шаги во вкладке «Анкета» (база, интересы, цели).</div>';
+                : '<div class="banner-warn"><strong>Анкета не заполнена.</strong> Заполните обязательные шаги во вкладке «Анкета» (база, интересы, цели).' +
+                  (missingProfile.length
+                      ? '<br><span style="font-size:.9em">Не хватает: ' +
+                        esc(missingProfile.join(', ')) +
+                        '.</span>'
+                      : '') +
+                  '</div>';
             const gradeBanner =
                 quizState.testGradeLabel
                     ? '<div class="banner-grade" style="margin-bottom:12px;padding:10px 14px;background:var(--accent-soft);border-radius:var(--radius-sm);border:1px solid var(--accent-border);font-size:.82rem;line-height:1.45"><strong>Грейд теста:</strong> ' +
@@ -3001,7 +3369,6 @@
                 gradeBanner +
                 '<label for="testSphereSelect">Сфера для теста</label>' +
                 '<select id="testSphereSelect">' + sphereOpts + '</select>' +
-                '<p class="muted">Сейчас: <strong>' + esc(quizState.interest) + '</strong></p>' +
                 '<p class="muted" id="quizProgCaption" style="margin:0 0 14px;font-size:.95rem">Отвечено ' +
                 answered +
                 ' из ' +
@@ -3131,19 +3498,17 @@
         const v = r.value_percent != null ? r.value_percent : 0;
         const left = Math.max(0, Math.min(100, v));
         return (
-            '<div class="readiness-track-wrap">' +
-            '<div class="muted" style="margin-bottom:8px;font-size:.8rem;font-weight:600">Готовность к цели трека</div>' +
-            '<div class="readiness-bar">' +
+            '<div class="readiness-metric">' +
+            '<div class="readiness-metric__head">' +
+            '<h3 class="readiness-metric__title">Готовность к цели трека</h3>' +
+            '<span class="readiness-metric__value">' + esc(String(v)) + '%</span>' +
+            '</div>' +
+            '<div class="readiness-metric__bar-wrap">' +
+            '<div class="readiness-pointer" style="left:' + left + '%" aria-hidden="true"></div>' +
+            '<div class="readiness-bar" role="img" aria-label="Готовность ' + esc(String(v)) + '%">' +
             bar +
             '</div>' +
-            '<div class="readiness-pointer" style="left:' +
-            left +
-            '%"></div>' +
-            '<div class="readiness-badge" style="left:' +
-            left +
-            '%">' +
-            esc(String(v)) +
-            '%</div>' +
+            '</div>' +
             '</div>'
         );
     }
@@ -3255,6 +3620,13 @@
                 html += '<div class="scenario-hero">';
                 html += '<div class="big-pct">' + esc(String(bestPct)) + '%</div>';
                 html += '<div class="sub">' + esc(cap) + '</div>';
+                                if ((d.inferred_profession || sc.inferred_profession || {}).label) {
+                    var infLbl = (d.inferred_profession || sc.inferred_profession).label;
+                    html +=
+                        '<p class="muted" style="margin:10px 0 0;font-size:.88rem">Специализация по тесту: <strong style="color:var(--text)">' +
+                        esc(String(infLbl)) +
+                        '</strong></p>';
+                }
                 html += '<div class="plan-name">' + esc(bestName) + '</div></div>';
                 for (let i = 0; i < plans.length; i++) {
                     const p = plans[i];
@@ -3272,7 +3644,17 @@
             }
             const mts = (d.mts_matrix && d.mts_matrix.rows) || [];
             if (mts.length) {
-                html += '<div class="dash-card" style="margin-bottom:16px"><h3>Роли (матрица направлений)</h3>';
+                const mtsTrackLbl = (d.inferred_profession || sc.inferred_profession || {}).label;
+                const mtsTitle = mtsTrackLbl
+                    ? 'Роли по вашему треку'
+                    : 'Роли (матрица направлений)';
+                html += '<div class="dash-card" style="margin-bottom:16px"><h3>' + esc(mtsTitle) + '</h3>';
+                if (mtsTrackLbl) {
+                    html +=
+                        '<p class="muted" style="margin:0 0 12px;font-size:.82rem">Ранжирование по ответам теста и сфере «' +
+                        esc(String(mtsTrackLbl)) +
+                        '», не по корпоративным стажировкам.</p>';
+                }
                 for (let i = 0; i < mts.length; i++) {
                     const row = mts[i];
                     const pct = row.percent != null ? row.percent : 0;
@@ -3290,9 +3672,96 @@
                 }
                 html += '</div>';
             }
+            const lp = d.learning_path || {};
+            const lpMetrics = lp.metrics || {};
+            const lpSteps = lp.steps || [];
+            if (lp.path_id && lpSteps.length) {
+                html +=
+                    '<div class="dash-card" style="margin-top:16px"><h3>' +
+                    esc(lp.title || 'Путь развития') +
+                    '</h3>';
+                if (lpMetrics.coverage_percent != null) {
+                    html +=
+                        '<p class="muted" style="margin:0 0 12px;font-size:.88rem">Прогресс пути: <strong>' +
+                        esc(String(lpMetrics.coverage_percent)) +
+                        '%</strong> · шаг ' +
+                        esc(String((lpMetrics.current_step_index || 0) + 1)) +
+                        ' из ' +
+                        esc(String(lpMetrics.total_steps || lpSteps.length)) +
+                        '</p>';
+                }
+                for (let si = 0; si < lpSteps.length; si++) {
+                    const st = lpSteps[si];
+                    const stStatus = st.status || 'pending';
+                    const statusLbl =
+                        stStatus === 'done'
+                            ? '✓ сделано'
+                            : stStatus === 'in_progress'
+                              ? 'в работе'
+                              : 'ожидает';
+                    html +=
+                        '<div class="learn-path-step" style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-sm)">' +
+                        '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
+                        '<b style="font-size:.92rem">' +
+                        esc(String(st.order || si + 1) + '. ' + (st.title || '')) +
+                        '</b>' +
+                        '<span class="muted" style="font-size:.75rem;white-space:nowrap">' +
+                        esc(statusLbl) +
+                        '</span></div>';
+                    if (st.goal) {
+                        html +=
+                            '<p class="muted" style="margin:6px 0 4px;font-size:.82rem">' +
+                            esc(String(st.goal)) +
+                            '</p>';
+                    }
+                    if (st.duration_hint) {
+                        html +=
+                            '<p class="muted" style="margin:0 0 8px;font-size:.78rem">Срок: ' +
+                            esc(String(st.duration_hint)) +
+                            '</p>';
+                    }
+                    const resList = st.resources || [];
+                    for (let ri = 0; ri < resList.length; ri++) {
+                        const R = resList[ri];
+                        const rurl = R.url && R.url !== '#' ? R.url : '';
+                        html += '<div style="margin:4px 0;font-size:.85rem">';
+                        if (rurl) {
+                            html +=
+                                '<a href="' +
+                                esc(rurl) +
+                                '" target="_blank" rel="noopener" style="color:var(--accent-dark);font-weight:600">' +
+                                esc(R.title || 'Материал') +
+                                '</a>';
+                        } else {
+                            html += esc(R.title || 'Материал');
+                        }
+                        if (R.provider) {
+                            html +=
+                                ' <span class="muted" style="font-size:.75rem">· ' +
+                                esc(String(R.provider)) +
+                                '</span>';
+                        }
+                        html += '</div>';
+                    }
+                    html +=
+                        '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' +
+                        '<button type="button" class="btn-secondary lp-step-btn" data-path="' +
+                        esc(String(lp.path_id)) +
+                        '" data-step="' +
+                        esc(String(st.step_id || '')) +
+                        '" data-status="in_progress" style="font-size:.78rem;padding:6px 12px">В работе</button>' +
+                        '<button type="button" class="btn-primary lp-step-btn" data-path="' +
+                        esc(String(lp.path_id)) +
+                        '" data-step="' +
+                        esc(String(st.step_id || '')) +
+                        '" data-status="done" style="font-size:.78rem;padding:6px 12px">Готово</button>' +
+                        '</div></div>';
+                }
+                html += '</div>';
+            }
             const learn = d.learning || [];
             if (learn.length) {
-                html += '<h3 style="margin-top:8px">Обучение</h3><div class="dash-grid-2">';
+                html += '<h3 style="margin-top:8px">Материалы (кратко)</h3><div class="dash-grid-2">';
                 for (let i = 0; i < learn.length; i++) {
                     const L = learn[i];
                     const u =
@@ -3336,7 +3805,42 @@
                     if (block.steps && block.steps.length) {
                         html += '<ol style="margin:0;padding-left:18px;color:var(--text);font-size:.85rem">';
                         for (let s = 0; s < block.steps.length; s++) {
-                            html += '<li style="margin-bottom:4px">' + esc(block.steps[s]) + '</li>';
+                            const st = block.steps[s];
+                            const stepText =
+                                typeof st === 'string' ? st : st && st.text ? String(st.text) : '';
+                            html += '<li style="margin-bottom:8px">' + esc(stepText);
+                            const mats =
+                                st && typeof st === 'object' && st.materials && st.materials.length
+                                    ? st.materials
+                                    : [];
+                            if (mats.length) {
+                                html +=
+                                    '<ul style="margin:6px 0 0;padding-left:16px;font-size:.8rem;list-style:disc">';
+                                for (let mi = 0; mi < mats.length; mi++) {
+                                    const M = mats[mi];
+                                    const mu = M.url && M.url !== '#' ? M.url : '';
+                                    html += '<li style="margin-bottom:3px">';
+                                    if (mu) {
+                                        html +=
+                                            '<a href="' +
+                                            esc(mu) +
+                                            '" target="_blank" rel="noopener" style="color:var(--accent-dark);font-weight:600">' +
+                                            esc(M.title || 'Материал') +
+                                            '</a>';
+                                    } else {
+                                        html += esc(M.title || 'Материал');
+                                    }
+                                    if (M.provider) {
+                                        html +=
+                                            ' <span class="muted" style="font-size:.72rem">· ' +
+                                            esc(String(M.provider)) +
+                                            '</span>';
+                                    }
+                                    html += '</li>';
+                                }
+                                html += '</ul>';
+                            }
+                            html += '</li>';
                         }
                         html += '</ol>';
                     }
@@ -3384,12 +3888,98 @@
                         esc(s.horizon || '') +
                         '</p>' +
                         ul +
+                        (s.continues_from
+                            ? '<p class="muted" style="font-size:.8rem;margin:8px 0 0"><strong>Связь с прошлым:</strong> ' +
+                              esc(String(s.continues_from)) +
+                              '</p>'
+                            : '') +
+                        (function () {
+                            const advRefs = s.advice_refs || [];
+                            if (!advRefs.length) return '';
+                            let h =
+                                '<p class="muted" style="font-size:.8rem;margin:8px 0 0"><strong>Из индивидуальных советов (план ' +
+                                esc(String(s.linked_plan_id || 'A')) +
+                                '):</strong></p><ul style="margin:4px 0 0;padding-left:18px;font-size:.78rem;color:var(--text-muted)">';
+                            for (let ar = 0; ar < advRefs.length; ar++) {
+                                h += '<li style="margin-bottom:3px">' + esc(String(advRefs[ar])) + '</li>';
+                            }
+                            return h + '</ul>';
+                        })() +
+                        (function () {
+                            const pSteps = s.path_steps || [];
+                            if (!pSteps.length) return '';
+                            return (
+                                '<p class="muted" style="font-size:.8rem;margin:8px 0 0"><strong>Шаги пути обучения:</strong> ' +
+                                esc(pSteps.join(' · ')) +
+                                '</p>'
+                            );
+                        })() +
+                        (function () {
+                            const stMats = s.materials || [];
+                            if (!stMats.length) return '';
+                            let h =
+                                '<p class="muted" style="font-size:.8rem;margin:8px 0 4px"><strong>Материалы на этап:</strong></p><ul style="margin:0;padding-left:18px;font-size:.8rem">';
+                            for (let sm = 0; sm < stMats.length; sm++) {
+                                const M = stMats[sm];
+                                const mu = M.url && M.url !== '#' ? M.url : '';
+                                h += '<li style="margin-bottom:3px">';
+                                if (mu) {
+                                    h +=
+                                        '<a href="' +
+                                        esc(mu) +
+                                        '" target="_blank" rel="noopener" style="color:var(--accent-dark);font-weight:600">' +
+                                        esc(M.title || 'Материал') +
+                                        '</a>';
+                                } else {
+                                    h += esc(M.title || 'Материал');
+                                }
+                                if (M.path_step) {
+                                    h +=
+                                        ' <span class="muted" style="font-size:.72rem">← ' +
+                                        esc(String(M.path_step)) +
+                                        '</span>';
+                                }
+                                h += '</li>';
+                            }
+                            return h + '</ul>';
+                        })() +
                         '<p class="muted" style="font-size:.85rem;margin:12px 0 0"><strong>Когда переходить дальше:</strong> ' +
                         esc(s.when_next || '') +
                         '</p></div>';
                 }
             }
             el.innerHTML = html;
+            el.querySelectorAll('.lp-step-btn').forEach(function (btn) {
+                btn.onclick = async function () {
+                    const pathId = btn.getAttribute('data-path');
+                    const stepId = btn.getAttribute('data-step');
+                    const status = btn.getAttribute('data-status');
+                    if (!pathId || !stepId || !status) return;
+                    btn.disabled = true;
+                    try {
+                        await fetchJson(
+                            '/vibework/learning/progress/' + encodeURIComponent(userId),
+                            {
+                                method: 'POST',
+                                headers: Object.assign(
+                                    { 'Content-Type': 'application/json' },
+                                    apiFetchHeaders()
+                                ),
+                                body: JSON.stringify({
+                                    path_id: pathId,
+                                    step_id: stepId,
+                                    status: status
+                                })
+                            }
+                        );
+                        await renderAnalysisTab();
+                    } catch (errLp) {
+                        showAppAlert(String(errLp.message || errLp), 'Прогресс');
+                    } finally {
+                        btn.disabled = false;
+                    }
+                };
+            });
         } catch (e) {
             el.innerHTML = '<p>' + esc(e.message) + '</p>';
         }
@@ -4366,28 +4956,24 @@
                 } catch (eSt) {}
                 const isTgApp = document.documentElement.getAttribute('data-tg-webapp') === '1';
                 const schema = await ensureSchema();
-                const p = cachedProfile || {};
+                const p = normalizeProfileDraftFromServer(cachedProfile || {}, schema);
                 const emailDisp =
                     (accountStatus && accountStatus.email) ||
                     localStorage.getItem(USER_EMAIL_KEY) ||
                     '';
                 const nickForInput = p.nickname != null && p.nickname !== '' ? String(p.nickname) : '';
-                const sphereLbl = labelMainSphere(schema, p.main_sphere) || '—';
-                let eduLbl = labelEducationDetail(schema, p.education_detail);
-                if (!eduLbl && p.education) eduLbl = String(p.education);
-                if (!eduLbl) eduLbl = '—';
-                let wfStr = '';
-                if (p.work_format_pref) {
-                    const arr =
-                        typeof p.work_format_pref === 'string'
-                            ? p.work_format_pref.split(',').map(function (x) { return x.trim(); }).filter(Boolean)
-                            : Array.isArray(p.work_format_pref)
-                              ? p.work_format_pref
-                              : [];
-                    wfStr = workFormatPreferenceRu(arr);
-                }
-                const ageStr = p.age != null && p.age !== '' ? String(p.age) : '—';
-                const cityStr = (p.city && String(p.city).trim()) || '—';
+                let inferredProfession = '';
+                try {
+                    const ar = await fetchJson('/vibework/analysis/' + encodeURIComponent(userId));
+                    if (ar.ok) {
+                        const ad = await ar.json();
+                        const inf = ad.inferred_profession || (ad.scenarios && ad.scenarios.inferred_profession);
+                        if (inf && inf.label) inferredProfession = String(inf.label);
+                    }
+                } catch (eAn) {}
+                const aboutYouHtml = buildAboutYouHtml(schema, p, emailDisp, {
+                    inferredProfession: inferredProfession
+                });
                 let syncCardHtml = '';
                 if (accountStatus && isTgApp && !accountStatus.email) {
                     syncCardHtml +=
@@ -4415,16 +5001,16 @@
                 if (accountStatus && !isTgApp && accountStatus.email && !accountStatus.telegram_linked) {
                     if (accountStatus.telegram_login_bot_username) {
                         syncCardHtml +=
-                            '<div class="profile-card" style="margin-top:16px">' +
+                            '<div class="profile-card profile-card--telegram" style="margin-top:16px">' +
                             '<div class="section-title">Привязать Telegram</div>' +
-                            '<p class="muted" style="margin:0 0 12px">Нажмите кнопку Telegram — данные мини-приложения и сайта объединятся.</p>' +
-                            '<div id="vwTgWidgetMount"></div>' +
+                            '<p class="muted" style="margin:0 0 12px">Нажмите кнопку ниже — мини-приложение и сайт будут в одном аккаунте.</p>' +
+                            '<div id="vwTgWidgetMount" class="tg-widget-mount"></div>' +
                             '</div>';
                     } else {
                         syncCardHtml +=
-                            '<div class="profile-card" style="margin-top:16px">' +
+                            '<div class="profile-card profile-card--telegram" style="margin-top:16px">' +
                             '<div class="section-title">Telegram</div>' +
-                            '<p class="muted" style="margin:0">Для кнопки входа Telegram задайте на сервере TELEGRAM_BOT_USERNAME (имя бота без @).</p>' +
+                            '<p class="muted" style="margin:0">Кнопка входа недоступна: на сервере задайте TELEGRAM_BOT_TOKEN (и при необходимости TELEGRAM_BOT_USERNAME) в .env и перезапустите API.</p>' +
                             '</div>';
                     }
                 }
@@ -4443,27 +5029,7 @@
                     '</div>' +
                     '<div class="profile-card" style="margin-top:16px">' +
                     '<div class="section-title">О вас</div>' +
-                    '<dl class="account-dl">' +
-                    '<div><dt>Почта (вход)</dt><dd>' +
-                    esc(emailDisp || '—') +
-                    '</dd></div>' +
-                    '<div><dt>Направление (сфера интереса)</dt><dd>' +
-                    esc(sphereLbl) +
-                    '</dd></div>' +
-                    '<div><dt>Возраст</dt><dd>' +
-                    esc(ageStr) +
-                    '</dd></div>' +
-                    '<div><dt>Город</dt><dd>' +
-                    esc(cityStr) +
-                    '</dd></div>' +
-                    '<div><dt>Образование</dt><dd>' +
-                    esc(eduLbl) +
-                    '</dd></div>' +
-                    '<div><dt>Предпочитаемый формат работы</dt><dd>' +
-                    esc(wfStr || '—') +
-                    '</dd></div>' +
-                    '</dl>' +
-                    '<p class="muted" style="margin:14px 0 0;font-size:0.8rem">Данные из сохранённой анкеты. Редактировать их можно в разделе «Анкета».</p>' +
+                    aboutYouHtml +
                     '</div>' +
                     '<div class="profile-card" style="margin-top:16px">' +
                     '<div class="section-title">Смена пароля</div>' +

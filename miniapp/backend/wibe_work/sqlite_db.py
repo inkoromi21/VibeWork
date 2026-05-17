@@ -242,7 +242,7 @@ def _seed_mts_catalog(conn):
             1,
             None,
             None,
-            "Тренинги по продажам: открытые лекции, YouTube по B2B-воронке",
+            "Тренинги по продажам: открытые лекции, Rutube по B2B-воронке",
         ),
     )
     conn.execute(

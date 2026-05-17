@@ -15,7 +15,10 @@ __pycache__/
 .env
 .env.local
 .env.*.local
-!.env.example
+
+# Случайные env в deploy/ (секреты только в корневом .env)
+deploy/.env
+deploy/*.env
 
 # Local databases (keep JSON/fixtures tracked)
 *.db
@@ -53,3 +56,4 @@ build/
 # Logs & temp
 *.log
 *.tmp
+deploy/vps.env.template

@@ -9,7 +9,7 @@
 - веб-интерфейс с корня и Mini App — **один и тот же** UI (`frontend/index.html`, дубликат по **`/miniapp/`**);
 - единый REST API и OpenAPI (**`/docs`**).
 
-Файл конфигурации — **`.env` в корне репозитория** (шаблон: `miniapp/.env.example`). Зависимости Python: **`miniapp/requirements.txt`**.
+Файл конфигурации — **`.env` в корне репозитория** (см. [docs/ENV.md](../docs/ENV.md)). Зависимости Python: **`miniapp/requirements.txt`**.
 
 Полная картина запуска, переменных окружения и продакшена: **[README в корне](../README.md)**.
 

@@ -163,14 +163,31 @@ def _radar_axes(vec: List[int]) -> List[Dict[str, Any]]:
     return axes
 
 
+# IT: id трека → подпись в разборе и буст к планам A/B/C
+_IT_TRACK_LABELS: Dict[str, str] = {
+    "backend": "Backend-разработчик",
+    "frontend": "Frontend-разработчик",
+    "devops": "DevOps / инженер инфраструктуры",
+    "data": "Аналитик данных / SQL",
+    "qa": "Инженер по тестированию (QA)",
+}
+
+_IT_TRACK_PLAN_KEYWORDS: Dict[str, Tuple[str, ...]] = {
+    "backend": ("бэкенд", "backend", "api", "сервер", "веб- и бэкенд"),
+    "frontend": ("frontend", "интерфейс", "веб-интерфейс", "мобильн"),
+    "devops": ("devops", "релиз", "ci/cd", "сопровожд", "инфраструктур"),
+    "data": ("данн", "sql", "аналит", "продуктовая аналитика"),
+    "qa": ("автотест", "качеств", "qa", "тестирован"),
+}
+
 DIRECTION_POOLS: Dict[str, Tuple[str, ...]] = {
     "it_dev": (
-        "Веб- и бэкенд-разработка",
-        "Мобильные приложения",
-        "Автотесты и качество ПО",
+        "Backend-разработка (API, сервер, базы данных)",
+        "Frontend и веб-интерфейсы",
+        "Мобильная разработка",
+        "Автотесты и QA",
         "Данные, SQL и продуктовая аналитика",
-        "DevOps и релизы",
-        "Сопровождение и внутренние сервисы",
+        "DevOps и CI/CD",
     ),
     "data": (
         "Продуктовая и бизнес-аналитика",
@@ -211,6 +228,145 @@ def _direction_interest_key(interest: str) -> str:
     return k if k in DIRECTION_POOLS else "default"
 
 
+def _resolve_effective_interest(profile: Dict[str, Any], interest: str) -> str:
+    """Сфера для разбора: явная → main_sphere → первая из анкеты."""
+    k = (interest or "").strip()
+    if k in DIRECTION_POOLS:
+        return k
+    ms = str(profile.get("main_sphere") or "").strip()
+    if ms in DIRECTION_POOLS:
+        return ms
+    raw = profile.get("interest_spheres")
+    if isinstance(raw, list):
+        for item in raw:
+            sid = str(item).strip()
+            if sid in DIRECTION_POOLS:
+                return sid
+    elif isinstance(raw, str) and raw.strip():
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                for item in parsed:
+                    sid = str(item).strip()
+                    if sid in DIRECTION_POOLS:
+                        return sid
+        except (json.JSONDecodeError, TypeError):
+            pass
+        for part in raw.replace(";", ",").split(","):
+            sid = part.strip().strip('"').strip("'")
+            if sid in DIRECTION_POOLS:
+                return sid
+    return k or "other"
+
+
+_CORPORATE_MTS_MARKERS = (
+    "закуп",
+    "линейно-кабель",
+    "кабельн",
+    "транспортн",
+    "недвижим",
+    "юрист",
+    "хозяйствен",
+    "розничн",
+)
+
+
+def _rows_look_like_corporate_mts(rows: List[Dict[str, Any]]) -> bool:
+    if not rows:
+        return False
+    combined = " ".join(str(r.get("role_name") or "") for r in rows).lower()
+    return any(m in combined for m in _CORPORATE_MTS_MARKERS)
+
+
+def _rows_match_it_direction_pool(rows: List[Dict[str, Any]]) -> bool:
+    if not rows:
+        return False
+    combined = " ".join(str(r.get("role_name") or "") for r in rows).lower()
+    it_kw = ("backend", "бэкенд", "frontend", "devops", "qa", "мобильн", "автотест", "sql")
+    return any(k in combined for k in it_kw)
+
+
+def _should_refresh_mts_matrix(
+    profile: Dict[str, Any], interest: str, rows: List[Dict[str, Any]]
+) -> bool:
+    eff = _resolve_effective_interest(profile, interest)
+    if eff not in _MTS_DIRECTION_INTERESTS:
+        return False
+    if not rows:
+        return True
+    if _rows_look_like_corporate_mts(rows):
+        return True
+    if eff == "it_dev" and not _rows_match_it_direction_pool(rows):
+        return True
+    return False
+
+
+def _answer_letter(ans: Dict[str, Any]) -> str:
+    ch = ans.get("choice") or ans.get("choice_id")
+    if isinstance(ch, int):
+        return "ABCD"[max(0, min(3, int(ch)))]
+    s = str(ch or "A").strip().upper()
+    return s[0] if s and s[0] in "ABCD" else "A"
+
+
+def infer_it_track_from_answers(answers: List[Dict[str, Any]]) -> Optional[str]:
+    """
+    По техническим вопросам IT (1–10): A → backend/data, B → frontend,
+    D → devops/QA, C → меньший вес (люди/PM).
+    """
+    scores: Dict[str, float] = {
+        "backend": 0.0,
+        "frontend": 0.0,
+        "devops": 0.0,
+        "data": 0.0,
+        "qa": 0.0,
+    }
+    for a in answers:
+        qid = int(a.get("question_id") or 0)
+        if qid < 1 or qid > 10:
+            continue
+        w = 2.0 if qid <= 5 else 1.0
+        letter = _answer_letter(a)
+        if letter == "A":
+            scores["backend"] += w
+            if qid in (4, 5):
+                scores["data"] += w * 0.35
+        elif letter == "B":
+            scores["frontend"] += w
+        elif letter == "C":
+            scores["backend"] += w * 0.15
+        elif letter == "D":
+            scores["devops"] += w
+            if qid in (1, 2):
+                scores["qa"] += w * 0.4
+    best = max(scores.items(), key=lambda x: x[1])
+    if best[1] < 1.0:
+        return None
+    if best[0] == "data" and scores["backend"] >= scores["data"]:
+        return "backend"
+    if best[0] == "qa" and scores["devops"] >= scores["qa"]:
+        return "devops"
+    return str(best[0])
+
+
+def inferred_it_profession(
+    interest: str, answers: List[Dict[str, Any]], stack: Optional[List[str]] = None
+) -> Optional[Dict[str, Any]]:
+    if _direction_interest_key(interest) != "it_dev":
+        return None
+    track = infer_it_track_from_answers(answers)
+    if not track:
+        return None
+    label = _IT_TRACK_LABELS.get(track, track)
+    from wibe_work.services.hh_filter import hh_search_phrase_for_it_track
+
+    return {
+        "track_id": track,
+        "label": label,
+        "hh_search_phrase": hh_search_phrase_for_it_track(track, stack or []),
+    }
+
+
 def _answer_fingerprint(answers: List[Dict[str, Any]]) -> int:
     h = 0
     for a in sorted(answers, key=lambda x: int(x.get("question_id") or 0)):
@@ -230,9 +386,21 @@ def _dominant_radar_key(axes: List[Dict[str, Any]]) -> str:
     return str(best.get("key") or "structure_mastery")
 
 
-def _score_direction_name(name: str, dom_axis: str, fp: int, idx: int) -> int:
+def _score_direction_name(
+    name: str,
+    dom_axis: str,
+    fp: int,
+    idx: int,
+    *,
+    it_track: Optional[str] = None,
+) -> int:
     n = name.lower()
     score = 44 + ((fp + idx * 17) % 23) + idx * 3
+    if it_track:
+        for kw in _IT_TRACK_PLAN_KEYWORDS.get(it_track, ()):
+            if kw in n:
+                score += 22
+                break
     if dom_axis == "structure_mastery":
         score += sum(
             9
@@ -294,9 +462,16 @@ def _pick_scenario_plans(
     interest: str,
     axes: List[Dict[str, Any]],
     fp: int,
+    answers: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Три плана A/B/C из пула сферы + смежные треки по доминанте радара."""
     dk = _direction_interest_key(interest)
+    it_track: Optional[str] = None
+    inferred: Optional[Dict[str, Any]] = None
+    if dk == "it_dev" and answers:
+        inferred = inferred_it_profession(interest, answers)
+        if inferred:
+            it_track = str(inferred.get("track_id") or "")
     pool = list(DIRECTION_POOLS.get(dk, DIRECTION_POOLS["default"]))
     dom = _dominant_radar_key(axes)
     pool = pool + list(ADJACENT_BY_AXIS.get(dom, ()))
@@ -306,7 +481,10 @@ def _pick_scenario_plans(
         if p not in seen:
             seen.add(p)
             uniq.append(p)
-    scored = [(n, _score_direction_name(n, dom, fp, i)) for i, n in enumerate(uniq)]
+    scored = [
+        (n, _score_direction_name(n, dom, fp, i, it_track=it_track))
+        for i, n in enumerate(uniq)
+    ]
     scored.sort(key=lambda x: -x[1])
     top = scored[:3]
     fallback = list(DIRECTION_POOLS["default"])
@@ -326,13 +504,16 @@ def _pick_scenario_plans(
         match_score = max(47, min(97, raw + (fp % 5) - 2))
         plans.append({"id": pid, "name": f"План {pid}: {name}", "score_percent": match_score})
     best = max(plans, key=lambda p: p["score_percent"])
-    return {
+    out: Dict[str, Any] = {
         "plans": plans,
         "best_plan_id": best["id"],
         "best_plan_name": best["name"],
         "best_avg_percent": best["score_percent"],
-        "caption": "согласованность профиля с треками развития (правила + ответы теста)",
+        "caption": "согласованность профиля с треками развития (ответы теста + анкета)",
     }
+    if inferred:
+        out["inferred_profession"] = inferred
+    return out
 
 
 def _mts_tokens(text: str) -> Set[str]:
@@ -343,6 +524,152 @@ def _mts_tokens(text: str) -> Set[str]:
     }
 
 
+_MINIAPP_INTEREST_TO_MTS_TAG: Dict[str, str] = {
+    "it_dev": "IT",
+    "data": "IT",
+    "design": "маркетинг",
+    "marketing": "маркетинг",
+    "sales": "маркетинг",
+    "engineering": "инженерия",
+    "logistics": "инженерия",
+    "finance": "бизнес",
+    "mgmt": "бизнес",
+    "hr_edu": "бизнес",
+    "medicine": "бизнес",
+    "education": "бизнес",
+    "creative": "маркетинг",
+    "sport": "бизнес",
+    "other": "бизнес",
+}
+
+_MTS_DIRECTION_INTERESTS = frozenset({"it_dev", "data", "design"})
+
+
+def _infer_mts_profession_tag(title: str) -> str:
+    """Тег роли МТС для сопоставления с интересом (как на сайте)."""
+    t = title.lower()
+    if "аналитик" in t and "ai" in t:
+        return "IT"
+    if "сопровожден" in t and "рабоч" in t:
+        return "IT"
+    if "инженер" in t or "линейно-кабель" in t:
+        return "инженерия"
+    if "маркетинг" in t:
+        return "маркетинг"
+    if "продавец" in t or "рознич" in t:
+        return "маркетинг"
+    if "продаж" in t or "развития" in t:
+        return "маркетинг"
+    if "корпоратив" in t or "клиент" in t:
+        return "бизнес"
+    if "hr" in t:
+        return "бизнес"
+    if "юрист" in t:
+        return "бизнес"
+    if "закуп" in t:
+        return "бизнес"
+    if "недвижим" in t or ("эксплуатац" in t and "здан" in t):
+        return "бизнес"
+    if "транспорт" in t:
+        return "инженерия"
+    if "административн" in t or "хозяйствен" in t:
+        return "бизнес"
+    return "бизнес"
+
+
+def _percent_rows_from_scored(
+    scored: List[Tuple[float, str]], limit: int
+) -> List[Dict[str, Any]]:
+    scored.sort(key=lambda x: -x[0])
+    top = scored[:limit]
+    if not top:
+        return []
+    mx = top[0][0] if top[0][0] > 0 else 1.0
+    rows: List[Dict[str, Any]] = []
+    for rank, (sc, title) in enumerate(top):
+        pct = int(round(40 + 55 * (sc / mx)))
+        pct = max(38, min(97, pct))
+        rows.append({"role_name": title, "percent": pct, "rank": rank})
+    return rows
+
+
+def _rank_career_direction_rows(
+    interest: str,
+    axes: List[Dict[str, Any]],
+    fp: int,
+    answers: List[Dict[str, Any]],
+    limit: int = 6,
+    *,
+    it_track_override: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Роли из пула направлений сферы (backend, frontend и т.д.) — по тесту и радару."""
+    dk = _direction_interest_key(interest)
+    it_track: Optional[str] = it_track_override
+    if dk == "it_dev" and not it_track:
+        inf = inferred_it_profession(interest, answers)
+        if inf:
+            it_track = str(inf.get("track_id") or "")
+    pool = list(DIRECTION_POOLS.get(dk, DIRECTION_POOLS["default"]))
+    if dk == "it_dev" and it_track and it_track in _IT_TRACK_LABELS:
+        lead = _IT_TRACK_LABELS[it_track]
+        pool = [lead] + [p for p in pool if p != lead]
+    dom = _dominant_radar_key(axes)
+    if dk != "it_dev":
+        for adj in ADJACENT_BY_AXIS.get(dom, ()):
+            if adj not in pool:
+                pool.append(adj)
+    scored: List[Tuple[float, str]] = []
+    for i, n in enumerate(pool):
+        sc = float(_score_direction_name(n, dom, fp, i, it_track=it_track))
+        if dk == "it_dev" and it_track and i == 0 and n in _IT_TRACK_LABELS.values():
+            sc += 12.0
+        scored.append((sc, n))
+    return _percent_rows_from_scored(scored, limit)
+
+
+def refresh_mts_matrix_in_snapshot(
+    snap: Dict[str, Any],
+    profile: Dict[str, Any],
+    profile_extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Пересчитать роли в сохранённом разборе (старые снимки с матрицей МТС)."""
+    interest = str(snap.get("_analysis_interest") or "").strip()
+    if not interest:
+        interest = _resolve_effective_interest(profile, "")
+    rows = list((snap.get("mts_matrix") or {}).get("rows") or [])
+    if not _should_refresh_mts_matrix(profile, interest, rows):
+        return snap
+    answers = list(snap.get("_quiz_answers") or [])
+    axes = list((snap.get("style_radar") or {}).get("axes") or [])
+    it_track: Optional[str] = None
+    inf = (snap.get("scenarios") or {}).get("inferred_profession") or snap.get(
+        "inferred_profession"
+    )
+    if isinstance(inf, dict) and inf.get("track_id"):
+        it_track = str(inf["track_id"])
+    eff = _resolve_effective_interest(profile, interest)
+    extra = profile_extra if profile_extra is not None else {}
+    if eff in _MTS_DIRECTION_INTERESTS:
+        new_rows = _rank_career_direction_rows(
+            eff, axes, _answer_fingerprint(answers), answers, it_track_override=it_track
+        )
+    else:
+        new_rows = _rank_mts_rows(profile, extra, eff, answers, axes)
+    out = dict(snap)
+    out["mts_matrix"] = {"rows": new_rows}
+    if it_track and eff == "it_dev":
+        label = _IT_TRACK_LABELS.get(it_track)
+        if label:
+            inf_out = dict(inf) if isinstance(inf, dict) else {}
+            inf_out.setdefault("track_id", it_track)
+            inf_out.setdefault("label", label)
+            out["inferred_profession"] = inf_out
+            sc = dict(out.get("scenarios") or {})
+            sc["inferred_profession"] = inf_out
+            out["scenarios"] = sc
+    return out
+
+
 def _rank_mts_rows(
     profile: Dict[str, Any],
     profile_extra: Dict[str, Any],
@@ -351,9 +678,17 @@ def _rank_mts_rows(
     axes: List[Dict[str, Any]],
     limit: int = 6,
 ) -> List[Dict[str, Any]]:
+    dom = _dominant_radar_key(axes)
+    fp = _answer_fingerprint(answers)
+    eff = _resolve_effective_interest(profile, interest)
+    dk = _direction_interest_key(eff)
+
+    if dk in _MTS_DIRECTION_INTERESTS:
+        return _rank_career_direction_rows(eff, axes, fp, answers, limit)
+
     roles = _load_mts_roles()
     if not roles:
-        return [
+        return _rank_career_direction_rows(eff, axes, fp, answers, limit) or [
             {"role_name": "Стажёр направления", "percent": 72, "rank": 0},
             {"role_name": "Младший специалист", "percent": 58, "rank": 1},
         ]
@@ -368,9 +703,7 @@ def _rank_mts_rows(
     ]
     user_blob = " ".join(blob_parts).lower()
     user_tokens = _mts_tokens(user_blob)
-    dom = _dominant_radar_key(axes)
-    fp = _answer_fingerprint(answers)
-    dk = _direction_interest_key(interest)
+    user_tag = _MINIAPP_INTEREST_TO_MTS_TAG.get(eff, "бизнес")
 
     scored: List[Tuple[float, str]] = []
     for role in roles:
@@ -380,40 +713,50 @@ def _rank_mts_rows(
         combined = f"{title} {req} {duty}".lower()
         rt = _mts_tokens(combined)
         overlap = len(user_tokens & rt)
-        sc = 20.0 + min(38.0, overlap * 3.5)
+        tag = _infer_mts_profession_tag(title)
+        sc = 22.0 + min(36.0, overlap * 3.2)
+
+        if tag == user_tag:
+            sc += 38.0
+        elif interest == "design" and tag == "маркетинг":
+            sc += 14.0
+        elif user_tag == "IT" and tag in ("IT", "инженерия"):
+            sc += 10.0
+        elif user_tag == "инженерия" and tag == "инженерия":
+            sc += 28.0
+
+        if user_tag == "IT" and tag == "бизнес":
+            sc -= 28.0
+        if user_tag == "IT" and tag not in ("IT", "инженерия"):
+            sc -= 10.0
 
         tl = title.lower()
         if dom == "structure_mastery":
-            if any(x in tl for x in ("инженер", "данн", "аналит", "сопровожд", "систем", "закуп")):
-                sc += 14
+            if tag in ("IT", "инженерия") or any(
+                x in tl for x in ("инженер", "данн", "аналит", "систем", "ai")
+            ):
+                sc += 12.0
+            if user_tag == "IT" and any(x in tl for x in ("закуп", "транспорт", "недвижим", "юрист")):
+                sc -= 18.0
         elif dom == "people_service":
             if any(x in tl for x in ("продаж", "hr", "клиент", "рекрут", "развития")):
-                sc += 16
+                sc += 14.0
         elif dom == "self_insight":
-            sc += 6
+            sc += 5.0
         else:
-            sc += 4
+            sc += 3.0
 
-        if dk == "it_dev" and any(x in combined for x in ("it", "данн", "систем", "sql", "тех")):
-            sc += 10
-        if dk == "data" and any(x in combined for x in ("данн", "аналит", "отчёт", "метрик", "excel")):
-            sc += 12
-        if dk == "design" and any(x in combined for x in ("дизайн", "визуал", "ux", "бренд")):
-            sc += 10
+        if dk == "data" and any(x in combined for x in ("данн", "аналит", "отчёт", "метрик", "excel", "sql")):
+            sc += 10.0
 
-        sc += float((fp >> (len(scored) % 7)) % 9)
+        sc += float((fp >> (len(scored) % 7)) % 5)
         scored.append((sc, title))
 
-    scored.sort(key=lambda x: -x[0])
-    top = scored[:limit]
-    mx = top[0][0] if top else 1.0
-    if mx < 1:
-        mx = 1.0
-    rows: List[Dict[str, Any]] = []
-    for rank, (sc, title) in enumerate(top):
-        pct = int(round(40 + 55 * (sc / mx)))
-        pct = max(38, min(97, pct))
-        rows.append({"role_name": title, "percent": pct, "rank": rank})
+    rows = _percent_rows_from_scored(scored, limit)
+    if user_tag == "IT" and rows:
+        top_name = (rows[0].get("role_name") or "").lower()
+        if any(x in top_name for x in ("закуп", "транспорт", "недвижим", "юрист", "хозяйствен")):
+            return _rank_career_direction_rows(eff, axes, fp, answers, limit)
     return rows
 
 
@@ -815,41 +1158,6 @@ def _advice_blocks(
     return {"by_plan": out}
 
 
-def _growth_stages(interest: str) -> List[Dict[str, Any]]:
-    return [
-        {
-            "stage": 1,
-            "title": "Самопознание и ценности",
-            "subtitle": f"Опора перед выбором в «{interest}»",
-            "body": "Выписать сильные стороны и примеры; отметить, где сейчас энергия и интерес; отделить хобби от готовности делать то же для запросов других людей.",
-            "horizon": "2–4 недели",
-            "focus_tags": ["трио", "якоря"],
-            "milestones": ["Список сильных сторон", "Черновик карьерных ценностей"],
-            "when_next": "Когда ясно, что вас мотивирует в работе и где вы готовы отдавать ценность не только себе.",
-        },
-        {
-            "stage": 2,
-            "title": "Резюме и поддержка",
-            "subtitle": "Снять страх отклика",
-            "body": "Разобрать структуру резюме; при страхе ошибки — опора на гайды; при страхе отказа — друг или консультант; спросить близких: «с каким вопросом ты ко мне приходишь?»",
-            "horizon": "2–6 недель",
-            "focus_tags": ["резюме", "обратная связь"],
-            "milestones": ["Черновик резюме", "3 формулировки достижений от друзей/наставника"],
-            "when_next": "Когда есть версия резюме, которую не стыдно показать и вы готовы к первым откликам.",
-        },
-        {
-            "stage": 3,
-            "title": "Рынок и тип среды",
-            "subtitle": "Голланд, команда, ритм",
-            "body": "Целенаправленно откликайтесь с учётом типа среды (идеи, практика, люди, творчество) и комфорта: общение vs регламент, хаос vs план.",
-            "horizon": "1–3 месяца",
-            "focus_tags": ["отклики", "собес"],
-            "milestones": ["10 откликов", "3 разговора с работодателями или стажировками"],
-            "when_next": "Когда есть оффер, стажировка или понятный разбор, что докрутить.",
-        },
-    ]
-
-
 def build_analysis_result(
     profile: Dict[str, Any],
     profile_extra: Dict[str, Any],
@@ -869,21 +1177,59 @@ def build_analysis_result(
         axes = _radar_axes(vec)
         readiness = readiness_vec
     fp = _answer_fingerprint(answers)
-    scenarios = _pick_scenario_plans(interest, axes, fp)
+    eff_interest = _resolve_effective_interest(profile, interest)
+    scenarios = _pick_scenario_plans(eff_interest, axes, fp, answers)
     plans = scenarios.get("plans") or []
     top_track = str(scenarios.get("best_plan_name") or (plans[0].get("name") if plans else interest))
     top_track = re.sub(r"^План [ABC]:\s*", "", top_track).strip() or interest
     gap = _build_gap_analysis(profile, interest, top_track, axes, fp)
-    mts_rows = _rank_mts_rows(profile, profile_extra, interest, answers, axes)
-    learning = _learning_cards(interest, preparation_level)
-    advice = _advice_blocks(scenarios, preparation_level, profile, gap)
-    stages = _growth_stages(interest)
+    mts_rows = _rank_mts_rows(profile, profile_extra, eff_interest, answers, axes)
+    from wibe_work.services.learning.engine import build_learning_for_analysis
+
+    _learning_pack = build_learning_for_analysis(
+        user_id=str(profile.get("_user_id") or "") or None,
+        profile=profile,
+        interest=eff_interest,
+        preparation_level=preparation_level,
+        scenarios=scenarios,
+        gap=gap,
+    )
+    learning = _learning_pack.get("learning") or _learning_cards(
+        eff_interest, preparation_level
+    )
+    learning_path = _learning_pack.get("learning_path")
+    from wibe_work.services.learning.personalized_advice import build_individual_advice
+
+    profile_summary_pre = _profile_summary_rich(
+        profile, profile_extra, interest, education, preparation_level
+    )
+    advice = build_individual_advice(
+        scenarios=scenarios,
+        preparation_level=preparation_level,
+        profile=profile,
+        gap=gap,
+        interest=eff_interest,
+        learning_path=learning_path,
+        profile_summary=profile_summary_pre,
+        user_id=str(profile.get("_user_id") or "") or None,
+    )
+    from wibe_work.services.learning.growth_stages import build_growth_stages
+
+    stages = build_growth_stages(
+        interest=interest,
+        eff_interest=eff_interest,
+        preparation_level=preparation_level,
+        readiness_percent=readiness,
+        profile=profile,
+        gap=gap,
+        scenarios=scenarios,
+        individual_advice=advice,
+        learning_path=learning_path,
+    )
     pain_focus = _pain_focus(profile)
     weekly = _weekly_roadmap(top_track, interest)
 
-    profile_summary = _profile_summary_rich(
-        profile, profile_extra, interest, education, preparation_level
-    )
+    profile_summary = profile_summary_pre
     directions_hint = ", ".join(
         f"{p['id']}: {p.get('name', '')} (~{p['score_percent']}%)"
         for p in scenarios.get("plans", [])
@@ -925,6 +1271,7 @@ def build_analysis_result(
         "scenarios": scenarios,
         "mts_matrix": {"rows": mts_rows},
         "learning": learning,
+        "learning_path": learning_path,
         "individual_advice": advice,
         "growth_stages": stages,
         "gap_analysis": gap,
@@ -939,6 +1286,8 @@ def build_analysis_result(
         "directions_hint": directions_hint,
         "narrative": narrative,
         "_timings_note": question_timings_ms,
+        "_analysis_interest": eff_interest,
+        "_quiz_answers": answers,
     }
 
 
@@ -949,8 +1298,10 @@ def public_analysis_payload(full: Dict[str, Any]) -> Dict[str, Any]:
         "readiness",
         "style_radar",
         "scenarios",
+        "inferred_profession",
         "mts_matrix",
         "learning",
+        "learning_path",
         "individual_advice",
         "growth_stages",
         "gap_analysis",
@@ -961,4 +1312,8 @@ def public_analysis_payload(full: Dict[str, Any]) -> Dict[str, Any]:
         "ai_narrative_source",
         "ai_narrative_notice",
     )
-    return {k: full[k] for k in keys if k in full}
+    out = {k: full[k] for k in keys if k in full}
+    inf = (full.get("scenarios") or {}).get("inferred_profession")
+    if inf and "inferred_profession" not in out:
+        out["inferred_profession"] = inf
+    return out

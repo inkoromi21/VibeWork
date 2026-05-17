@@ -20,7 +20,7 @@ export HH_USER_AGENT="${HH_USER_AGENT:-VibeWork/1.0 (+https://api.hh.ru)}"
 
 if [ ! -f "$REPO_ROOT/.env" ]; then
   echo -e "${c_red}✗ Нет .env в корне ($REPO_ROOT)${c_rst}"
-  echo -e "${c_dim}  cp miniapp/.env.example .env — затем TELEGRAM_BOT_TOKEN от @BotFather${c_rst}"
+  echo -e "${c_dim}  создайте .env в корне репо — TELEGRAM_BOT_TOKEN от @BotFather (docs/ENV.md)${c_rst}"
   exit 1
 fi
 if ! grep -qE '^[[:space:]]*TELEGRAM_BOT_TOKEN=[^[:space:]]' "$REPO_ROOT/.env"; then

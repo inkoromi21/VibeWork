@@ -1,3 +1,12 @@
+# Секреты и `.env`
+
+- Все ключи — только в **`/.env`** (локально и на VPS `/opt/vibework/.env`), файл в `.gitignore`.
+- Справка по именам переменных: [docs/ENV.md](../docs/ENV.md).
+- С ПК: `.\deploy\sync-env-to-vps.ps1` копирует корневой `.env` на сервер.
+- Опционально: `git config core.hooksPath .githooks` — pre-commit не даст закоммитить токены в `deploy/`.
+
+---
+
 # Git на VPS: Fine-grained Personal Access Token (HTTPS)
 
 Чтобы `git pull` на сервере **не спрашивал логин/пароль**, используйте PAT и один из способов ниже.

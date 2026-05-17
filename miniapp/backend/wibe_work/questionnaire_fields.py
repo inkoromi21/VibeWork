@@ -41,6 +41,65 @@ COMPLETION_REQUIRED: List[str] = [
 COMPLETION_ANY_OF: List[List[str]] = [["interest_spheres", "main_sphere"]]
 
 
+def normalize_profile_for_completion(profile: Dict[str, Any]) -> Dict[str, Any]:
+    """Свести legacy-поля к id из схемы v2 перед проверкой заполненности."""
+    p = dict(profile or {})
+    if not (p.get("course_grade") or "").strip() and p.get("course_or_grade") not in (None, ""):
+        p["course_grade"] = str(p["course_or_grade"]).strip()
+    if not (p.get("work_format_preference") or "").strip():
+        wfp = p.get("work_format_pref")
+        if isinstance(wfp, list) and wfp:
+            p["work_format_preference"] = str(wfp[0]).strip()
+        elif isinstance(wfp, str) and wfp.strip():
+            part = wfp.split(",")[0].strip()
+            if part:
+                p["work_format_preference"] = part
+    if not (p.get("education_detail") or "").strip() and (p.get("education_level") or "").strip():
+        p["education_detail"] = str(p["education_level"]).strip()
+    if not (p.get("like_to_do") or "").strip() and (p.get("interests") or "").strip():
+        p["like_to_do"] = str(p["interests"]).strip()
+    return p
+
+
+def _value_filled(value: Any) -> bool:
+    if value is None or value == "":
+        return False
+    if isinstance(value, (int, float)):
+        return not (isinstance(value, float) and value != value)
+    if isinstance(value, str):
+        return bool(value.strip())
+    return True
+
+
+def profile_field_filled(profile: Dict[str, Any], field_id: str) -> bool:
+    from wibe_work.services.user_context import parse_interest_spheres
+
+    if not profile:
+        return False
+    if field_id == "interest_spheres":
+        return bool(parse_interest_spheres(profile) or (profile.get("main_sphere") or "").strip())
+    if field_id == "course_grade":
+        return _value_filled(profile.get("course_grade")) or _value_filled(profile.get("course_or_grade"))
+    if field_id == "work_format_preference":
+        return _value_filled(profile.get("work_format_preference")) or _value_filled(profile.get("work_format_pref"))
+    if field_id == "education_detail":
+        return _value_filled(profile.get("education_detail")) or _value_filled(profile.get("education_level"))
+    if field_id == "like_to_do":
+        return _value_filled(profile.get("like_to_do")) or _value_filled(profile.get("interests"))
+    return _value_filled(profile.get(field_id))
+
+
+def is_profile_complete(profile: Dict[str, Any]) -> bool:
+    p = normalize_profile_for_completion(profile)
+    for fid in COMPLETION_REQUIRED:
+        if not profile_field_filled(p, fid):
+            return False
+    for group in COMPLETION_ANY_OF:
+        if not any(profile_field_filled(p, fid) for fid in group):
+            return False
+    return True
+
+
 def get_profile_schema() -> Dict[str, Any]:
     sphere_opts = [{"id": s["id"], "label": s["label"]} for s in INTEREST_SPHERES]
 

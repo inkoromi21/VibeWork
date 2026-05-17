@@ -23,6 +23,16 @@ def require_bearer_matches_user(request: Request, user_id: str) -> None:
         raise HTTPException(status_code=403, detail="Нет доступа к этим данным.")
 
 
+def optional_user_id_from_bearer(request: Request) -> str | None:
+    """user_id из JWT, если заголовок есть; иначе None (без 401)."""
+    auth = request.headers.get("Authorization") or request.headers.get("authorization") or ""
+    if not auth.lower().startswith("bearer "):
+        return None
+    token = auth[7:].strip()
+    sub = decode_token_subject(token)
+    return str(sub) if sub else None
+
+
 def get_current_user_id_from_bearer(request: Request) -> str:
     """Текущий user_id из JWT (без сопоставления с path)."""
     auth = request.headers.get("Authorization") or request.headers.get("authorization") or ""

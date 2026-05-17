@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VibeWork — админ</title>
+    <style>
+        :root {
+            --bg: #0f1419;
+            --surface: #1a222c;
+            --border: #2d3a47;
+            --text: #e8eef4;
+            --muted: #8b9aab;
+            --accent: #22c55e;
+            --accent-dim: #166534;
+            --danger: #f87171;
+            --radius: 10px;
+            --font: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+        a { color: var(--accent); }
+        .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
+        h1 { font-size: 1.35rem; margin: 0 0 8px; }
+        h2 { font-size: 1.1rem; margin: 0 0 12px; }
+        .muted { color: var(--muted); font-size: 0.9rem; }
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
+        input {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 1rem;
+            margin-bottom: 12px;
+        }
+        button, .btn {
+            display: inline-block;
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: none;
+            font-size: 0.95rem;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .btn-primary { background: var(--accent); color: #052e16; font-weight: 600; }
+        .btn-primary:hover { filter: brightness(1.05); }
+        .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+        .btn-secondary:hover { border-color: var(--muted); }
+        .msg { padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 0.9rem; }
+        .msg.err { background: rgba(248,113,113,0.15); color: var(--danger); }
+        .msg.ok { background: rgba(34,197,94,0.12); color: var(--accent); }
+        .hidden { display: none !important; }
+        .topbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+        th, td {
+            text-align: left;
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+        th { color: var(--muted); font-weight: 500; }
+        tr.user-row { cursor: pointer; }
+        tr.user-row:hover { background: rgba(34,197,94,0.06); }
+        tr.user-row.selected { background: rgba(34,197,94,0.12); }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            background: var(--border);
+            color: var(--muted);
+        }
+        .badge.yes { background: var(--accent-dim); color: #bbf7d0; }
+        .layout { display: grid; grid-template-columns: 1fr; gap: 16px; }
+        @media (min-width: 900px) {
+            .layout.has-detail { grid-template-columns: 1fr 1fr; }
+        }
+        .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .tab {
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .tab.active { border-color: var(--accent); color: var(--accent); background: rgba(34,197,94,0.08); }
+        pre.json {
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 0.8rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            max-height: 420px;
+            overflow: auto;
+            margin: 0;
+        }
+        .chat-block { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+        .chat-msg { margin: 6px 0; padding: 8px 10px; border-radius: 8px; font-size: 0.88rem; }
+        .chat-msg.user { background: rgba(59,130,246,0.12); }
+        .chat-msg.assistant { background: rgba(34,197,94,0.08); }
+        .chat-role { font-size: 0.72rem; text-transform: uppercase; color: var(--muted); }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div id="loginView">
+        <div class="card" style="max-width:400px;margin:40px auto">
+            <h1>Вход администратора</h1>
+            <p class="muted">Логин и пароль задаются в корневом <code>.env</code> (<code>ADMIN_LOGIN</code>, <code>ADMIN_PASSWORD</code>).</p>
+            <div id="loginMsg" class="msg err hidden"></div>
+            <label for="admLogin">Логин</label>
+            <input id="admLogin" type="text" autocomplete="username">
+            <label for="admPass">Пароль</label>
+            <input id="admPass" type="password" autocomplete="current-password">
+            <button type="button" class="btn-primary" id="btnLogin">Войти</button>
+        </div>
+    </div>
+
+    <div id="dashView" class="hidden">
+        <div class="topbar">
+            <div>
+                <h1>Админ-панель VibeWork</h1>
+                <p class="muted">Зарегистрированные пользователи и их данные</p>
+            </div>
+            <div>
+                <a href="/" class="btn btn-secondary" style="margin-right:8px;text-decoration:none">На сайт</a>
+                <button type="button" class="btn-secondary" id="btnLogout">Выйти</button>
+            </div>
+        </div>
+        <div id="dashMsg" class="msg err hidden"></div>
+        <div class="layout" id="mainLayout">
+            <div class="card">
+                <h2>Пользователи <span class="muted" id="userCount"></span></h2>
+                <div id="usersTableWrap"><p class="muted">Загрузка…</p></div>
+            </div>
+            <div class="card hidden" id="detailCard">
+                <h2 id="detailTitle">Пользователь</h2>
+                <div class="tabs" id="detailTabs"></div>
+                <div id="detailBody"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const API = '/admin/api';
+    const loginView = document.getElementById('loginView');
+    const dashView = document.getElementById('dashView');
+    const loginMsg = document.getElementById('loginMsg');
+    const dashMsg = document.getElementById('dashMsg');
+    let users = [];
+    let selectedId = null;
+    let detail = null;
+    let activeTab = 'profile';
+
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function showMsg(el, text, ok) {
+        el.textContent = text || '';
+        el.classList.toggle('hidden', !text);
+        el.classList.toggle('err', !ok);
+        el.classList.toggle('ok', !!ok);
+    }
+
+    async function api(path, opts) {
+        const res = await fetch(API + path, Object.assign({
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        }, opts || {}));
+        let data = null;
+        try { data = await res.json(); } catch (e) { /* */ }
+        if (!res.ok) {
+            const d = (data && data.detail) ? (typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)) : res.statusText;
+            throw new Error(d || 'Ошибка запроса');
+        }
+        return data;
+    }
+
+    async function checkSession() {
+        const me = await api('/me');
+        if (!me.configured) {
+            showMsg(loginMsg, 'Админка не настроена: добавьте ADMIN_LOGIN и ADMIN_PASSWORD в .env и перезапустите API.', false);
+            loginView.classList.remove('hidden');
+            dashView.classList.add('hidden');
+            return;
+        }
+        if (me.authenticated) {
+            loginView.classList.add('hidden');
+            dashView.classList.remove('hidden');
+            await loadUsers();
+        } else {
+            loginView.classList.remove('hidden');
+            dashView.classList.add('hidden');
+        }
+    }
+
+    document.getElementById('btnLogin').onclick = async function () {
+        showMsg(loginMsg, '');
+        try {
+            await api('/login', {
+                method: 'POST',
+                body: JSON.stringify({
+                    login: document.getElementById('admLogin').value.trim(),
+                    password: document.getElementById('admPass').value
+                })
+            });
+            document.getElementById('admPass').value = '';
+            loginView.classList.add('hidden');
+            dashView.classList.remove('hidden');
+            await loadUsers();
+        } catch (e) {
+            showMsg(loginMsg, e.message, false);
+        }
+    };
+
+    document.getElementById('btnLogout').onclick = async function () {
+        try { await api('/logout', { method: 'POST' }); } catch (e) { /* */ }
+        selectedId = null;
+        detail = null;
+        dashView.classList.add('hidden');
+        loginView.classList.remove('hidden');
+    };
+
+    async function loadUsers() {
+        showMsg(dashMsg, '');
+        const wrap = document.getElementById('usersTableWrap');
+        wrap.innerHTML = '<p class="muted">Загрузка…</p>';
+        try {
+            const data = await api('/users');
+            users = data.users || [];
+            document.getElementById('userCount').textContent = '(' + users.length + ')';
+            if (!users.length) {
+                wrap.innerHTML = '<p class="muted">Пока нет зарегистрированных пользователей.</p>';
+                return;
+            }
+            let html = '<table><thead><tr><th>Email / ID</th><th>Telegram</th><th>Анкета</th><th>Разбор</th><th>Чаты</th></tr></thead><tbody>';
+            for (let i = 0; i < users.length; i++) {
+                const u = users[i];
+                const label = u.email || u.user_id;
+                const tg = u.telegram_username ? '@' + u.telegram_username : (u.telegram_id ? 'id ' + u.telegram_id : '—');
+                html += '<tr class="user-row' + (u.user_id === selectedId ? ' selected' : '') + '" data-uid="' + esc(u.user_id) + '">';
+                html += '<td><strong>' + esc(label) + '</strong><br><span class="muted">' + esc(u.user_id) + '</span></td>';
+                html += '<td>' + esc(tg) + '</td>';
+                html += '<td><span class="badge' + (u.profile_completed ? ' yes' : '') + '">' + (u.profile_completed ? 'готова' : 'нет') + '</span></td>';
+                html += '<td><span class="badge' + (u.has_analysis ? ' yes' : '') + '">' + (u.has_analysis ? 'есть' : 'нет') + '</span></td>';
+                html += '<td>' + esc(String(u.chat_sessions || 0)) + '</td></tr>';
+            }
+            html += '</tbody></table>';
+            wrap.innerHTML = html;
+            wrap.querySelectorAll('.user-row').forEach(function (row) {
+                row.onclick = function () { selectUser(row.getAttribute('data-uid')); };
+            });
+        } catch (e) {
+            if (String(e.message).indexOf('401') >= 0 || e.message.indexOf('администратора') >= 0) {
+                dashView.classList.add('hidden');
+                loginView.classList.remove('hidden');
+                showMsg(loginMsg, 'Сессия истекла. Войдите снова.', false);
+                return;
+            }
+            wrap.innerHTML = '';
+            showMsg(dashMsg, e.message, false);
+        }
+    }
+
+    const TAB_LABELS = {
+        profile: 'Анкета',
+        quiz: 'Тест',
+        analysis: 'Разбор',
+        chats: 'Чаты ИИ',
+        simulator: 'Симулятор',
+        learning: 'Обучение'
+    };
+
+    async function selectUser(uid) {
+        selectedId = uid;
+        activeTab = 'profile';
+        document.querySelectorAll('.user-row').forEach(function (r) {
+            r.classList.toggle('selected', r.getAttribute('data-uid') === uid);
+        });
+        const card = document.getElementById('detailCard');
+        const layout = document.getElementById('mainLayout');
+        card.classList.remove('hidden');
+        layout.classList.add('has-detail');
+        document.getElementById('detailTitle').textContent = 'Загрузка…';
+        document.getElementById('detailBody').innerHTML = '<p class="muted">…</p>';
+        try {
+            detail = await api('/users/' + encodeURIComponent(uid));
+            document.getElementById('detailTitle').textContent = detail.email || detail.user_id;
+            renderDetailTabs();
+            renderDetailTab();
+        } catch (e) {
+            document.getElementById('detailBody').innerHTML = '<p class="msg err">' + esc(e.message) + '</p>';
+        }
+    }
+
+    function renderDetailTabs() {
+        const el = document.getElementById('detailTabs');
+        let html = '';
+        Object.keys(TAB_LABELS).forEach(function (k) {
+            html += '<button type="button" class="tab' + (k === activeTab ? ' active' : '') + '" data-tab="' + k + '">' + TAB_LABELS[k] + '</button>';
+        });
+        el.innerHTML = html;
+        el.querySelectorAll('.tab').forEach(function (btn) {
+            btn.onclick = function () {
+                activeTab = btn.getAttribute('data-tab');
+                renderDetailTabs();
+                renderDetailTab();
+            };
+        });
+    }
+
+    function renderDetailTab() {
+        const body = document.getElementById('detailBody');
+        if (!detail) return;
+        if (activeTab === 'profile') {
+            const p = detail.profile || {};
+            const lines = [];
+            if (detail.email) lines.push('Email: ' + detail.email);
+            if (detail.telegram && detail.telegram.telegram_id) {
+                lines.push('Telegram: ' + (detail.telegram.username ? '@' + detail.telegram.username : detail.telegram.telegram_id));
+            }
+            Object.keys(p).forEach(function (k) {
+                if (k === 'user_id') return;
+                const v = p[k];
+                if (v != null && v !== '') lines.push(k + ': ' + v);
+            });
+            body.innerHTML = '<pre class="json">' + esc(lines.join('\n') || 'Профиль пуст') + '</pre>';
+            return;
+        }
+        if (activeTab === 'quiz') {
+            const qa = detail.quiz_answers || [];
+            const pa = detail.poll_answers || [];
+            body.innerHTML =
+                '<p class="muted">Ответы карьерного теста (15 вопросов)</p><pre class="json">' + esc(JSON.stringify(qa, null, 2) || '[]') + '</pre>' +
+                (pa.length ? '<p class="muted">Опросы (polls)</p><pre class="json">' + esc(JSON.stringify(pa, null, 2)) + '</pre>' : '');
+            return;
+        }
+        if (activeTab === 'analysis') {
+            const a = detail.analysis;
+            body.innerHTML = a
+                ? '<p class="muted">Обновлено: ' + esc(detail.analysis_snapshot_updated_at || '—') + '</p><pre class="json">' + esc(JSON.stringify(a, null, 2)) + '</pre>'
+                : '<p class="muted">Разбор ещё не сохранён (пользователь не проходил тест или анализ).</p>';
+            return;
+        }
+        if (activeTab === 'chats') {
+            const sessions = detail.chat_sessions || [];
+            if (!sessions.length) {
+                body.innerHTML = '<p class="muted">Нет сохранённых чатов.</p>';
+                return;
+            }
+            let html = '';
+            sessions.forEach(function (s) {
+                html += '<div class="chat-block"><strong>' + esc(s.title || 'Диалог') + '</strong> <span class="muted">(' + esc(s.message_count) + ' сообщ.)</span>';
+                (s.messages || []).forEach(function (m) {
+                    const role = (m.role || '').toLowerCase();
+                    html += '<div class="chat-msg ' + esc(role) + '"><div class="chat-role">' + esc(role) + '</div><div>' + esc(m.content || '') + '</div></div>';
+                });
+                html += '</div>';
+            });
+            body.innerHTML = html;
+            return;
+        }
+        if (activeTab === 'simulator') {
+            const sim = detail.simulator;
+            if (!sim) {
+                body.innerHTML = '<p class="muted">Нет сохранённого прохождения. Прогресс пишется на сервер, когда пользователь залогинен и играет в симулятор.</p>';
+                return;
+            }
+            body.innerHTML =
+                '<p class="muted">Обновлено: ' + esc(sim.updated_at || '') + ' · роль: ' + esc(sim.role || '') +
+                ' · шаг: ' + esc(sim.step_index) + (sim.done ? ' · завершён' : '') + '</p>' +
+                '<pre class="json">' + esc(JSON.stringify(sim.state || sim, null, 2)) + '</pre>';
+            return;
+        }
+        if (activeTab === 'learning') {
+            const lp = detail.learning_progress || [];
+            body.innerHTML = lp.length
+                ? '<pre class="json">' + esc(JSON.stringify(lp, null, 2)) + '</pre>'
+                : '<p class="muted">Нет отметок по шагам обучения.</p>';
+        }
+    }
+
+    document.getElementById('admPass').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') document.getElementById('btnLogin').click();
+    });
+
+    checkSession().catch(function (e) {
+        showMsg(loginMsg, e.message, false);
+    });
+})();
+</script>
+</body>
+</html>
