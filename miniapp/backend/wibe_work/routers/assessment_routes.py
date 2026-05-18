@@ -189,6 +189,13 @@ async def quiz_analyze(user_id: str, request: Request, body: AnalyzeRequest):
     return public_analysis_payload(full)
 
 
+@miniapp_prefixed_router.get("/analysis/{user_id}/status")
+async def analysis_exists(user_id: str, request: Request):
+    """Быстрая проверка наличия разбора без пересборки learning path."""
+    require_bearer_matches_user(request, user_id)
+    return {"exists": bool(_load_analysis_snapshot(user_id))}
+
+
 @miniapp_prefixed_router.get("/analysis/{user_id}")
 async def get_saved_analysis(user_id: str, request: Request):
     require_bearer_matches_user(request, user_id)
@@ -203,30 +210,31 @@ async def get_saved_analysis(user_id: str, request: Request):
     refreshed = refresh_mts_matrix_in_snapshot(snap, profile, profile_extra)
     if refreshed is not snap:
         _save_analysis_snapshot(user_id, refreshed)
-    # обновить путь обучения с прогрессом
-    eff = str(refreshed.get("_analysis_interest") or _interest_for_user(profile, None))
-    prep = _prep_for_user(profile, None)
-    lp = build_learning_path_payload(
-        user_id=user_id,
-        profile=profile,
-        interest=eff,
-        preparation_level=prep,
-        scenarios=refreshed.get("scenarios"),
-        gap=refreshed.get("gap_analysis"),
-    )
-    from wibe_work.services.learning.engine import build_learning_for_analysis
 
-    pack = build_learning_for_analysis(
-        user_id=user_id,
-        profile=profile,
-        interest=eff,
-        preparation_level=prep,
-        scenarios=refreshed.get("scenarios"),
-        gap=refreshed.get("gap_analysis"),
-    )
-    refreshed = dict(refreshed)
-    refreshed["learning_path"] = pack.get("learning_path") or lp
-    refreshed["learning"] = pack.get("learning")
+    lp = refreshed.get("learning_path")
+    has_path = isinstance(lp, dict) and bool(lp.get("steps"))
+    if has_path:
+        from wibe_work.services.learning.engine import merge_learning_progress_in_snapshot
+
+        refreshed = merge_learning_progress_in_snapshot(refreshed, user_id)
+    else:
+        eff = str(refreshed.get("_analysis_interest") or _interest_for_user(profile, None))
+        prep = _prep_for_user(profile, None)
+        from wibe_work.services.learning.engine import build_learning_for_analysis
+
+        pack = build_learning_for_analysis(
+            user_id=user_id,
+            profile=profile,
+            interest=eff,
+            preparation_level=prep,
+            scenarios=refreshed.get("scenarios"),
+            gap=refreshed.get("gap_analysis"),
+        )
+        refreshed = dict(refreshed)
+        refreshed["learning_path"] = pack.get("learning_path")
+        refreshed["learning"] = pack.get("learning")
+        _save_analysis_snapshot(user_id, refreshed)
+
     return public_analysis_payload(refreshed)
 
 
@@ -242,8 +250,14 @@ async def learning_progress_update(
 ):
     require_bearer_matches_user(request, user_id)
     set_step_status(user_id, body.path_id.strip(), body.step_id.strip(), body.status.strip())
-    profile = load_profile(user_id)
     snap = _load_analysis_snapshot(user_id)
+    lp = (snap or {}).get("learning_path")
+    if isinstance(lp, dict) and lp.get("steps") and str(lp.get("path_id") or "") == body.path_id.strip():
+        from wibe_work.services.learning.engine import merge_learning_progress_in_snapshot
+
+        merged = merge_learning_progress_in_snapshot(snap, user_id)
+        return {"ok": True, "learning_path": merged.get("learning_path") or lp}
+    profile = load_profile(user_id)
     eff = _interest_for_user(profile, None)
     if snap and snap.get("_analysis_interest"):
         eff = str(snap["_analysis_interest"])

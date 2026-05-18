@@ -190,3 +190,58 @@ def build_learning_for_analysis(
 
 def get_integration_status() -> Dict[str, Any]:
     return integration_status()
+
+
+def learning_cards_from_path_payload(
+    path_payload: Dict[str, Any],
+    *,
+    limit: int = 8,
+) -> List[Dict[str, Any]]:
+    """Карточки из уже сохранённых resources шагов (без повторных внешних адаптеров)."""
+    cards: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for step in path_payload.get("steps") or []:
+        for res in step.get("resources") or []:
+            url = (res.get("url") or "").strip()
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            cards.append(
+                {
+                    "title": res.get("title"),
+                    "url": url,
+                    "kind": res.get("kind") or "ресурс",
+                    "description": (res.get("description") or step.get("goal") or "")[:300],
+                    "step_title": step.get("title"),
+                    "provider": res.get("provider"),
+                }
+            )
+            if len(cards) >= limit:
+                return cards
+    return cards
+
+
+def merge_learning_progress_in_snapshot(
+    snap: Dict[str, Any],
+    user_id: str,
+) -> Dict[str, Any]:
+    """Обновить только статусы шагов из БД — без пересборки каталога и API."""
+    lp = snap.get("learning_path")
+    if not isinstance(lp, dict) or not lp.get("path_id"):
+        return snap
+    path_id = str(lp["path_id"])
+    steps = list(lp.get("steps") or [])
+    if not steps:
+        return snap
+    progress = get_progress_map(user_id, path_id)
+    steps = apply_progress_to_steps(steps, progress)
+    out = dict(snap)
+    lp_out = dict(lp)
+    lp_out["steps"] = steps
+    lp_out["metrics"] = compute_metrics(steps)
+    out["learning_path"] = lp_out
+    if not out.get("learning"):
+        cards = learning_cards_from_path_payload(lp_out)
+        if cards:
+            out["learning"] = cards
+    return out

@@ -1500,6 +1500,19 @@
             animation: spin .8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+        .loading span { font-size: .95rem; font-weight: 600; color: var(--text); }
+        .loading .loading-hint {
+            font-size: .85rem;
+            font-weight: 400;
+            color: var(--text-muted);
+            text-align: center;
+            max-width: 340px;
+            line-height: 1.45;
+        }
+        .chat-bubble.chat-pending {
+            opacity: 0.92;
+            border-style: dashed;
+        }
         .auth-error {
             color: var(--danger);
             font-size: .85rem;
@@ -2158,6 +2171,7 @@
         testGradeHint: ''
     };
     let chatMessages = [];
+    let chatReplyPending = false;
     /** Текущая сессия ИИ-чата (UUID), хранится в localStorage vw_chat_session_<userId>. */
     let chatSessionId = null;
     let jobsViewMode = 'classic';
@@ -2196,6 +2210,33 @@
     let testSphereSelection = null;
     let hasSavedAnalysis = false;
     let analysisCheckDone = false;
+    let cachedAnalysisPayload = null;
+    let cachedAnalysisUserId = null;
+
+    function clearAnalysisCache() {
+        cachedAnalysisPayload = null;
+        cachedAnalysisUserId = null;
+    }
+
+    async function fetchAnalysisPayload(opts) {
+        const force = !!(opts && opts.force);
+        if (!force && cachedAnalysisPayload && cachedAnalysisUserId === userId) {
+            return { ok: true, status: 200, data: cachedAnalysisPayload };
+        }
+        const res = await fetchJson('/vibework/analysis/' + encodeURIComponent(userId));
+        if (res.status === 404) {
+            return { ok: false, status: 404, data: null };
+        }
+        if (!res.ok) {
+            return { ok: false, status: res.status, data: null };
+        }
+        const d = await res.json();
+        cachedAnalysisPayload = d;
+        cachedAnalysisUserId = userId;
+        hasSavedAnalysis = true;
+        analysisCheckDone = true;
+        return { ok: true, status: res.status, data: d };
+    }
 
     function apiUrl(path) {
         if (!path.startsWith('/')) path = '/' + path;
@@ -2206,6 +2247,17 @@
         const t = localStorage.getItem(ACCESS_TOKEN_KEY);
         if (t) h['Authorization'] = 'Bearer ' + t;
         return h;
+    }
+
+    function loadingBlock(message, hint) {
+        let h =
+            '<div class="loading"><div class="spinner"></div><span>' +
+            esc(message || 'Загрузка…') +
+            '</span>';
+        if (hint) {
+            h += '<span class="loading-hint">' + esc(hint) + '</span>';
+        }
+        return h + '</div>';
     }
 
     function esc(s) {
@@ -2626,8 +2678,11 @@
     async function refreshAnalysisFlag() {
         if (!userId) return;
         try {
-            const res = await fetchJson('/vibework/analysis/' + encodeURIComponent(userId));
-            hasSavedAnalysis = res.ok;
+            const res = await fetchJson(
+                '/vibework/analysis/' + encodeURIComponent(userId) + '/status'
+            );
+            const data = await res.json();
+            hasSavedAnalysis = res.ok && !!data.exists;
         } catch (e) {
             hasSavedAnalysis = false;
         }
@@ -2662,6 +2717,7 @@
         profileDraftSessionUser = null;
         hasSavedAnalysis = false;
         analysisCheckDone = false;
+        clearAnalysisCache();
     }
 
     function logout() {
@@ -3740,6 +3796,11 @@
                 }
                 const btn = this;
                 btn.disabled = true;
+                const testHost = document.getElementById('tabContent');
+                testHost.innerHTML = loadingBlock(
+                    'Разбор подготавливается',
+                    'ИИ формирует краткий вывод и персональные блоки. Обычно это занимает 15–60 секунд.'
+                );
                 try {
                     const r = await fetchJson('/vibework/quiz/analyze/' + encodeURIComponent(userId), {
                         method: 'POST',
@@ -3751,12 +3812,18 @@
                     });
                     const data = await r.json();
                     if (!r.ok) throw new Error(data.detail || 'Ошибка');
+                    cachedAnalysisPayload = data;
+                    cachedAnalysisUserId = userId;
+                    hasSavedAnalysis = true;
+                    analysisCheckDone = true;
                     showAppAlert('Разбор готов — откройте вкладку «Разбор».', 'Готово', async function () {
                         currentTab = 'analysis';
                         await renderShell();
                     });
                 } catch (e) {
                     showAppAlert(String(e.message || e), 'Ошибка');
+                    await renderTestTab();
+                    return;
                 }
                 btn.disabled = false;
             };
@@ -3884,17 +3951,7 @@
         return h;
     }
 
-    async function renderAnalysisTab() {
-        const el = document.getElementById('tabContent');
-        el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-        try {
-            const res = await fetchJson('/vibework/analysis/' + encodeURIComponent(userId));
-            if (res.status === 404) {
-                el.innerHTML = '<h2>Разбор</h2><p class="muted">Сначала пройдите тест на вкладке «Тест» — появятся метрики, сценарии и план развития.</p>';
-                return;
-            }
-            const d = await res.json();
-            hasSavedAnalysis = true;
+    function buildAnalysisTabHtml(d) {
             const axes = (d.style_radar && d.style_radar.axes) || [];
             let html = '<h2>Автоматический разбор</h2>';
             html += '<p class="analysis-ts">Разбор: ' + esc(d.analyzed_at || '') + '</p>';
@@ -4363,7 +4420,38 @@
                         '</p></div>';
                 }
             }
-            el.innerHTML = html;
+        return html;
+    }
+
+    async function renderAnalysisTab() {
+        const el = document.getElementById('tabContent');
+        if (cachedAnalysisPayload && cachedAnalysisUserId === userId) {
+            el.innerHTML = buildAnalysisTabHtml(cachedAnalysisPayload);
+            fetchAnalysisPayload({ force: true })
+                .then(function (pack) {
+                    if (
+                        pack.ok &&
+                        pack.data &&
+                        currentTab === 'analysis' &&
+                        document.getElementById('tabContent') === el
+                    ) {
+                        el.innerHTML = buildAnalysisTabHtml(pack.data);
+                    }
+                })
+                .catch(function () {});
+            return;
+        }
+        el.innerHTML = loadingBlock('Загружаем разбор…', '');
+        try {
+            const pack = await fetchAnalysisPayload({ force: true });
+            if (pack.status === 404) {
+                el.innerHTML = '<h2>Разбор</h2><p class="muted">Сначала пройдите тест на вкладке «Тест» — появятся метрики, сценарии и план развития.</p>';
+                return;
+            }
+            if (!pack.ok || !pack.data) {
+                throw new Error('Не удалось загрузить разбор');
+            }
+            el.innerHTML = buildAnalysisTabHtml(pack.data);
         } catch (e) {
             el.innerHTML = '<p>' + esc(e.message) + '</p>';
         }
@@ -4382,6 +4470,10 @@
             const cl = m.role === 'user' ? 'user' : 'ai';
             const who = m.role === 'user' ? 'Вы' : 'ИИ';
             h += '<div class="chat-bubble ' + cl + '"><div class="who">' + who + '</div>' + esc(m.content) + '</div>';
+        }
+        if (chatReplyPending) {
+            h +=
+                '<div class="chat-bubble ai chat-pending"><div class="who">ИИ</div>ИИ формирует ответ…</div>';
         }
         log.innerHTML = h;
         log.scrollTop = log.scrollHeight;
@@ -4526,24 +4618,32 @@
 
     async function renderChatTab() {
         const el = document.getElementById('tabContent');
-        el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
         let analysisOk = false;
-        try {
-            const ar = await fetchJson('/vibework/analysis/' + encodeURIComponent(userId));
-            analysisOk = ar.ok;
-            hasSavedAnalysis = ar.ok;
-        } catch (e) {
-            analysisOk = false;
+        if (analysisCheckDone) {
+            analysisOk = hasSavedAnalysis;
+        } else {
+            el.innerHTML = loadingBlock('Загружаем чат…', '');
+            try {
+                const sr = await fetchJson(
+                    '/vibework/analysis/' + encodeURIComponent(userId) + '/status'
+                );
+                const sd = await sr.json();
+                analysisOk = sr.ok && !!sd.exists;
+                hasSavedAnalysis = analysisOk;
+                analysisCheckDone = true;
+            } catch (e) {
+                analysisOk = false;
+            }
         }
-        let schema = null;
-        let profile = {};
-        try {
-            schema = await ensureSchema();
-            const pr = await fetchJson('/profile/' + encodeURIComponent(userId));
-            profile = await pr.json();
-        } catch (e) {}
-        const profileOk = schema ? isProfileComplete(schema, profile) : false;
         if (!analysisOk) {
+            let schema = null;
+            let profile = {};
+            try {
+                schema = await ensureSchema();
+                const pr = await fetchJson('/profile/' + encodeURIComponent(userId));
+                profile = await pr.json();
+            } catch (e) {}
+            const profileOk = schema ? isProfileComplete(schema, profile) : false;
             const li1 = profileOk ? '✓ Анкета заполнена' : '○ Заполните анкету (обязательные поля)';
             const li2 = '○ Пройдите тест: 10 вопросов по сфере + 5 профориентационных';
             const li3 = '○ Получите автоматический разбор';
@@ -4588,9 +4688,8 @@
             '<label for="chatInput">Сообщение</label>' +
             '<textarea id="chatInput" rows="2" placeholder="Например: привет — или вопрос по плану на месяц"></textarea>' +
             '<button type="button" class="btn-primary" style="margin-top:8px" id="btnSendChat">Отправить</button></div></div></div></div>';
-        await initAiChatSessionForTab();
         paintChatLogFromMessages();
-        await refreshChatHistoryList(el);
+        refreshChatHistoryList(el);
         const btnNew = document.getElementById('btnNewAiChat');
         if (btnNew) {
             btnNew.onclick = function () {
@@ -4614,9 +4713,12 @@
             if (!text) return;
             inp.value = '';
             chatMessages.push({ role: 'user', content: text });
-            paintChatLogFromMessages();
             const btn = this;
+            const inpSend = document.getElementById('chatInput');
             btn.disabled = true;
+            if (inpSend) inpSend.disabled = true;
+            chatReplyPending = true;
+            paintChatLogFromMessages();
             try {
                 const r = await fetchJson('/vibework/chat/' + encodeURIComponent(userId), {
                     method: 'POST',
@@ -4633,11 +4735,15 @@
             } catch (e) {
                 chatMessages.push({ role: 'assistant', content: 'Ошибка: ' + (e.message || String(e)) });
             }
+            chatReplyPending = false;
             btn.disabled = false;
+            if (inpSend) inpSend.disabled = false;
             paintChatLogFromMessages();
             await persistAiChatSession();
             await refreshChatHistoryList(el);
         };
+        await initAiChatSessionForTab();
+        paintChatLogFromMessages();
     }
 
     function jobsHhQueryString() {
