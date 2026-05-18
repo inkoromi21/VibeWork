@@ -2716,10 +2716,10 @@
             '<h2 style="margin-top:0">' + (isReg ? 'Регистрация' : 'Вход') + '</h2>' +
             '<p class="muted">' + (isReg
                 ? 'Почта и пароль — доступ к анкете, тесту и разбору.'
-                : 'Пользователь — email и пароль. Администратор — логин из .env (например admin) и пароль админа.') + '</p>' +
+                : 'Войдите по почте и паролю, которые указывали при регистрации.') + '</p>' +
             '<div id="authErr" class="auth-error" style="display:none"></div>' +
-            '<label for="authEmail">' + (isReg ? 'Email' : 'Email или логин администратора') + '</label>' +
-            '<input type="text" id="authEmail" autocomplete="username" placeholder="' + (isReg ? 'you@example.com' : 'you@example.com или admin') + '">' +
+            '<label for="authEmail">Email</label>' +
+            '<input type="text" id="authEmail" autocomplete="username" placeholder="you@example.com">' +
             '<label for="authPass">Пароль</label>' +
             '<input class="pwd-input" type="password" id="authPass" autocomplete="' + (isReg ? 'new-password' : 'current-password') + '" placeholder="' + (isReg ? 'Не меньше 8 символов' : '••••••••') + '">' +
             '<div class="pwd-reveal">' +
@@ -2781,7 +2781,7 @@
         const data = await res.json().catch(function () { return {}; });
         if (!res.ok) {
             let m = data.detail;
-            if (typeof m !== 'string') m = 'Неверный логин или пароль администратора';
+            if (typeof m !== 'string') m = 'Неверный email или пароль';
             errBox.textContent = m;
             errBox.style.display = 'block';
             return;
@@ -2795,18 +2795,18 @@
         const email = document.getElementById('authEmail').value.trim();
         const pass = sanitizePasswordInput(document.getElementById('authPass').value);
         if (!email) {
-            errBox.textContent = 'Укажите почту или логин';
+            errBox.textContent = 'Укажите почту';
             errBox.style.display = 'block';
             return;
         }
         if (authMode === 'register' && isAdminLoginField(email)) {
-            errBox.textContent = 'Администратор входит через «Войти», не через регистрацию.';
+            errBox.textContent = 'Для регистрации укажите email (например, name@example.com).';
             errBox.style.display = 'block';
             return;
         }
         if (authMode !== 'register' && isAdminLoginField(email)) {
             if (!pass) {
-                errBox.textContent = 'Укажите пароль администратора';
+                errBox.textContent = 'Укажите пароль';
                 errBox.style.display = 'block';
                 return;
             }
