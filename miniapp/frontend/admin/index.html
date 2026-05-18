@@ -133,8 +133,17 @@
 </head>
 <body>
 <div class="wrap">
-    <div id="gateView" class="card" style="max-width:420px;margin:48px auto;text-align:center">
-        <p class="muted" id="gateText">Проверка доступа…</p>
+    <div id="gateView" class="card" style="max-width:420px;margin:48px auto">
+        <h1 style="font-size:1.2rem;margin:0 0 8px">Вход в админку</h1>
+        <p class="muted" id="gateText" style="margin:0 0 16px">Проверка доступа…</p>
+        <div id="loginForm" class="hidden">
+            <label for="adminLogin">Логин</label>
+            <input type="text" id="adminLogin" autocomplete="username" placeholder="ADMIN_LOGIN из .env" />
+            <label for="adminPassword">Пароль</label>
+            <input type="password" id="adminPassword" autocomplete="current-password" placeholder="ADMIN_PASSWORD" />
+            <button type="button" class="btn-primary" id="btnAdminLogin" style="width:100%;margin-top:8px">Войти</button>
+            <p class="muted" style="margin:12px 0 0;font-size:.85rem"><a href="/">На главную сайта</a></p>
+        </div>
         <div id="loginMsg" class="msg err hidden"></div>
     </div>
 
@@ -209,6 +218,48 @@
         return data;
     }
 
+    const loginForm = document.getElementById('loginForm');
+    const adminLoginInput = document.getElementById('adminLogin');
+    const adminPasswordInput = document.getElementById('adminPassword');
+    const btnAdminLogin = document.getElementById('btnAdminLogin');
+
+    function showAdminLoginForm() {
+        if (gateText) gateText.textContent = 'Введите логин и пароль администратора из .env';
+        if (loginForm) loginForm.classList.remove('hidden');
+    }
+
+    async function adminSignIn() {
+        const login = (adminLoginInput && adminLoginInput.value || '').trim();
+        const password = adminPasswordInput ? adminPasswordInput.value : '';
+        if (!login || password.length < 8) {
+            showMsg(loginMsg, 'Укажите логин и пароль (не короче 8 символов).', false);
+            return;
+        }
+        showMsg(loginMsg, '');
+        try {
+            const res = await fetch('/auth/email/login', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: login, password: password })
+            });
+            const data = await res.json().catch(function () { return {}; });
+            if (!res.ok) {
+                const d = data.detail;
+                const msg = typeof d === 'string' ? d : (res.statusText || 'Ошибка входа');
+                showMsg(loginMsg, msg, false);
+                return;
+            }
+            if (!data.admin) {
+                showMsg(loginMsg, 'Это пользовательский аккаунт. Для админки используйте ADMIN_LOGIN без @.', false);
+                return;
+            }
+            await checkSession();
+        } catch (e) {
+            showMsg(loginMsg, e.message || 'Не вышло войти', false);
+        }
+    }
+
     async function checkSession() {
         let me;
         try {
@@ -228,7 +279,16 @@
             await loadUsers();
             return;
         }
-        window.location.replace('/');
+        showAdminLoginForm();
+    }
+
+    if (btnAdminLogin) {
+        btnAdminLogin.onclick = adminSignIn;
+    }
+    if (adminPasswordInput) {
+        adminPasswordInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') adminSignIn();
+        });
     }
 
     document.getElementById('btnLogout').onclick = async function () {

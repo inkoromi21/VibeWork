@@ -70,11 +70,12 @@
           </a>.
         </span>
       </label>
+      <p id="auth-gate-error" class="auth-gate-error hidden" role="alert"></p>
       <div class="auth-gate-actions">
         <button type="button" class="btn-auth-gate btn-auth-gate-primary" id="btn-auth-login">Войти</button>
         <button type="button" class="btn-auth-gate btn-auth-gate-secondary" id="btn-auth-register">Регистрация</button>
       </div>
-      <p class="auth-hint auth-gate-hint muted small" id="auth-forgot-hint">Забыли пароль? Восстановление по email пока недоступно — можно <strong>зарегистрировать новый аккаунт</strong> на другой почте.</p>
+      <p class="auth-hint auth-gate-hint muted small" id="auth-forgot-hint">Забыли пароль? Восстановление по email пока недоступно — можно <strong>зарегистрировать новый аккаунт</strong> на другой почте. Админ-панель: <a href="/admin">/admin</a> (логин и пароль из <code>ADMIN_LOGIN</code> / <code>ADMIN_PASSWORD</code> в .env, без @).</p>
       <p class="auth-gate-brand" aria-hidden="true">
         <span class="brand-lockup brand-lockup--gate" translate="no">
           <span class="brand-brace" aria-hidden="true">{</span><span class="brand-name">VibeWork</span><span class="brand-brace" aria-hidden="true">}</span>
@@ -133,7 +134,6 @@
         <div class="topbar-tools">
           <span class="streak-chip" id="streak-chip" hidden>фокус</span>
           <button type="button" class="spark-btn" id="btn-spark-tip" title="Случайный совет">✦</button>
-          <button type="button" class="theme-toggle-btn" id="btn-theme-toggle" title="Тёмная тема" aria-pressed="false" aria-label="Переключить тему">🌙</button>
           <span class="live-pill compact live-pill--local" id="sync-pill" title="">
             <span class="dot" aria-hidden="true"></span>
             <span id="sync-pill-text">Локально</span>

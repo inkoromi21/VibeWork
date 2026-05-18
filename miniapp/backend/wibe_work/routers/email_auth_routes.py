@@ -156,7 +156,7 @@ def _migrate_legacy_isolated_user_if_valid(email: str, password: str) -> str | N
 
 
 @router.post("/register")
-async def email_register(body: EmailRegisterBody):
+async def email_register(body: EmailRegisterBody, response: Response):
     email = _norm_email(str(body.email))
     pw = sanitize_password_input(body.password)
     if len(pw) < 8:
@@ -195,6 +195,9 @@ async def email_register(body: EmailRegisterBody):
         )
         conn.commit()
     token = create_access_token(user_id)
+    from wibe_work.routers.website_auth_compat_routes import issue_browser_session
+
+    issue_browser_session(response, user_id)
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -416,6 +419,9 @@ async def email_login(body: EmailLoginBody, response: Response):
                 )
             raise HTTPException(status_code=401, detail="Аккаунт не найден.")
     token = create_access_token(user_id)
+    from wibe_work.routers.website_auth_compat_routes import issue_browser_session
+
+    issue_browser_session(response, user_id)
     return {
         "access_token": token,
         "token_type": "bearer",

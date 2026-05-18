@@ -25,6 +25,21 @@ const MICRO_TIPS = [
   "Если вам важен баланс жизни, вакансии «всегда на связи» быстро выжгут — честно сравнивайте с карьерными ценностями.",
 ];
 
+function showAuthGateError(msg) {
+  const el = document.getElementById("auth-gate-error");
+  if (!el) {
+    if (msg) showToast(msg);
+    return;
+  }
+  if (!msg) {
+    el.textContent = "";
+    el.classList.add("hidden");
+    return;
+  }
+  el.textContent = msg;
+  el.classList.remove("hidden");
+}
+
 function showToast(msg, ms = 4200) {
   const el = document.getElementById("app-toast");
   if (!el) return;
@@ -2288,30 +2303,92 @@ document.getElementById("sim-restart").addEventListener("click", () => {
   startSim().catch((e) => alert(e.message));
 });
 
-async function authRequest(path, email, password) {
-  const r = await fetch(path, {
+const ACCESS_TOKEN_KEY = "career_access_token";
+
+function formatAuthError(detail) {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((x) => (x && typeof x.msg === "string" ? x.msg : ""))
+      .filter(Boolean)
+      .join(" ") || "Ошибка запроса";
+  }
+  return "Ошибка запроса";
+}
+
+async function authRequestEmail(email, password) {
+  const login = (email || "").trim();
+  const r = await fetch("/auth/email/login", {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email: login, password }),
   });
   const j = await r.json().catch(() => ({}));
+  if (r.ok && j.admin) {
+    window.location.assign(j.redirect || "/admin");
+    return { ok: true, j, admin: true };
+  }
+  if (r.ok && j.access_token) {
+    try {
+      localStorage.setItem(ACCESS_TOKEN_KEY, j.access_token);
+      if (j.user_id) localStorage.setItem("userId", j.user_id);
+      if (j.email) localStorage.setItem("userEmail", j.email);
+    } catch (_) {}
+    return { ok: true, j };
+  }
+  return { ok: r.ok, j };
+}
+
+async function authRegisterEmail(email, password) {
+  const r = await fetch("/auth/email/register", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: (email || "").trim(), password }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (r.ok && j.access_token) {
+    try {
+      localStorage.setItem(ACCESS_TOKEN_KEY, j.access_token);
+      if (j.user_id) localStorage.setItem("userId", j.user_id);
+      if (j.email) localStorage.setItem("userEmail", j.email);
+    } catch (_) {}
+    return { ok: true, j };
+  }
   return { ok: r.ok, j };
 }
 
 document.getElementById("btn-auth-login").addEventListener("click", async () => {
+  showAuthGateError("");
   const email = document.getElementById("auth-email")?.value?.trim();
   const password = document.getElementById("auth-password")?.value || "";
   if (!email || password.length < 8) {
-    showToast("Укажите email и пароль не короче 8 символов.");
+    showAuthGateError("Укажите email и пароль не короче 8 символов (для админки — логин из .env без @).");
     return;
   }
-  const { ok, j } = await authRequest("/api/auth/login", email, password);
+  let ok;
+  let j;
+  try {
+    const res = await authRequestEmail(email, password);
+    if (res.admin) return;
+    ok = res.ok;
+    j = res.j;
+  } catch (e) {
+    showAuthGateError(e.message || "Не вышло войти");
+    return;
+  }
   if (!ok) {
-    showToast(typeof j.detail === "string" ? j.detail : "Не вышло войти");
+    showAuthGateError(formatAuthError(j.detail) || "Не вышло войти");
     return;
   }
   const me = await refreshAuthState();
+  if (!me.authenticated) {
+    showAuthGateError(
+      "Вход принят, но сессия не сохранилась. Разрешите cookie для сайта и обновите страницу (на сервере нужен деплой последней версии API)."
+    );
+    return;
+  }
   await fetchAndRenderQuiz();
   if (me.snapshot?.test_answers?.length === QUIZ.length) {
     applyTestAnswersToDom(me.snapshot.test_answers);
@@ -2337,23 +2414,28 @@ document.getElementById("btn-auth-login").addEventListener("click", async () => 
 });
 
 document.getElementById("btn-auth-register").addEventListener("click", async () => {
+  showAuthGateError("");
   const email = document.getElementById("auth-email")?.value?.trim();
   const password = document.getElementById("auth-password")?.value || "";
   const agree = document.getElementById("hh-agree");
   if (!email || password.length < 8) {
-    showToast("Укажите email и пароль не короче 8 символов.");
+    showAuthGateError("Укажите email и пароль не короче 8 символов.");
     return;
   }
   if (agree && !agree.checked) {
-    showToast("Чтобы зарегистрироваться, подтвердите согласие с офертой hh.ru.");
+    showAuthGateError("Чтобы зарегистрироваться, подтвердите согласие с офертой.");
     return;
   }
-  const { ok, j } = await authRequest("/api/auth/register", email, password);
+  const { ok, j } = await authRegisterEmail(email, password);
   if (!ok) {
-    showToast(typeof j.detail === "string" ? j.detail : "Регистрация не удалась");
+    showAuthGateError(formatAuthError(j.detail) || "Регистрация не удалась");
     return;
   }
-  await refreshAuthState();
+  const me = await refreshAuthState();
+  if (!me.authenticated) {
+    showAuthGateError("Аккаунт создан, но сессия не сохранилась. Обновите страницу и войдите снова.");
+    return;
+  }
   resetClientStateForNewAccount();
   await fetchAndRenderQuiz();
   updateQuizProgress();
@@ -2364,6 +2446,12 @@ document.getElementById("btn-auth-register").addEventListener("click", async () 
 document.getElementById("btn-auth-logout").addEventListener("click", async () => {
   try {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    await fetch("/auth/email/logout", { method: "POST", credentials: "include" }).catch(() => {});
+  } catch (_) {}
+  try {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem("userId");
+    localStorage.removeItem("userEmail");
   } catch (_) {}
   window.serverLoggedIn = false;
   window.serverEmail = null;

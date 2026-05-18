@@ -309,6 +309,21 @@ body.app-ready .auth-gate {
   background: var(--green-soft);
 }
 
+.auth-gate-error {
+  margin: 0.65rem 0 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.auth-gate-error.hidden {
+  display: none;
+}
+
 .auth-gate-hint {
   margin: 1rem 0 0;
   text-align: center;
@@ -759,6 +774,14 @@ html[data-theme="dark"] .avatar-bubble.sm {
 
 .theme-toggle-btn:active {
   transform: scale(0.96);
+}
+
+.theme-toggle-btn--floating {
+  position: fixed;
+  top: max(1rem, env(safe-area-inset-top));
+  right: max(1rem, env(safe-area-inset-right));
+  z-index: 10051;
+  box-shadow: var(--shadow);
 }
 
 .live-pill {

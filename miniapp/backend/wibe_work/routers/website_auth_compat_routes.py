@@ -135,6 +135,12 @@ def _clear_cookie(response: Response) -> None:
     )
 
 
+def issue_browser_session(response: Response, user_id: str) -> None:
+    """Cookie vw_session для веб-UI (website/frontend) после входа через /auth/email/*."""
+    token, _exp_iso = _create_cookie_session(user_id)
+    _set_cookie(response, token)
+
+
 def _set_cookie(response: Response, token: str) -> None:
     secure_flag = None
     if cfg.COOKIE_SECURE:
