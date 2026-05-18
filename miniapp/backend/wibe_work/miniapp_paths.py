@@ -12,6 +12,7 @@ else:
 # Данные миниаппы (SQLite, JSON) — внутри miniapp/data/
 DATA_DIR = _MINIAPP_ROOT / "data"
 MINIAPP_HTML = _MINIAPP_ROOT / "frontend" / "index.html"
+WEBSITE_HTML = PROJECT_ROOT / "website" / "frontend" / "index.html"
 RESET_PASSWORD_HTML = _MINIAPP_ROOT / "frontend" / "reset-password.html"
 ADMIN_HTML = _MINIAPP_ROOT / "frontend" / "admin" / "index.html"
 STATIC_DIR = _MINIAPP_ROOT / "frontend" / "static"

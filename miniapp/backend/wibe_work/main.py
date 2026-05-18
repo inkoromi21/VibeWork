@@ -3,7 +3,7 @@ from pathlib import Path
 
 from dotenv import dotenv_values, load_dotenv
 
-from wibe_work.miniapp_paths import ADMIN_HTML, MINIAPP_HTML, PROJECT_ROOT, RESET_PASSWORD_HTML
+from wibe_work.miniapp_paths import ADMIN_HTML, MINIAPP_HTML, PROJECT_ROOT, RESET_PASSWORD_HTML, WEBSITE_HTML
 
 # Сначала корневой .env репозитория (рядом с miniapp/), затем при необходимости — отдельный файл (systemd: VIBEWORK_ENV_FILE=/opt/.../.env).
 load_dotenv(PROJECT_ROOT / ".env")
@@ -61,7 +61,7 @@ app.add_middleware(
 _WEBSITE_FRONTEND_DIR = PROJECT_ROOT / "website" / "frontend"
 _FAVICON_PNG = _WEBSITE_FRONTEND_DIR / "favicon.png"
 if _WEBSITE_FRONTEND_DIR.is_dir():
-    # Старая веб-статика (style.css, script.js) — на случай прямых ссылок; корень отдаёт тот же UI, что миниапп
+    # Веб-сайт: style.css, script.js, favicon (корень «/» — website/frontend/index.html)
     app.mount("/static", StaticFiles(directory=str(_WEBSITE_FRONTEND_DIR)), name="website_static")
 
 
@@ -157,6 +157,14 @@ def _read_miniapp_html() -> str:
     path = MINIAPP_HTML
     if not path.is_file():
         raise HTTPException(status_code=404, detail=f"Miniapp HTML not found: {path}")
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def _read_website_html() -> str:
+    path = WEBSITE_HTML
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail=f"Website HTML not found: {path}")
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
@@ -290,8 +298,8 @@ async def miniapp():
 
 @app.get("/", response_class=HTMLResponse)
 async def website_index():
-    """Главная сайта — тот же UI, что мини-приложение в Telegram (miniapp/frontend/index.html)."""
-    return _html_no_cache(_read_miniapp_html())
+    """Главная сайта — веб-UI (website/frontend); Telegram Mini App — /miniapp/."""
+    return _html_no_cache(_read_website_html())
 
 
 @app.get("/reset-password", response_class=HTMLResponse)
