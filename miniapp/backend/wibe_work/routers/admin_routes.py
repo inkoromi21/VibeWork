@@ -19,6 +19,7 @@ from wibe_work.admin_auth import (
 )
 from wibe_work.password_input import sanitize_password_input
 from wibe_work.services.admin_queries import get_user_detail, list_users
+from wibe_work.services.user_accounts import delete_user_account
 
 router = APIRouter(prefix="/admin/api", tags=["admin"])
 
@@ -75,3 +76,13 @@ async def admin_user_detail(user_id: str, _: None = Depends(require_admin)) -> d
     if not detail:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     return detail
+
+
+@router.delete("/users/{user_id}")
+async def admin_delete_user(user_id: str, _: None = Depends(require_admin)) -> dict[str, bool]:
+    uid = user_id.strip()
+    if not uid:
+        raise HTTPException(status_code=400, detail="Не указан пользователь")
+    if not delete_user_account(uid):
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    return {"ok": True}

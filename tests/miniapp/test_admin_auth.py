@@ -68,3 +68,37 @@ def test_admin_users_requires_auth(admin_client: TestClient) -> None:
     admin_client.cookies.clear()
     r = admin_client.get("/admin/api/users")
     assert r.status_code == 401
+
+
+def test_admin_delete_user(admin_client: TestClient) -> None:
+    import uuid
+    from datetime import datetime, timezone
+
+    import bcrypt
+
+    from wibe_work.services.user_accounts import account_exists
+    from wibe_work.sqlite_db import get_db
+
+    admin_client.post(
+        "/admin/api/login",
+        json={"login": "testadmin", "password": "test-secret-pass"},
+    )
+    uid = "u_adm_del_" + uuid.uuid4().hex[:10]
+    email = f"adm_del_{uuid.uuid4().hex[:8]}@example.com"
+    pw_hash = bcrypt.hashpw(b"testpass123", bcrypt.gensalt()).decode("ascii")
+    now = datetime.now(timezone.utc).isoformat()
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO email_users (user_id, email, password_hash, created_at) VALUES (?, ?, ?, ?)",
+            (uid, email, pw_hash, now),
+        )
+        conn.commit()
+    assert account_exists(uid)
+
+    r = admin_client.delete(f"/admin/api/users/{uid}")
+    assert r.status_code == 200
+    assert r.json().get("ok") is True
+    assert account_exists(uid) is False
+
+    r404 = admin_client.delete(f"/admin/api/users/{uid}")
+    assert r404.status_code == 404
