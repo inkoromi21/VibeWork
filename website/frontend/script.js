@@ -1242,9 +1242,8 @@ function updateAuthPanel() {
   const em = document.getElementById("auth-email");
   const pw = document.getElementById("auth-password");
   const loginB = document.getElementById("btn-auth-login");
-  const regB = document.getElementById("btn-auth-register");
   const outB = document.getElementById("btn-auth-logout");
-  const forgot = document.getElementById("auth-forgot-hint");
+  const forgot = document.getElementById("auth-forgot-wrap");
   if (window.serverLoggedIn) {
     if (lab) {
       lab.hidden = false;
@@ -1253,7 +1252,6 @@ function updateAuthPanel() {
     if (em) em.hidden = true;
     if (pw) pw.hidden = true;
     if (loginB) loginB.hidden = true;
-    if (regB) regB.hidden = true;
     if (outB) outB.hidden = false;
     if (forgot) forgot.hidden = true;
     document.body.classList.add("app-ready");
@@ -1262,7 +1260,6 @@ function updateAuthPanel() {
     if (em) em.hidden = false;
     if (pw) pw.hidden = false;
     if (loginB) loginB.hidden = false;
-    if (regB) regB.hidden = false;
     if (outB) outB.hidden = true;
     if (forgot) forgot.hidden = false;
     document.body.classList.remove("app-ready");
@@ -2303,68 +2300,18 @@ document.getElementById("sim-restart").addEventListener("click", () => {
   startSim().catch((e) => alert(e.message));
 });
 
-const ACCESS_TOKEN_KEY = "career_access_token";
-
-function formatAuthError(detail) {
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail)) {
-    return detail
-      .map((x) => (x && typeof x.msg === "string" ? x.msg : ""))
-      .filter(Boolean)
-      .join(" ") || "Ошибка запроса";
-  }
-  return "Ошибка запроса";
-}
-
-async function authRequestEmail(email, password) {
-  const login = (email || "").trim();
-  const r = await fetch("/auth/email/login", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: login, password }),
-  });
-  const j = await r.json().catch(() => ({}));
-  if (r.ok && j.admin) {
-    window.location.assign(j.redirect || "/admin");
-    return { ok: true, j, admin: true };
-  }
-  if (r.ok && j.access_token) {
-    try {
-      localStorage.setItem(ACCESS_TOKEN_KEY, j.access_token);
-      if (j.user_id) localStorage.setItem("userId", j.user_id);
-      if (j.email) localStorage.setItem("userEmail", j.email);
-    } catch (_) {}
-    return { ok: true, j };
-  }
-  return { ok: r.ok, j };
-}
-
-async function authRegisterEmail(email, password) {
-  const r = await fetch("/auth/email/register", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: (email || "").trim(), password }),
-  });
-  const j = await r.json().catch(() => ({}));
-  if (r.ok && j.access_token) {
-    try {
-      localStorage.setItem(ACCESS_TOKEN_KEY, j.access_token);
-      if (j.user_id) localStorage.setItem("userId", j.user_id);
-      if (j.email) localStorage.setItem("userEmail", j.email);
-    } catch (_) {}
-    return { ok: true, j };
-  }
-  return { ok: r.ok, j };
-}
+document.getElementById("btn-auth-forgot")?.addEventListener("click", () => {
+  const email = (document.getElementById("auth-email")?.value || "").trim();
+  const q = email ? `?email=${encodeURIComponent(email)}` : "";
+  window.location.href = `/reset-password${q}`;
+});
 
 document.getElementById("btn-auth-login").addEventListener("click", async () => {
   showAuthGateError("");
   const email = document.getElementById("auth-email")?.value?.trim();
   const password = document.getElementById("auth-password")?.value || "";
   if (!email || password.length < 8) {
-    showAuthGateError("Укажите email и пароль не короче 8 символов (для админки — логин из .env без @).");
+    showAuthGateError("Укажите email и пароль не короче 8 символов.");
     return;
   }
   let ok;
@@ -2410,36 +2357,6 @@ document.getElementById("btn-auth-login").addEventListener("click", async () => 
   }
   updateQuizProgress();
   showToast("Вошли: профиль с сервера.");
-  schedulePushServerSnapshot();
-});
-
-document.getElementById("btn-auth-register").addEventListener("click", async () => {
-  showAuthGateError("");
-  const email = document.getElementById("auth-email")?.value?.trim();
-  const password = document.getElementById("auth-password")?.value || "";
-  const agree = document.getElementById("hh-agree");
-  if (!email || password.length < 8) {
-    showAuthGateError("Укажите email и пароль не короче 8 символов.");
-    return;
-  }
-  if (agree && !agree.checked) {
-    showAuthGateError("Чтобы зарегистрироваться, подтвердите согласие с офертой.");
-    return;
-  }
-  const { ok, j } = await authRegisterEmail(email, password);
-  if (!ok) {
-    showAuthGateError(formatAuthError(j.detail) || "Регистрация не удалась");
-    return;
-  }
-  const me = await refreshAuthState();
-  if (!me.authenticated) {
-    showAuthGateError("Аккаунт создан, но сессия не сохранилась. Обновите страницу и войдите снова.");
-    return;
-  }
-  resetClientStateForNewAccount();
-  await fetchAndRenderQuiz();
-  updateQuizProgress();
-  showToast("Аккаунт создан. Данные сохраняются на сервере.");
   schedulePushServerSnapshot();
 });
 

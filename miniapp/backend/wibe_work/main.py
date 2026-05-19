@@ -3,7 +3,7 @@ from pathlib import Path
 
 from dotenv import dotenv_values, load_dotenv
 
-from wibe_work.miniapp_paths import ADMIN_HTML, MINIAPP_HTML, PROJECT_ROOT, RESET_PASSWORD_HTML, WEBSITE_HTML
+from wibe_work.miniapp_paths import ADMIN_HTML, MINIAPP_HTML, PROJECT_ROOT, REGISTER_HTML, RESET_PASSWORD_HTML, WEBSITE_HTML
 
 # Сначала корневой .env репозитория (рядом с miniapp/), затем при необходимости — отдельный файл (systemd: VIBEWORK_ENV_FILE=/opt/.../.env).
 load_dotenv(PROJECT_ROOT / ".env")
@@ -177,6 +177,14 @@ def _read_reset_password_html() -> str:
         return f.read()
 
 
+def _read_register_html() -> str:
+    path = REGISTER_HTML
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail=f"Register HTML not found: {path}")
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
 def _read_admin_html() -> str:
     path = ADMIN_HTML
     if not path.is_file():
@@ -306,6 +314,12 @@ async def website_index():
 async def reset_password_page():
     """Сброс пароля по ссылке из письма (Resend)."""
     return _html_no_cache(_read_reset_password_html())
+
+
+@app.get("/register", response_class=HTMLResponse)
+async def register_page():
+    """Регистрация по email (отдельно от входа на /)."""
+    return _html_no_cache(_read_register_html())
 
 
 @app.get("/admin", response_class=HTMLResponse)

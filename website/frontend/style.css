@@ -309,6 +309,69 @@ body.app-ready .auth-gate {
   background: var(--green-soft);
 }
 
+.auth-gate-switch {
+  margin: 0.65rem 0 0;
+  text-align: center;
+}
+
+.auth-gate-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--green-dark);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+a.auth-gate-link {
+  display: inline;
+}
+
+.auth-gate-actions--single .btn-auth-gate {
+  flex: 1 1 100%;
+}
+
+body.auth-standalone {
+  margin: 0;
+  min-height: 100vh;
+}
+
+body.auth-standalone .auth-gate {
+  display: flex !important;
+}
+
+.auth-hh-agree {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 10px 0 0;
+  cursor: pointer;
+}
+
+.auth-hh-agree input {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.auth-forgot-wrap {
+  margin-top: 0.75rem;
+}
+
+.btn-auth-gate-forgot {
+  flex: 1 1 100%;
+  width: 100%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--green-dark);
+}
+
+.btn-auth-gate-forgot:hover {
+  border-color: var(--green-border);
+  background: var(--green-soft);
+}
+
 .auth-gate-error {
   margin: 0.65rem 0 0;
   padding: 0.55rem 0.75rem;

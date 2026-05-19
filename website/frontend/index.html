@@ -62,21 +62,16 @@
       <p class="auth-gate-sub muted">Профиль, тесты и разбор — после входа в аккаунт VibeWork.</p>
       <input type="email" id="auth-email" class="auth-field auth-gate-field" placeholder="Email" autocomplete="username" />
       <input type="password" id="auth-password" class="auth-field auth-gate-field" placeholder="Пароль (не короче 8 символов)" autocomplete="current-password" />
-      <label class="auth-hint auth-gate-hint muted small" style="display:flex;gap:10px;align-items:flex-start;margin:10px 0 0;cursor:pointer;">
-        <input type="checkbox" id="hh-agree" style="margin-top:3px" />
-        <span>
-          Регистрируясь, я принимаю условия
-          <a href="https://hh.ru/account/agreement" target="_blank" rel="noopener noreferrer">
-            «Соглашения об оказании услуг по содействию в трудоустройстве (оферта)»
-          </a>.
-        </span>
-      </label>
       <p id="auth-gate-error" class="auth-gate-error hidden" role="alert"></p>
-      <div class="auth-gate-actions">
+      <div class="auth-gate-actions auth-gate-actions--single">
         <button type="button" class="btn-auth-gate btn-auth-gate-primary" id="btn-auth-login">Войти</button>
-        <button type="button" class="btn-auth-gate btn-auth-gate-secondary" id="btn-auth-register">Регистрация</button>
       </div>
-      <p class="auth-hint auth-gate-hint muted small" id="auth-forgot-hint">Забыли пароль? Восстановление по email пока недоступно — можно <strong>зарегистрировать новый аккаунт</strong> на другой почте. Админ-панель: <a href="/admin">/admin</a> (логин и пароль из <code>ADMIN_LOGIN</code> / <code>ADMIN_PASSWORD</code> в .env, без @).</p>
+      <p class="auth-gate-switch muted small">
+        Нет аккаунта? <a class="auth-gate-link" href="/register">Создать аккаунт</a>
+      </p>
+      <div id="auth-forgot-wrap" class="auth-forgot-wrap">
+        <button type="button" class="btn-auth-gate btn-auth-gate-forgot" id="btn-auth-forgot">Восстановить пароль по email</button>
+      </div>
       <p class="auth-gate-brand" aria-hidden="true">
         <span class="brand-lockup brand-lockup--gate" translate="no">
           <span class="brand-brace" aria-hidden="true">{</span><span class="brand-name">VibeWork</span><span class="brand-brace" aria-hidden="true">}</span>
@@ -477,6 +472,7 @@
 
   <div id="app-toast" class="app-toast" role="status" aria-live="polite" hidden></div>
 
+  <script src="/static/auth-email.js"></script>
   <script src="/static/script.js"></script>
 </body>
 </html>

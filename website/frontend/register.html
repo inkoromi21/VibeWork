@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>VibeWork — регистрация</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="/static/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem("vibework_theme") === "dark") document.documentElement.setAttribute("data-theme", "dark");
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body class="auth-standalone">
+  <div id="auth-gate" class="auth-gate" role="main" aria-labelledby="auth-gate-title">
+    <div class="auth-gate-waves" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 720" preserveAspectRatio="xMidYMid slice" fill="none">
+        <g stroke="#22a954" stroke-width="1.15" stroke-linecap="round" opacity="0.38">
+          <path d="M-80 300c200-48 400 48 600 0s400-48 600 0 400 48 600 0" />
+          <path d="M-80 326c220 52 420-52 640 0s380 52 600 0 420-52 640 0" />
+          <path d="M-80 352c180-40 380 40 560 0s420-40 600 0 420 40 600 0" />
+          <path d="M-80 378c240 44 440-44 680 0s360 44 560 0 440-44 680 0" />
+          <path d="M-80 404c160-36 360 36 520 0s440-36 600 0 440 36 600 0" />
+          <path d="M-80 430c210 40 410-40 620 0s390 40 580 0 410-40 620 0" />
+          <path d="M-80 456c190-44 390 44 580 0s410-44 590 0 410 44 590 0" />
+          <path d="M-80 482c230 36 430-36 660 0s370 36 550 0 430-36 660 0" />
+          <path d="M-80 508c170-32 370 32 540 0s430-32 600 0 430 32 600 0" />
+          <path d="M-80 534c200 38 400-38 600 0s400 38 600 0 400-38 600 0" />
+        </g>
+      </svg>
+    </div>
+    <div class="auth-gate-card">
+      <h1 id="auth-gate-title" class="auth-gate-title">Регистрация</h1>
+      <p class="auth-gate-sub muted">Почта и пароль — доступ к анкете, тестам и разбору.</p>
+      <input type="email" id="auth-email" class="auth-field auth-gate-field" placeholder="Email" autocomplete="username" />
+      <input type="password" id="auth-password" class="auth-field auth-gate-field" placeholder="Пароль (не короче 8 символов)" autocomplete="new-password" />
+      <label id="hh-agree-row" class="auth-hint auth-gate-hint muted small auth-hh-agree">
+        <input type="checkbox" id="hh-agree" />
+        <span>
+          Регистрируясь, я принимаю условия
+          <a href="https://hh.ru/account/agreement" target="_blank" rel="noopener noreferrer">
+            оферты hh.ru о содействии в трудоустройстве
+          </a>.
+        </span>
+      </label>
+      <p id="auth-gate-error" class="auth-gate-error hidden" role="alert"></p>
+      <div class="auth-gate-actions auth-gate-actions--single">
+        <button type="button" class="btn-auth-gate btn-auth-gate-primary" id="btn-auth-register">Зарегистрироваться</button>
+      </div>
+      <p class="auth-gate-switch muted small">
+        Уже есть аккаунт? <a class="auth-gate-link" href="/">Войти</a>
+      </p>
+      <p class="auth-gate-brand" aria-hidden="true">
+        <span class="brand-lockup brand-lockup--gate" translate="no">
+          <span class="brand-brace" aria-hidden="true">{</span><span class="brand-name">VibeWork</span><span class="brand-brace" aria-hidden="true">}</span>
+        </span>
+        <span class="auth-gate-brand-tag">карьерный навигатор</span>
+      </p>
+    </div>
+  </div>
+  <script src="/static/auth-email.js"></script>
+  <script src="/static/register.js"></script>
+</body>
+</html>
