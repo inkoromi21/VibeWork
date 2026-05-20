@@ -1107,8 +1107,9 @@ function getSphereToWebMap() {
   return PROFILE_SCHEMA?.sphere_to_web_interest || {};
 }
 
-function getPrimarySphereId() {
-  const sheet = profilePayloadForCompletion();
+function getPrimarySphereId(sheetOpt) {
+  const sheet =
+    sheetOpt != null && typeof sheetOpt === "object" ? sheetOpt : profilePayloadForCompletion();
   const spheres = sheet.interest_spheres;
   if (Array.isArray(spheres) && spheres[0]) return String(spheres[0]);
   if (typeof spheres === "string" && spheres.trim()) {
@@ -1121,8 +1122,8 @@ function getPrimarySphereId() {
   return "";
 }
 
-function getPrimaryQuizInterest() {
-  const sid = getPrimarySphereId();
+function getPrimaryQuizInterest(sheetOpt) {
+  const sid = getPrimarySphereId(sheetOpt);
   const map = getSphereToWebMap();
   if (sid && map[sid]) return map[sid];
   return "IT";
@@ -1964,12 +1965,25 @@ function collectProfileFields() {
   const form = document.getElementById("diag-form");
   if (!form) return null;
   syncEducationFromDetail();
-  const sheet = collectSheetExtra();
+  let sheet = collectSheetExtra();
+  /** После «Профиль заполнен» полей в DOM нет; отложенный save всё ещё может сработать и записать пустой sheet — восстанавливаем из последнего черновика. */
+  const summaryShown = Boolean(document.getElementById("sheet-profile-root")?.querySelector(".profile-complete"));
+  if (summaryShown && Object.keys(sheet).length === 0) {
+    try {
+      const raw = localStorage.getItem(getProfileDraftStorageKey());
+      if (raw) {
+        const prev = JSON.parse(raw);
+        if (prev.sheet && typeof prev.sheet === "object" && Object.keys(prev.sheet).length > 0) {
+          sheet = { ...prev.sheet };
+        }
+      }
+    } catch (_) {}
+  }
   const age = parseInt(String(sheet.age ?? ""), 10);
   const prep = mapPreparationForApi(sheet.preparation_level);
   return {
     age: Number.isFinite(age) && age >= 14 && age <= 30 ? age : 18,
-    interest: getPrimaryQuizInterest(),
+    interest: getPrimaryQuizInterest(sheet),
     education: String(document.getElementById("field-education-sync")?.value || "школа"),
     motivation: String(sheet.motivation_ai || sheet.motivation || ""),
     preparation_level: prep,
