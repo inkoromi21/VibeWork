@@ -3097,7 +3097,7 @@ function renderScenariosPanel(res) {
   if (titleEl) {
     titleEl.textContent = school ? "Куда идти учиться (A / B / C)" : "Сценарии развития (A / B / C)";
   }
-  const best = dirs.reduce((a, b) => ((a.match_score || 0) >= (b.match_score || 0) ? a : b)), dirs[0]);
+  const best = dirs.reduce((a, b) => ((a.match_score || 0) >= (b.match_score || 0) ? a : b), dirs[0]);
   if (capEl) {
     capEl.textContent = school
       ? "Три маршрута обучения по ответам теста — сравните и обсудите с родителями или школой."
@@ -3841,7 +3841,7 @@ document.getElementById("btn-auth-forgot")?.addEventListener("click", () => {
   window.location.href = `/reset-password${q}`;
 });
 
-document.getElementById("btn-auth-login").addEventListener("click", async () => {
+async function submitAuthLogin() {
   showAuthGateError("");
   const email = document.getElementById("auth-email")?.value?.trim();
   const password = document.getElementById("auth-password")?.value || "";
@@ -3849,50 +3849,61 @@ document.getElementById("btn-auth-login").addEventListener("click", async () => 
     showAuthGateError("Укажите email и пароль не короче 8 символов.");
     return;
   }
-  let ok;
-  let j;
+  const btn = document.getElementById("btn-auth-login");
+  if (btn) btn.disabled = true;
   try {
     const res = await authRequestEmail(email, password);
     if (res.admin) return;
-    ok = res.ok;
-    j = res.j;
+    if (!res.ok) {
+      showAuthGateError(formatAuthError(res.j?.detail) || "Не вышло войти");
+      return;
+    }
+    const meRaw = await fetchAuthMeWithRetry();
+    if (!meRaw.authenticated) {
+      showAuthGateError(
+        "Вход принят, но сессия не сохранилась. Разрешите cookie, откройте тот же адрес что PUBLIC_BASE_URL (http://127.0.0.1:8000) и перезапустите API после обновления."
+      );
+      return;
+    }
+    const me = await refreshAuthState();
+    await fetchAndRenderQuiz();
+    if (me.snapshot?.test_answers?.length === QUIZ.length) {
+      applyTestAnswersToDom(me.snapshot.test_answers);
+    }
+    if (me.snapshot?.personality_test_answers?.length === PERSONALITY_QUIZ.length) {
+      applyPersonalityAnswersToDom(me.snapshot.personality_test_answers);
+    }
+    if (
+      me.snapshot?.analysis &&
+      quizComplete() &&
+      me.snapshot.test_answers?.length === QUIZ.length &&
+      me.snapshot.personality_test_answers?.length === PERSONALITY_QUIZ.length &&
+      answersMatchPayloadTest(me.snapshot.test_answers, me.snapshot.personality_test_answers)
+    ) {
+      renderResults(me.snapshot.analysis);
+      await loadJobsData().catch(() => {});
+    } else {
+      clearReportUi();
+    }
+    updateQuizProgress();
+    showToast("Вошли: профиль с сервера.");
+    schedulePushServerSnapshot();
   } catch (e) {
     showAuthGateError(e.message || "Не вышло войти");
-    return;
+  } finally {
+    if (btn) btn.disabled = false;
   }
-  if (!ok) {
-    showAuthGateError(formatAuthError(j.detail) || "Не вышло войти");
-    return;
+}
+
+document.getElementById("btn-auth-login").addEventListener("click", () => {
+  submitAuthLogin().catch((e) => showAuthGateError(e.message || "Не вышло войти"));
+});
+
+document.getElementById("auth-password")?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    submitAuthLogin().catch((err) => showAuthGateError(err.message || "Не вышло войти"));
   }
-  const me = await refreshAuthState();
-  if (!me.authenticated) {
-    showAuthGateError(
-      "Вход принят, но сессия не сохранилась. Разрешите cookie для сайта и обновите страницу (на сервере нужен деплой последней версии API)."
-    );
-    return;
-  }
-  await fetchAndRenderQuiz();
-  if (me.snapshot?.test_answers?.length === QUIZ.length) {
-    applyTestAnswersToDom(me.snapshot.test_answers);
-  }
-  if (me.snapshot?.personality_test_answers?.length === PERSONALITY_QUIZ.length) {
-    applyPersonalityAnswersToDom(me.snapshot.personality_test_answers);
-  }
-  if (
-    me.snapshot?.analysis &&
-    quizComplete() &&
-    me.snapshot.test_answers?.length === QUIZ.length &&
-    me.snapshot.personality_test_answers?.length === PERSONALITY_QUIZ.length &&
-    answersMatchPayloadTest(me.snapshot.test_answers, me.snapshot.personality_test_answers)
-  ) {
-    renderResults(me.snapshot.analysis);
-    await loadJobsData().catch(() => {});
-  } else {
-    clearReportUi();
-  }
-  updateQuizProgress();
-  showToast("Вошли: профиль с сервера.");
-  schedulePushServerSnapshot();
 });
 
 document.getElementById("btn-auth-logout").addEventListener("click", async () => {

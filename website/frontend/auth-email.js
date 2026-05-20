@@ -27,15 +27,33 @@ async function authRequestEmail(email, password) {
     window.location.assign(j.redirect || "/admin");
     return { ok: true, j, admin: true };
   }
-  if (r.ok && j.access_token) {
-    try {
-      localStorage.setItem(ACCESS_TOKEN_KEY, j.access_token);
-      if (j.user_id) localStorage.setItem("userId", j.user_id);
-      if (j.email) localStorage.setItem("userEmail", j.email);
-    } catch (_) {}
+  if (r.ok && (j.access_token || j.ok)) {
+    if (j.access_token) {
+      try {
+        localStorage.setItem(ACCESS_TOKEN_KEY, j.access_token);
+        if (j.user_id) localStorage.setItem("userId", j.user_id);
+        if (j.email) localStorage.setItem("userEmail", j.email);
+      } catch (_) {}
+    }
     return { ok: true, j };
   }
   return { ok: r.ok, j };
+}
+
+/** Несколько попыток /api/auth/me после Set-Cookie (браузер иногда отдаёт cookie с задержкой). */
+async function fetchAuthMeWithRetry(attempts = 3, delayMs = 120) {
+  let last = { authenticated: false };
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      const r = await fetch("/api/auth/me", { credentials: "include" });
+      last = await r.json().catch(() => ({ authenticated: false }));
+      if (last.authenticated) return last;
+    } catch (_) {}
+    if (i < attempts - 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+    }
+  }
+  return last;
 }
 
 async function authRegisterEmail(email, password) {
@@ -46,12 +64,14 @@ async function authRegisterEmail(email, password) {
     body: JSON.stringify({ email: (email || "").trim(), password }),
   });
   const j = await r.json().catch(() => ({}));
-  if (r.ok && j.access_token) {
-    try {
-      localStorage.setItem(ACCESS_TOKEN_KEY, j.access_token);
-      if (j.user_id) localStorage.setItem("userId", j.user_id);
-      if (j.email) localStorage.setItem("userEmail", j.email);
-    } catch (_) {}
+  if (r.ok && (j.access_token || j.ok)) {
+    if (j.access_token) {
+      try {
+        localStorage.setItem(ACCESS_TOKEN_KEY, j.access_token);
+        if (j.user_id) localStorage.setItem("userId", j.user_id);
+        if (j.email) localStorage.setItem("userEmail", j.email);
+      } catch (_) {}
+    }
     return { ok: true, j };
   }
   return { ok: r.ok, j };

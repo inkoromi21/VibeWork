@@ -199,6 +199,7 @@ async def email_register(body: EmailRegisterBody, response: Response):
 
     issue_browser_session(response, user_id)
     return {
+        "ok": True,
         "access_token": token,
         "token_type": "bearer",
         "user_id": user_id,
@@ -424,6 +425,7 @@ async def email_login(body: EmailLoginBody, response: Response):
 
     issue_browser_session(response, user_id)
     return {
+        "ok": True,
         "access_token": token,
         "token_type": "bearer",
         "user_id": user_id,

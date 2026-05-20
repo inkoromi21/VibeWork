@@ -41,12 +41,11 @@ document.getElementById("btn-auth-register")?.addEventListener("click", async ()
       showAuthGateError(formatAuthError(j.detail) || "Регистрация не удалась");
       return;
     }
-    const me = await fetch("/api/auth/me", { credentials: "include" }).then((r) => r.json());
+    const me = await fetchAuthMeWithRetry();
     if (!me.authenticated) {
-      showAuthGateError("Аккаунт создан. Войдите на главной странице.");
-      window.setTimeout(() => {
-        window.location.href = "/";
-      }, 1500);
+      showAuthGateError(
+        "Аккаунт создан, но сессия не сохранилась. Разрешите cookie для сайта, проверьте что открыт тот же адрес что PUBLIC_BASE_URL (http://127.0.0.1:8000), и войдите на главной."
+      );
       return;
     }
     try {

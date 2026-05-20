@@ -134,18 +134,12 @@ def _user_id_from_cookie(raw: Optional[str]) -> Optional[str]:
 
 
 def _clear_cookie(response: Response) -> None:
-    # Secure — только при HTTPS (в проде обычно да).
-    secure_flag = None
-    if cfg.COOKIE_SECURE:
-        secure_flag = cfg.COOKIE_SECURE.strip().lower() in ("1", "true", "yes", "y", "on")
-    else:
-        secure_flag = cfg.PUBLIC_BASE_URL.lower().startswith("https://")
     response.set_cookie(
         key=SESSION_COOKIE,
         value="",
         httponly=True,
         samesite="lax",
-        secure=bool(secure_flag),
+        secure=cfg.cookie_secure(),
         max_age=0,
         path="/",
     )
@@ -158,17 +152,12 @@ def issue_browser_session(response: Response, user_id: str) -> None:
 
 
 def _set_cookie(response: Response, token: str) -> None:
-    secure_flag = None
-    if cfg.COOKIE_SECURE:
-        secure_flag = cfg.COOKIE_SECURE.strip().lower() in ("1", "true", "yes", "y", "on")
-    else:
-        secure_flag = cfg.PUBLIC_BASE_URL.lower().startswith("https://")
     response.set_cookie(
         key=SESSION_COOKIE,
         value=token,
         httponly=True,
         samesite="lax",
-        secure=bool(secure_flag),
+        secure=cfg.cookie_secure(),
         max_age=SESSION_DAYS * 86400,
         path="/",
     )

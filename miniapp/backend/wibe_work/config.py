@@ -58,8 +58,14 @@ ADMIN_SESSION_HOURS = int(os.environ.get("ADMIN_SESSION_HOURS", "12") or "12")
 
 def cookie_secure() -> bool:
     """Secure-флаг для httponly-cookie (сессии сайта и админки)."""
-    if COOKIE_SECURE:
-        return COOKIE_SECURE.strip().lower() in ("1", "true", "yes", "y", "on")
+    raw = COOKIE_SECURE.strip().lower()
+    if raw in ("1", "true", "yes", "y", "on"):
+        return True
+    if raw in ("0", "false", "no", "n", "off"):
+        return False
+    # В dev не выставляем Secure по PUBLIC_BASE_URL (часто https в .env при http://127.0.0.1)
+    if VIBEWORK_ENV != "prod":
+        return False
     return PUBLIC_BASE_URL.lower().startswith("https://")
 
 # Отправитель: "VibeWork <noreply@your-domain.ru>" (домен должен быть верифицирован в Resend).

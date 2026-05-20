@@ -13,7 +13,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.account_auth_routes import router as auth_router
 from app.hh_client import suggest_areas
 from app.career_advisor import (
     build_analysis,
@@ -46,6 +45,9 @@ from app.api_schemas import (
 
 # Явный путь: иначе .env не находится при другом cwd или uvicorn --reload
 ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = ROOT.parent
+MINIAPP_BACKEND = REPO_ROOT / "miniapp" / "backend"
+load_dotenv(REPO_ROOT / ".env")
 load_dotenv(ROOT / ".env")
 
 logging.basicConfig(level=logging.INFO)
@@ -77,7 +79,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth_router)
+def _mount_unified_auth() -> None:
+    """Те же /auth/email/* и /api/auth/*, что при python miniapp/run.py."""
+    if not MINIAPP_BACKEND.is_dir():
+        logger.warning(
+            "miniapp/backend не найден — регистрация только через python miniapp/run.py "
+            "или VIBEWORK_FULL_STACK=1"
+        )
+        from app.account_auth_routes import router as legacy_auth_router
+
+        app.include_router(legacy_auth_router)
+        return
+    import sys
+
+    backend_s = str(MINIAPP_BACKEND)
+    if backend_s not in sys.path:
+        sys.path.insert(0, backend_s)
+    from wibe_work.routers.email_auth_routes import router as email_auth_router
+    from wibe_work.routers.website_auth_compat_routes import router as web_auth_router
+
+    app.include_router(email_auth_router)
+    app.include_router(web_auth_router)
+
+
+_mount_unified_auth()
 
 if FRONTEND_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
@@ -89,6 +114,14 @@ async def serve_index():
     if not index.is_file():
         raise HTTPException(status_code=404, detail="frontend/index.html не найден")
     return FileResponse(index)
+
+
+@app.get("/register")
+async def serve_register():
+    page = FRONTEND_DIR / "register.html"
+    if not page.is_file():
+        raise HTTPException(status_code=404, detail="frontend/register.html не найден")
+    return FileResponse(page)
 
 
 @app.get("/api/health")
