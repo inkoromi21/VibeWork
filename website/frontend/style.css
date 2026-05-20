@@ -2288,15 +2288,29 @@ body.app-ready .theme-toggle-btn--auth-gate {
 /* Jobs */
 .filters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 0.65rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.65rem 0.75rem;
+  align-items: end;
   margin-bottom: 1rem;
+}
+
+@media (max-width: 960px) {
+  .filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .filters {
+    grid-template-columns: 1fr;
+  }
 }
 
 .filters label {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+  min-width: 0;
   font-size: 0.75rem;
   color: var(--muted);
 }
@@ -2304,21 +2318,27 @@ body.app-ready .theme-toggle-btn--auth-gate {
 .filters input,
 .filters select {
   font: inherit;
+  width: 100%;
+  box-sizing: border-box;
   padding: 0.45rem 0.55rem;
   border-radius: 8px;
   border: 1px solid var(--border);
-}
-
-.filters label:has(.city-ac-wrap) {
-  position: relative;
-  overflow: visible;
-}
-
-.filters label:has(.city-ac-wrap:focus-within) {
-  z-index: 80;
+  background: var(--bg-card);
+  color: var(--text);
 }
 
 .filters .city-ac-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.filters .city-ac-wrap:focus-within {
+  z-index: 80;
+}
+
+.filters .city-ac-wrap input {
   display: block;
   width: 100%;
 }

@@ -8,9 +8,6 @@ window.serverEmail = null;
 window.serverNickname = null;
 window.serverUserId = null;
 let chatMessages = [];
-/** Прогресс профиля в шапке — только после разбора (тест пройден) */
-let profileProgressUnlocked = false;
-
 const MICRO_TIPS = [
   "Один мини-проект в портфолио ценнее десяти «почти начал».",
   "Спросите у знакомого на 15 минут разбор резюме — свежий взгляд бесценен.",
@@ -312,26 +309,6 @@ function collectPersonalityTimings() {
 
 function quizTotal() {
   return Math.max(1, QUIZ.length + PERSONALITY_QUIZ.length);
-}
-
-function unlockProfileMetrics() {
-  profileProgressUnlocked = true;
-  refreshProfileMetricsVisibility();
-  updateProfileProgress();
-}
-
-function refreshProfileMetricsVisibility() {
-  const wrap = document.getElementById("profile-metrics-wrap");
-  const hint = document.getElementById("profile-metrics-hint");
-  const show = !!window.lastAnalysis;
-  if (wrap) wrap.hidden = !show;
-  if (hint) {
-    hint.hidden = show;
-    if (!show) {
-      hint.textContent =
-        "Эта шкала и итоговые метрики появятся после теста и разбора — до этого заполните поля и пройдите вопросы.";
-    }
-  }
 }
 
 function updateQuizMetricsVisibility() {
@@ -1181,8 +1158,6 @@ function clearReportUi() {
   chatMessages = [];
   const cm = document.getElementById("chat-messages");
   if (cm) cm.innerHTML = "";
-  refreshProfileMetricsVisibility();
-  updateProfileProgress();
   updateAiChecklist();
   updateFlowUI();
 }
@@ -1245,19 +1220,6 @@ function updateFlowUI() {
     const testBanner = document.getElementById("test-blocked-banner");
     if (testBanner) testBanner.hidden = pOk;
 
-    const tag = document.getElementById("profile-tagline");
-    if (tag && !window.lastAnalysis) {
-      tag.hidden = false;
-      if (!pOk) tag.textContent = "Заполните обязательные блоки анкеты: база, интересы и цели.";
-      else if (!qOk) tag.textContent = "Профиль готов — откройте «Тест»: два блока (сфера + тип личности).";
-      else tag.textContent = "Дозаполните оба теста — затем появится разбор и метрики.";
-    } else if (tag && window.lastAnalysis) {
-      tag.textContent = "";
-      tag.hidden = true;
-    } else if (tag) {
-      tag.hidden = false;
-    }
-
     if (!btn || !hint) {
       updateQuizMetricsVisibility();
       return;
@@ -1300,23 +1262,6 @@ function updateFlowUI() {
       if (aiBtn) aiBtn.hidden = !window.lastAnalysis;
     }
   updateQuizMetricsVisibility();
-}
-
-function updateProfileProgress() {
-  refreshProfileMetricsVisibility();
-  if (!window.lastAnalysis) return;
-  let pts = 0;
-  if (profileBasicsOk()) pts += 84;
-  const sheet = collectSheetExtra();
-  if (String(sheet.motivation_ai || sheet.motivation || "").trim().length > 10) pts += 10;
-  if (sheet.preparation_level) pts += 6;
-  const g = window.lastAnalysis.gap_analysis?.overall_hp;
-  if (Number.isFinite(g)) pts = Math.min(100, Math.round((pts + g) / 2));
-  else pts = Math.min(100, pts);
-  const pctEl = document.getElementById("profile-pct");
-  const barEl = document.getElementById("profile-bar");
-  if (pctEl) pctEl.textContent = `${pts}%`;
-  if (barEl) barEl.style.width = `${pts}%`;
 }
 
 function renderQuiz() {
@@ -1648,8 +1593,6 @@ function resetClientStateForNewAccount() {
   }
   syncEducationFromDetail();
   renderChatMessages();
-  refreshProfileMetricsVisibility();
-  updateProfileProgress();
   updateAvatarBubble();
 }
 
@@ -2366,7 +2309,6 @@ function renderResults(res) {
   }
   window.lastAnalysis = res;
   lastReportAnswerFingerprint = quizAnswerFingerprint();
-  unlockProfileMetrics();
   updateAvatarBubble();
   const av = document.getElementById("avatar-bubble");
   if (av) {
@@ -3085,8 +3027,6 @@ document.getElementById("btn-auth-logout").addEventListener("click", async () =>
 
   renderQuiz();
   renderPersonalityQuiz();
-  refreshProfileMetricsVisibility();
-  updateProfileProgress();
   updateQuizProgress();
   updateFlowUI();
   updateAvatarBubble();
