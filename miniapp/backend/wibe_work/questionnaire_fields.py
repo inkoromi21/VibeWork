@@ -140,13 +140,12 @@ def get_profile_schema() -> Dict[str, Any]:
             {
                 "id": "pain",
                 "title": "Что сейчас больше всего мешает?",
-                "subtitle": "Поможет точнее советовать в чате и разборе. Можно пропустить.",
                 "optional": True,
                 "fields": [
                     {
                         "id": "primary_pain",
                         "type": "select",
-                        "label": "Главная сложность",
+                        "label": "",
                         "required": False,
                         "options": [
                             {"id": "pain_career", "label": "Не знаю, кем стать"},

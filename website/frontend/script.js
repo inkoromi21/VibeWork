@@ -511,7 +511,11 @@ function renderSheetField(f) {
         (o) => `<option value="${esc(sheetOptValue(o))}">${esc(o.label)}</option>`
       ),
     ].join("");
-    return `<label class="field full sheet-field"><span>${esc(f.label)}${req}</span><select data-sheet-field="${esc(f.id)}">${opts}</select>${hint}</label>`;
+    const lbl = (f.label || "").trim();
+    if (!lbl) {
+      return `<label class="field full sheet-field sheet-field--bare"><select data-sheet-field="${esc(f.id)}">${opts}</select>${hint}</label>`;
+    }
+    return `<label class="field full sheet-field"><span>${esc(lbl)}${req}</span><select data-sheet-field="${esc(f.id)}">${opts}</select>${hint}</label>`;
   }
   if (f.type === "multiselect" && f.options) {
     const maxN = f.max_select ?? f.max ?? 5;
@@ -545,12 +549,15 @@ function wizardSectionItems() {
 function renderSheetSectionHtml(sec, stepIndex) {
   const fields = (sec.fields || []).map(renderSheetField).filter(Boolean).join("");
   if (!fields) return "";
-  const opt = sec.optional
-    ? '<span class="sheet-section-badge muted small">по желанию</span>'
-    : "";
-  const sub = sec.subtitle
-    ? `<p class="sheet-section-sub muted small">${esc(sec.subtitle)}</p>`
-    : "";
+  const hideExtras = sec.id === "pain";
+  const opt =
+    !hideExtras && sec.optional
+      ? '<span class="sheet-section-badge muted small">по желанию</span>'
+      : "";
+  const sub =
+    !hideExtras && sec.subtitle
+      ? `<p class="sheet-section-sub muted small">${esc(sec.subtitle)}</p>`
+      : "";
   const hidden = stepIndex === 0 ? "" : " hidden";
   return `<section class="sheet-section profile-wizard-step"${hidden} data-wizard-step="${stepIndex}" data-section="${esc(sec.id || "")}"><div class="sheet-section-head"><h3 class="sheet-section-title">${esc(sec.title)}</h3>${opt}</div>${sub}<div class="sheet-section-body">${fields}</div></section>`;
 }
@@ -1059,11 +1066,6 @@ function updateFlowUI() {
     const tf = document.getElementById("test-footer");
     const tff = document.getElementById("test-footer-hint");
     const aiBtn = document.getElementById("btn-request-ai");
-    if (!btn || !hint) {
-      updateQuizMetricsVisibility();
-      return;
-    }
-
     updateAiChecklist();
 
     const pOk = profileBasicsOk();
@@ -1079,6 +1081,12 @@ function updateFlowUI() {
       else tag.textContent = "Дозаполните оба теста — затем появится разбор и метрики.";
     } else if (tag && window.lastAnalysis) {
       tag.textContent = "Разбор готов: листайте блоки ниже или откройте ИИ и вакансии.";
+    }
+
+    if (!btn || !hint) {
+      updateQuizMetricsVisibility();
+      updateHeaderStepper(document.querySelector(".nav-pill.active, .tab-btn.active")?.dataset.tab || "profile");
+      return;
     }
 
     if (!pOk) {
@@ -2588,7 +2596,7 @@ async function runConsultation(opts = {}) {
   }
 }
 
-document.getElementById("btn-analyze").addEventListener("click", async () => {
+document.getElementById("btn-analyze")?.addEventListener("click", async () => {
   showError("");
   if (!profileBasicsOk()) return;
   if (!quizComplete()) {
@@ -2616,7 +2624,7 @@ document.getElementById("btn-request-ai").addEventListener("click", () => {
   unlockChatUi();
 });
 
-document.getElementById("btn-restore").addEventListener("click", async () => {
+document.getElementById("btn-restore")?.addEventListener("click", async () => {
   const stored = loadResult();
   if (!stored || !stored.data) {
     showError("Сохранённых результатов нет.");
