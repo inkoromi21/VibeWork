@@ -40,6 +40,7 @@
   --profi-pillar-bg: rgba(255, 255, 255, 0.88);
   --chat-thread-bg: #f6f7f8;
   --chat-user-bubble: #e8eaef;
+  --bottom-nav-h: 64px;
   color-scheme: light;
 }
 
@@ -120,6 +121,71 @@ body {
   line-height: 1.5;
   color: var(--text);
   background: var(--bg-page);
+}
+
+/* ——— Bottom tab bar (mobile) ——— */
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: none;
+  gap: 0.25rem;
+  padding: 0.5rem 0.55rem calc(0.5rem + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--bg-card) 82%, transparent);
+  backdrop-filter: saturate(160%) blur(18px);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+  border-top: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.08);
+}
+
+.bottom-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 14px;
+  padding: 0.5rem 0.35rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  line-height: 1;
+}
+
+.bottom-tab .bt-ico {
+  font-size: 1.05rem;
+  opacity: 0.92;
+}
+
+.bottom-tab .bt-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  opacity: 0.92;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Mobile layout: hide sidebar, show bottom nav, keep content visible */
+@media (max-width: 860px) {
+  .sidebar {
+    display: none;
+  }
+  .app-layout {
+    display: block;
+    min-height: 100vh;
+  }
+  .main-topbar {
+    padding: 0.95rem 1rem 1rem;
+  }
+  .shell {
+    padding: 1rem 1rem calc(1rem + var(--bottom-nav-h) + env(safe-area-inset-bottom));
+  }
+  .bottom-nav {
+    display: flex;
+  }
 }
 
 .mono {
