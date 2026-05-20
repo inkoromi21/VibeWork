@@ -1610,6 +1610,42 @@ body.app-ready .theme-toggle-btn--auth-gate {
   color: var(--accent-dark, var(--accent));
 }
 
+.advice-sec-spoiler {
+  margin: 0.75rem 0 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 10px);
+  overflow: hidden;
+}
+
+.advice-sec-spoiler__sum {
+  cursor: pointer;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent-dark, var(--accent));
+  background: color-mix(in srgb, var(--green-soft, var(--accent-soft)) 45%, transparent);
+  list-style: none;
+  user-select: none;
+}
+
+.advice-sec-spoiler__sum::-webkit-details-marker {
+  display: none;
+}
+
+.advice-sec-spoiler__sum::before {
+  content: "▸ ";
+}
+
+.advice-sec-spoiler[open] .advice-sec-spoiler__sum::before {
+  content: "▾ ";
+}
+
+.advice-sec-spoiler__body {
+  padding: 0.65rem 0.75rem 0.75rem;
+}
+
 .growth-card {
   margin-bottom: 1rem;
   padding: 1rem 1.1rem;

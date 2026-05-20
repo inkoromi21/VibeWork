@@ -35,6 +35,35 @@ def test_reset_password_miniapp_back_link():
     assert "/miniapp/?auth=login" in text
 
 
+def test_miniapp_analysis_nested_spoilers():
+    html = MINIAPP_HTML.read_text(encoding="utf-8")
+    assert "analysisSpoiler" in html
+    assert "analysis-spoiler--nested" in html
+    assert "analysis-spoiler--root" in html
+    assert "renderAdvicePlanSectionHtml" in html
+    assert "renderLearnResourceSpoiler" in html
+
+
+def test_miniapp_radar_chart_has_axis_labels_on_graph():
+    html = MINIAPP_HTML.read_text(encoding="utf-8")
+    assert "radar-axis-label" in html
+    assert "radar-axis-pct" in html
+    assert "RADAR_AXIS_POS" in html
+    assert "radar-spoke" in html
+
+
+def test_miniapp_resolves_test_sphere_from_profile_and_web_interest():
+    html = MINIAPP_HTML.read_text(encoding="utf-8")
+    for name in (
+        "resolveTestSphereId",
+        "webInterestToSphereId",
+        "sphereIdToWebInterest",
+        "applyTestSphereSelectValue",
+        "sphere_to_web_interest",
+    ):
+        assert name in html
+
+
 def test_miniapp_keyboard_hides_menu_on_mobile():
     html = MINIAPP_HTML.read_text(encoding="utf-8")
     css = SHELL_CSS.read_text(encoding="utf-8")
@@ -42,3 +71,6 @@ def test_miniapp_keyboard_hides_menu_on_mobile():
     assert "data-vw-keyboard-open" in html
     assert "data-vw-keyboard-open" in css
     assert ".bottom-nav" in css
+    assert "__vwResetKeyboardChrome" in html
+    assert "renderShell" in html
+    assert "__vwResetKeyboardChrome" in html.split("async function renderShell")[1][:800]

@@ -3247,6 +3247,20 @@ function renderLearningPathDetail(host, lp) {
   host.insertAdjacentHTML("beforeend", html);
 }
 
+function isAdviceStartSection(title) {
+  return /^с\s*чего\s*начать$/i.test(String(title || "").trim());
+}
+
+function renderAdvicePlanStepsListHtml(steps) {
+  let html = `<ul class="advice-steps">`;
+  for (const st of steps || []) {
+    const t = typeof st === "string" ? st : st?.text || "";
+    if (t) html += `<li>${esc(t)}</li>`;
+  }
+  html += `</ul>`;
+  return html;
+}
+
 function renderIndividualAdviceBlock(root, advice) {
   if (!root || !advice?.by_plan) return false;
   const ids = ["A", "B", "C"];
@@ -3262,13 +3276,17 @@ function renderIndividualAdviceBlock(root, advice) {
     const sections =
       block.sections?.length ? block.sections : block.steps?.length ? [{ title: "Ваш план", steps: block.steps }] : [];
     for (const sec of sections) {
-      if (sec.title) html += `<p class="advice-sec-title">${esc(sec.title)}</p>`;
-      html += `<ul class="advice-steps">`;
-      for (const st of sec.steps || []) {
-        const t = typeof st === "string" ? st : st?.text || "";
-        if (t) html += `<li>${esc(t)}</li>`;
+      const secTitle = sec.title ? String(sec.title) : "";
+      if (isAdviceStartSection(secTitle)) {
+        html +=
+          `<details class="advice-sec-spoiler">` +
+          `<summary class="advice-sec-spoiler__sum">${esc(secTitle)}</summary>` +
+          `<div class="advice-sec-spoiler__body">${renderAdvicePlanStepsListHtml(sec.steps)}</div>` +
+          `</details>`;
+      } else {
+        if (secTitle) html += `<p class="advice-sec-title">${esc(secTitle)}</p>`;
+        html += renderAdvicePlanStepsListHtml(sec.steps);
       }
-      html += `</ul>`;
     }
     html += `</section>`;
   }

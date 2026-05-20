@@ -1098,6 +1098,78 @@
             font-size: 0.78rem;
             line-height: 1.45;
         }
+        .analysis-spoiler,
+        .advice-sec-spoiler {
+            margin: 0 0 10px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+        }
+        .analysis-spoiler--root {
+            margin: 0 0 14px;
+        }
+        .analysis-spoiler--nested,
+        .advice-sec-spoiler {
+            margin: 8px 0 0;
+            border-color: color-mix(in srgb, var(--border) 72%, transparent);
+        }
+        .analysis-spoiler__sum,
+        .advice-sec-spoiler__sum {
+            cursor: pointer;
+            padding: 10px 12px;
+            font-size: 0.86rem;
+            font-weight: 600;
+            line-height: 1.35;
+            color: var(--text);
+            background: color-mix(in srgb, var(--accent-soft) 40%, transparent);
+            list-style: none;
+            user-select: none;
+        }
+        .analysis-spoiler--nested .analysis-spoiler__sum,
+        .advice-sec-spoiler__sum {
+            padding: 8px 10px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .analysis-spoiler__sum::-webkit-details-marker,
+        .advice-sec-spoiler__sum::-webkit-details-marker {
+            display: none;
+        }
+        .analysis-spoiler__sum::before,
+        .advice-sec-spoiler__sum::before {
+            content: "▸ ";
+            color: var(--accent-dark);
+            font-weight: 700;
+        }
+        .analysis-spoiler[open] > .analysis-spoiler__sum::before,
+        .advice-sec-spoiler[open] > .advice-sec-spoiler__sum::before {
+            content: "▾ ";
+        }
+        .analysis-spoiler__body,
+        .advice-sec-spoiler__body {
+            padding: 10px 12px 12px;
+        }
+        .analysis-spoiler--nested .analysis-spoiler__body {
+            padding: 8px 10px 10px;
+        }
+        .analysis-spoiler__title {
+            color: var(--accent-dark);
+        }
+        .analysis-spoiler--nested .analysis-spoiler__title {
+            color: var(--text);
+            font-weight: 600;
+        }
+        .analysis-spoiler__hint {
+            font-weight: 400;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+        }
+        .analysis-spoiler__body > .analysis-spoiler:last-child,
+        .analysis-spoiler__body > .advice-sec-spoiler:last-child {
+            margin-bottom: 0;
+        }
         .multiselect-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
         .radio-list {
             display: flex;
@@ -1477,7 +1549,20 @@
         }
         .dash-card h3 { margin-bottom: 8px; font-size: .875rem; }
         .radar-svg-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-        .radar-svg-wrap svg { max-width: 100%; height: auto; }
+        .radar-svg-wrap svg { max-width: 100%; height: auto; color: var(--text-muted); }
+        .radar-chart-svg .radar-ring { fill: none; stroke: var(--border); stroke-width: 1; }
+        .radar-chart-svg .radar-spoke { stroke: color-mix(in srgb, var(--border) 85%, transparent); stroke-width: 1; }
+        .radar-chart-svg .radar-fill { fill: rgba(61, 177, 61, 0.22); stroke: var(--accent-dark); stroke-width: 2; }
+        .radar-chart-svg .radar-node { fill: var(--card); stroke: var(--accent-dark); stroke-width: 2; }
+        .radar-chart-svg .radar-axis-label { fill: var(--text); font-size: 9px; font-weight: 600; font-family: var(--font); }
+        .radar-chart-svg .radar-axis-pct { fill: var(--accent-dark); font-size: 10px; font-weight: 700; font-family: var(--font-mono); }
+        .radar-chip-pos {
+            display: inline-block;
+            min-width: 1.1em;
+            margin-right: 2px;
+            font-weight: 700;
+            color: var(--accent-dark);
+        }
         .radar-legend { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
         .radar-chip {
             font-family: var(--font-mono);
@@ -2594,12 +2679,22 @@
                 setKeyboardChromeOpen(false);
                 return;
             }
+            if (!anyTextInputFocused()) {
+                openFromFocus = false;
+            }
             if (openFromFocus || anyTextInputFocused()) {
                 setKeyboardChromeOpen(true);
                 return;
             }
             setKeyboardChromeOpen(false);
         }
+
+        window.__vwResetKeyboardChrome = function () {
+            openFromFocus = false;
+            clearTimeout(hideTimer);
+            hideTimer = null;
+            setKeyboardChromeOpen(false);
+        };
 
         function scheduleSync(delay) {
             clearTimeout(hideTimer);
@@ -2813,6 +2908,116 @@
             esc(t) +
             '</p></details>'
         );
+    }
+
+    function truncHint(s, max) {
+        const t = String(s || '').trim();
+        if (!t) return '';
+        const lim = max == null ? 72 : max;
+        return t.length <= lim ? t : t.slice(0, lim - 1) + '…';
+    }
+
+    function analysisSummaryTitle(title, hint) {
+        let h = '<span class="analysis-spoiler__title">' + esc(title) + '</span>';
+        if (hint) {
+            h += ' <span class="analysis-spoiler__hint">· ' + esc(hint) + '</span>';
+        }
+        return h;
+    }
+
+    function analysisSpoiler(summaryHtml, bodyHtml, opts) {
+        opts = opts || {};
+        let cls = 'analysis-spoiler';
+        if (opts.nested) cls += ' analysis-spoiler--nested';
+        if (opts.root) cls += ' analysis-spoiler--root';
+        const openAttr = opts.open ? ' open' : '';
+        return (
+            '<details class="' +
+            cls +
+            '"' +
+            openAttr +
+            '>' +
+            '<summary class="analysis-spoiler__sum">' +
+            summaryHtml +
+            '</summary>' +
+            '<div class="analysis-spoiler__body">' +
+            (bodyHtml || '') +
+            '</div></details>'
+        );
+    }
+
+    function renderLearnResourceSpoiler(M, style) {
+        if (!M) return '';
+        const mu = M.url && M.url !== '#' ? M.url : '';
+        const mdesc = M.description && String(M.description).trim();
+        let body = '';
+        if (style === 'card') {
+            body +=
+                '<div class="learn-path-resource" style="margin:0;font-size:.85rem;line-height:1.4">' +
+                (M.kind
+                    ? '<span class="muted" style="font-size:.72rem;display:block;margin-bottom:4px">' +
+                      esc(String(M.kind)) +
+                      '</span>'
+                    : '');
+        } else {
+            body += '<div class="learn-path-resource" style="margin:0;font-size:.82rem;line-height:1.35">';
+        }
+        if (mu) {
+            body +=
+                '<a href="' +
+                esc(mu) +
+                '" target="_blank" rel="noopener" style="color:var(--accent-dark);font-weight:600">' +
+                esc(M.title || 'Материал') +
+                '</a>';
+        } else {
+            body += esc(M.title || 'Материал');
+        }
+        if (M.provider) {
+            body +=
+                ' <span class="muted" style="font-size:.72rem">· ' + esc(String(M.provider)) + '</span>';
+        }
+        if (M.path_step) {
+            body +=
+                ' <span class="muted" style="font-size:.72rem">· ' + esc(String(M.path_step)) + '</span>';
+        }
+        body += learnDescSpoiler(mdesc);
+        body += '</div>';
+        const hint = M.provider ? String(M.provider) : mdesc ? 'есть описание' : '';
+        return analysisSpoiler(analysisSummaryTitle(M.title || 'Материал', hint), body, { nested: true });
+    }
+
+    function renderAdvicePlanStepsHtml(secSteps) {
+        let html = '';
+        const steps = secSteps || [];
+        for (let s = 0; s < steps.length; s++) {
+            const st = steps[s];
+            const stepText = typeof st === 'string' ? st : st && st.text ? String(st.text) : '';
+            let inner = '';
+            if (stepText) {
+                inner +=
+                    '<p class="advice-plan-step" style="margin:0 0 8px;font-size:.85rem;line-height:1.45">' +
+                    esc(stepText) +
+                    '</p>';
+            }
+            const mats =
+                st && typeof st === 'object' && st.materials && st.materials.length ? st.materials : [];
+            for (let mi = 0; mi < mats.length; mi++) {
+                inner += renderLearnResourceSpoiler(mats[mi], 'inline');
+            }
+            const stepHint = truncHint(stepText, 56) || 'Шаг ' + (s + 1);
+            html += analysisSpoiler(analysisSummaryTitle(stepHint, mats.length ? mats.length + ' материала' : ''), inner, {
+                nested: true
+            });
+        }
+        return html;
+    }
+
+    function renderAdvicePlanSectionHtml(sec) {
+        const secTitle = sec.title ? String(sec.title) : 'Раздел';
+        const secSteps = sec.steps || [];
+        return analysisSpoiler(analysisSummaryTitle(secTitle, secSteps.length ? secSteps.length + ' шаг.' : ''), renderAdvicePlanStepsHtml(secSteps), {
+            nested: true
+        });
     }
 
     var vwAppAlertEscapeBound = false;
@@ -3136,6 +3341,68 @@
         return s.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
     }
 
+    function getSphereToWebMap(schema) {
+        return (schema && schema.sphere_to_web_interest) || {};
+    }
+
+    function schemaSphereIds(schema) {
+        const spheres = (schema && schema.interest_spheres) || [];
+        return spheres.map(function (s) {
+            return String(s.id);
+        });
+    }
+
+    function webInterestToSphereId(webVal, schema) {
+        const raw = (webVal || '').trim();
+        if (!raw) return '';
+        const ids = schemaSphereIds(schema);
+        if (ids.indexOf(raw) >= 0) return raw;
+        const map = getSphereToWebMap(schema);
+        const keys = Object.keys(map);
+        for (let i = 0; i < keys.length; i++) {
+            if (String(map[keys[i]]) === raw) return keys[i];
+        }
+        return '';
+    }
+
+    function resolveTestSphereId(profile, override, schema) {
+        const ids = schemaSphereIds(schema);
+        function isValid(id) {
+            return id && ids.indexOf(String(id)) >= 0;
+        }
+        const ov = override != null && override !== '' ? String(override).trim() : '';
+        if (ov) {
+            if (isValid(ov)) return ov;
+            const fromWeb = webInterestToSphereId(ov, schema);
+            if (isValid(fromWeb)) return fromWeb;
+        }
+        const sp = parseProfileSpheres(profile);
+        if (sp.length && isValid(sp[0])) return sp[0];
+        const ms = profile && profile.main_sphere ? String(profile.main_sphere).trim() : '';
+        if (isValid(ms)) return ms;
+        if (ids.indexOf('other') >= 0) return 'other';
+        return ids[0] || 'other';
+    }
+
+    function sphereIdToWebInterest(sphereId, schema) {
+        const map = getSphereToWebMap(schema);
+        const sid = (sphereId || '').trim();
+        if (sid && map[sid]) return map[sid];
+        return sid || 'IT';
+    }
+
+    function applyTestSphereSelectValue() {
+        const selEl = document.getElementById('testSphereSelect');
+        if (!selEl || testSphereSelection == null || testSphereSelection === '') return;
+        const want = String(testSphereSelection);
+        for (let i = 0; i < selEl.options.length; i++) {
+            if (String(selEl.options[i].value) === want) {
+                selEl.value = want;
+                return;
+            }
+        }
+    }
+
     function normalizeProfileDraftFromServer(profile, schema) {
         const d = Object.assign({}, profile || {});
         const spheres = parseProfileSpheres(d);
@@ -3266,49 +3533,112 @@
         return true;
     }
 
+    /** Подписи у вершин радара: 0 — верх, 1 — слева, 2 — низ, 3 — справа (по часовой от верха). */
+    const RADAR_AXIS_POS = ['↑', '←', '↓', '→'];
+
+    function radarLabelAnchor(rad) {
+        const c = Math.cos(rad);
+        if (c < -0.35) return 'end';
+        if (c > 0.35) return 'start';
+        return 'middle';
+    }
+
     function buildRadarSvg(axes) {
         const ax = axes || [];
         if (!ax.length) return '';
         const n = ax.length;
-        const R = 88;
-        const cx = 100;
-        const cy = 100;
+        const pad = 44;
+        const vb = 200 + pad * 2;
+        const cx = vb / 2;
+        const cy = vb / 2;
+        const R = 76;
+        const labelR = R + 26;
         let grid = '';
         for (let g = 1; g <= 4; g++) {
             const r = (R * g) / 4;
-            grid += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="#e2e5eb" stroke-width="1"/>';
+            grid +=
+                '<circle class="radar-ring" cx="' +
+                cx +
+                '" cy="' +
+                cy +
+                '" r="' +
+                r.toFixed(1) +
+                '"/>';
         }
+        let spokes = '';
         let pts = '';
         let nodes = '';
         let labels = '';
         for (let i = 0; i < n; i++) {
             const pct = Math.max(0, Math.min(100, ax[i].value_percent != null ? ax[i].value_percent : 0));
-            const rad = (Math.PI / 2) + (i * 2 * Math.PI) / n;
+            const rad = Math.PI / 2 + (i * 2 * Math.PI) / n;
+            const sx = cx + R * Math.cos(rad);
+            const sy = cy - R * Math.sin(rad);
+            spokes +=
+                '<line class="radar-spoke" x1="' +
+                cx +
+                '" y1="' +
+                cy +
+                '" x2="' +
+                sx.toFixed(1) +
+                '" y2="' +
+                sy.toFixed(1) +
+                '"/>';
             const rr = (R * pct) / 100;
             const x = cx + rr * Math.cos(rad);
             const y = cy - rr * Math.sin(rad);
             pts += (i ? ' ' : '') + x.toFixed(1) + ',' + y.toFixed(1);
-            nodes += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="4" fill="#fff" stroke="#3DB13D" stroke-width="2"/>';
-            const lx = cx + (R + 22) * Math.cos(rad);
-            const ly = cy - (R + 22) * Math.sin(rad);
-            const anchor = lx < cx - 20 ? 'end' : lx > cx + 20 ? 'start' : 'middle';
+            nodes +=
+                '<circle class="radar-node" cx="' +
+                x.toFixed(1) +
+                '" cy="' +
+                y.toFixed(1) +
+                '" r="4.5" aria-label="' +
+                esc((ax[i].label || '') + ' ' + pct + '%') +
+                '"/>';
+            const lx = cx + labelR * Math.cos(rad);
+            const ly = cy - labelR * Math.sin(rad);
+            const anchor = radarLabelAnchor(rad);
+            const dy = Math.sin(rad) > 0.25 ? 4 : Math.sin(rad) < -0.25 ? -2 : 0;
+            const title = esc(ax[i].label || '');
             labels +=
                 '<text x="' +
                 lx.toFixed(1) +
                 '" y="' +
-                ly.toFixed(1) +
+                (ly + dy).toFixed(1) +
                 '" text-anchor="' +
                 anchor +
-                '" font-size="11" fill="#5c6370" font-family="Inter,sans-serif">' +
-                esc(ax[i].label || '') +
-                '</text>';
+                '">' +
+                '<tspan class="radar-axis-label" x="' +
+                lx.toFixed(1) +
+                '" dy="0">' +
+                title +
+                '</tspan>' +
+                '<tspan class="radar-axis-pct" x="' +
+                lx.toFixed(1) +
+                '" dy="11">' +
+                pct +
+                '%</tspan></text>';
         }
+        const ariaParts = ax
+            .map(function (a, i) {
+                const pos = RADAR_AXIS_POS[i] || '';
+                return (pos ? pos + ' ' : '') + (a.label || '') + ' ' + (a.value_percent != null ? a.value_percent : 0) + '%';
+            })
+            .join('; ');
         return (
-            '<svg viewBox="0 0 200 200" width="220" height="220" aria-label="Профориентационный радар">' +
+            '<svg class="radar-chart-svg" viewBox="0 0 ' +
+            vb +
+            ' ' +
+            vb +
+            '" width="100%" style="max-width:280px" role="img" aria-label="Оси методики: ' +
+            esc(ariaParts) +
+            '">' +
             grid +
-            '<polygon points="' +
+            spokes +
+            '<polygon class="radar-fill" points="' +
             pts +
-            '" fill="rgba(61,177,61,0.22)" stroke="#3DB13D" stroke-width="2"/>' +
+            '"/>' +
             nodes +
             labels +
             '</svg>'
@@ -3648,6 +3978,12 @@
     }
 
     async function renderShell() {
+        try {
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                document.activeElement.blur();
+            }
+        } catch (e) {}
+        if (window.__vwResetKeyboardChrome) window.__vwResetKeyboardChrome();
         if (userId && localStorage.getItem(ACCESS_TOKEN_KEY)) {
             if (!(await ensureSessionStillValid())) return;
         }
@@ -4114,7 +4450,9 @@
             btnRetake.onclick = async function () {
                 testForceWizard = true;
                 quizState.answers = Object.assign({}, savedQuizAnswersMap);
-                if (savedTestInterest) testSphereSelection = savedTestInterest;
+                if (savedTestInterest) {
+                    testSphereSelection = resolveTestSphereId(profile, savedTestInterest, schema);
+                }
                 await renderTestTab();
             };
         }
@@ -4677,14 +5015,14 @@
             }
             cachedProfile = Object.assign({}, profile);
             profileFetchDone = true;
-            if (testSphereSelection == null) {
-                if (savedTestInterest) testSphereSelection = savedTestInterest;
-                else {
-                    const sp = parseProfileSpheres(profile);
-                    testSphereSelection = (sp[0] || profile.main_sphere || '').trim() || 'other';
-                }
-            }
-            await loadQuiz(testSphereSelection);
+            testSphereSelection = resolveTestSphereId(
+                profile,
+                testSphereSelection != null ? testSphereSelection : savedTestInterest,
+                schema
+            );
+            await loadQuiz(sphereIdToWebInterest(testSphereSelection, schema));
+            const syncedSphere = webInterestToSphereId(quizState.interest, schema);
+            if (syncedSphere) testSphereSelection = syncedSphere;
             const qs = quizState.questions;
             const techQs =
                 quizState.technical.length > 0
@@ -4728,8 +5066,9 @@
                     '<label for="testSphereSelect">Сфера для теста</label>' +
                     '<select id="testSphereSelect">' + sphereOpts + '</select>' +
                     '<p>Нет вопросов для выбранной сферы.</p>';
+                applyTestSphereSelectValue();
                 document.getElementById('testSphereSelect').onchange = async function () {
-                    testSphereSelection = this.value;
+                    testSphereSelection = resolveTestSphereId(profile, this.value, schema);
                     quizState.answers = {};
                     await renderTestTab();
                 };
@@ -4869,8 +5208,9 @@
             html += renderTest2Blocks();
             html += '<button type="button" class="btn-primary" id="btnSubmitQuiz">Отправить ответы и получить разбор</button>';
             el.innerHTML = html;
+            applyTestSphereSelectValue();
             document.getElementById('testSphereSelect').onchange = async function () {
-                testSphereSelection = this.value;
+                testSphereSelection = resolveTestSphereId(profile, this.value, schema);
                 quizState.answers = {};
                 await renderTestTab();
             };
@@ -4911,7 +5251,10 @@
                         headers: Object.assign({ 'Content-Type': 'application/json' }, apiFetchHeaders()),
                         body: JSON.stringify({
                             answers: answers,
-                            interest: quizState.interest || testSphereSelection || undefined
+                            interest:
+                                quizState.interest ||
+                                sphereIdToWebInterest(testSphereSelection, schema) ||
+                                undefined
                         })
                     });
                     const data = await r.json();
@@ -4925,7 +5268,10 @@
                     answers.forEach(function (a) {
                         savedQuizAnswersMap[a.question_id] = a.choice;
                     });
-                    savedTestInterest = quizState.interest || testSphereSelection || null;
+                    savedTestInterest =
+                        webInterestToSphereId(quizState.interest, schema) ||
+                        testSphereSelection ||
+                        null;
                     await renderTestTab();
                     showAppAlert('Тест сохранён. Разбор — на вкладке «Разбор».', 'Готово');
                 } catch (e) {
@@ -4991,26 +5337,22 @@
     }
 
     function renderReadinessInsightLists(insight) {
-        let html = '<div class="readiness-metric__insight">';
+        let html = '';
         const blocks = [
-            { key: 'pros', cls: 'pro', label: 'Плюсы' },
-            { key: 'cons', cls: 'con', label: 'Минусы' }
+            { key: 'pros', label: 'Плюсы' },
+            { key: 'cons', label: 'Минусы' }
         ];
         for (let bi = 0; bi < blocks.length; bi++) {
             const b = blocks[bi];
             const items = insight[b.key] || [];
-            html +=
-                '<div class="readiness-insight-col readiness-insight-col--' +
-                b.cls +
-                '"><span class="readiness-insight-col__label">' +
-                esc(b.label) +
-                '</span><ul>';
+            if (!items.length) continue;
+            let list = '<ul style="margin:0;padding-left:18px;font-size:.82rem;line-height:1.45">';
             for (let ii = 0; ii < items.length; ii++) {
-                if (items[ii]) html += '<li>' + esc(String(items[ii])) + '</li>';
+                if (items[ii]) list += '<li style="margin-bottom:4px">' + esc(String(items[ii])) + '</li>';
             }
-            html += '</ul></div>';
+            list += '</ul>';
+            html += analysisSpoiler(analysisSummaryTitle(b.label, items.length + ' пункта'), list, { nested: true });
         }
-        html += '</div>';
         return html;
     }
 
@@ -5027,33 +5369,37 @@
             r.why && (r.pros || r.cons)
                 ? { why: r.why, pros: r.pros || [], cons: r.cons || [] }
                 : buildReadinessInsightFallback(v, ctx);
+        let whyBlock = analysisSpoiler(
+            analysisSummaryTitle('Почему ' + v + '%', truncHint(insight.why, 48)),
+            '<p class="readiness-metric__why muted" style="margin:0;font-size:.82rem;line-height:1.5">' + esc(insight.why || '') + '</p>',
+            { nested: true }
+        );
         return (
             '<div class="readiness-metric">' +
-            '<div class="readiness-metric__head">' +
-            '<h3 class="readiness-metric__title">Готовность к цели трека</h3>' +
-            '<span class="readiness-metric__value">' + esc(String(v)) + '%</span>' +
-            '</div>' +
             '<div class="readiness-metric__bar-wrap">' +
             '<div class="readiness-pointer" style="left:' + left + '%" aria-hidden="true"></div>' +
             '<div class="readiness-bar" role="img" aria-label="Готовность ' + esc(String(v)) + '%">' +
             bar +
             '</div></div>' +
-            '<p class="readiness-metric__why"><strong>Почему ' +
-            esc(String(v)) +
-            '%:</strong> ' +
-            esc(insight.why || '') +
-            '</p>' +
+            whyBlock +
             renderReadinessInsightLists(insight) +
             '</div>'
         );
     }
 
     function radarLegendChips(axes) {
-        let h = '<div class="radar-legend">';
+        let h = '<div class="radar-legend" aria-label="Расшифровка осей радара">';
         for (let i = 0; i < axes.length; i++) {
             const a = axes[i];
             const pct = a.value_percent != null ? a.value_percent : 0;
-            h += '<span class="radar-chip">' + esc(a.label) + ' · ' + pct + '%</span>';
+            const pos = RADAR_AXIS_POS[i] || '';
+            h +=
+                '<span class="radar-chip">' +
+                (pos ? '<span class="radar-chip-pos" aria-hidden="true">' + pos + '</span>' : '') +
+                esc(a.label) +
+                ' · ' +
+                pct +
+                '%</span>';
         }
         h += '</div>';
         return h;
@@ -5062,93 +5408,106 @@
     function buildAnalysisTabHtml(d) {
             const schoolMode = d.analysis_mode === 'school';
             const axes = (d.style_radar && d.style_radar.axes) || [];
+            const prepLevel = (cachedProfile && cachedProfile.preparation_level) || '';
             let html = '<h2>Автоматический разбор</h2>';
             if (schoolMode) {
                 html +=
                     '<p class="muted" style="font-size:.88rem;margin:0 0 12px">Школьный разбор: <strong>куда идти учиться</strong> и что подтянуть по предметам. Без карьерных треков и вакансий.</p>';
             }
             html += '<p class="analysis-ts">Разбор: ' + esc(d.analyzed_at || '') + '</p>';
-            html += '<div class="dash-grid-2">';
-            html += '<div class="dash-card">' + renderReadinessGauge(d.readiness, { axes: axes, gap: d.gap_analysis, scenarios: d.scenarios, preparation_level: (cachedProfile && cachedProfile.preparation_level) || '' }) + '</div>';
-            html +=
-                '<div class="dash-card"><h3>Оси методики (самопознание, люди, структура, баланс)</h3><div class="radar-svg-wrap">' +
-                buildRadarSvg(axes) +
-                radarLegendChips(axes) +
-                '</div></div></div>';
+
+            let summaryInner = '';
+            if (d.readiness) {
+                const rv = d.readiness.value_percent != null ? d.readiness.value_percent : 0;
+                summaryInner += analysisSpoiler(
+                    analysisSummaryTitle('Готовность к цели трека', rv + '%'),
+                    renderReadinessGauge(d.readiness, {
+                        axes: axes,
+                        gap: d.gap_analysis,
+                        scenarios: d.scenarios,
+                        preparation_level: prepLevel
+                    }),
+                    { nested: true }
+                );
+            }
+            if (axes.length) {
+                summaryInner += analysisSpoiler(
+                    analysisSummaryTitle('Оси методики', '4 показателя'),
+                    '<div class="radar-svg-wrap">' + buildRadarSvg(axes) + radarLegendChips(axes) + '</div>',
+                    { nested: true }
+                );
+            }
+            if (summaryInner) {
+                html += analysisSpoiler(analysisSummaryTitle('Сводка', 'готовность и оси'), summaryInner, { root: true });
+            }
+
             if (d.behavioral_hint) {
-                html +=
-                    '<div class="dash-card" style="margin-bottom:16px"><h3>Поведенческая подсказка</h3><p class="muted" style="font-size:.9rem;line-height:1.5">' +
-                    esc(d.behavioral_hint) +
-                    '</p></div>';
+                html += analysisSpoiler(
+                    analysisSummaryTitle('Поведенческая подсказка', truncHint(d.behavioral_hint, 40)),
+                    '<p class="muted" style="font-size:.9rem;line-height:1.5;margin:0">' + esc(d.behavioral_hint) + '</p>',
+                    { root: true }
+                );
             }
             const gap = d.gap_analysis;
             if (gap && gap.bars && gap.bars.length) {
-                html += '<div class="dash-card" style="margin-bottom:16px">';
-                html +=
-                    '<h3>' +
-                    (schoolMode ? 'Что подтянуть (предметы)' : 'Разрыв навыков') +
-                    '</h3><p class="muted" style="font-size:.85rem;margin:0 0 10px">' +
-                    esc(gap.headline || '') +
-                    (gap.overall_hp != null ? ' · близость к цели ~' + esc(String(gap.overall_hp)) + '%' : '') +
-                    '</p>';
+                const gapTitle = schoolMode ? 'Что подтянуть (предметы)' : 'Разрыв навыков';
+                let gapBody = '';
+                if (gap.headline || gap.overall_hp != null) {
+                    gapBody +=
+                        '<p class="muted" style="font-size:.85rem;margin:0 0 10px">' +
+                        esc(gap.headline || '') +
+                        (gap.overall_hp != null ? ' · близость к цели ~' + esc(String(gap.overall_hp)) + '%' : '') +
+                        '</p>';
+                }
                 for (let gi = 0; gi < gap.bars.length; gi++) {
                     const bar = gap.bars[gi];
                     const userPct = bar.user_percent != null ? bar.user_percent : 0;
                     const targetPct = bar.target_percent != null ? bar.target_percent : 0;
-                    html +=
-                        '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:8px"><span>' +
-                        esc(bar.label || '') +
-                        '</span><span class="muted" style="font-size:.78rem">у вас ' +
-                        esc(String(userPct)) +
-                        '% → цель ' +
-                        esc(String(targetPct)) +
-                        '%</span></div><div class="plan-bar-outer" style="margin:4px 0 12px"><div class="plan-bar-inner" style="width:' +
-                        Math.min(100, userPct) +
-                        '%"></div></div>';
+                    gapBody += analysisSpoiler(
+                        analysisSummaryTitle(bar.label || 'Навык', userPct + '% → ' + targetPct + '%'),
+                        '<div class="plan-bar-outer"><div class="plan-bar-inner" style="width:' +
+                            Math.min(100, userPct) +
+                            '%"></div></div>',
+                        { nested: true }
+                    );
                 }
                 if (gap.closing_skills && gap.closing_skills.length) {
-                    html +=
-                        '<p class="muted" style="font-size:.82rem;margin:8px 0 0"><strong>Закрыть в первую очередь:</strong> ' +
-                        esc(gap.closing_skills.join(', ')) +
-                        '</p>';
+                    gapBody += analysisSpoiler(
+                        analysisSummaryTitle('Закрыть в первую очередь', gap.closing_skills.length + ' навыка'),
+                        '<p class="muted" style="font-size:.82rem;margin:0">' + esc(gap.closing_skills.join(', ')) + '</p>',
+                        { nested: true }
+                    );
                 }
-                html += '</div>';
+                html += analysisSpoiler(analysisSummaryTitle(gapTitle, gap.bars.length + ' показателя'), gapBody, { root: true });
             }
             const pain = d.pain_focus;
             if (pain && (pain.summary || pain.label)) {
-                html +=
-                    '<div class="dash-card pain-focus-card" style="margin-bottom:16px">' +
-                    '<h3>Фокус по вашей ситуации</h3>';
+                let painBody = '';
                 if (pain.label) {
-                    html +=
+                    painBody +=
                         '<p class="pain-focus-tag" style="margin:0 0 10px;font-size:.88rem"><strong>' +
                         esc(pain.label) +
                         '</strong></p>';
                 }
                 if (pain.summary) {
-                    html +=
+                    painBody +=
                         '<p class="pain-focus-summary muted" style="margin:0 0 12px;font-size:.88rem;line-height:1.55">' +
                         esc(pain.summary) +
                         '</p>';
                 }
                 const tips = pain.tips || [];
-                if (tips.length) {
-                    html +=
-                        '<p style="margin:0 0 6px;font-size:.8rem;font-weight:600;color:var(--text)">Что сделать дальше</p>' +
-                        '<ul class="pain-focus-steps" style="margin:0;padding-left:18px;font-size:.85rem;color:var(--text-muted);line-height:1.5">';
-                    for (let pi = 0; pi < tips.length; pi++) {
-                        if (tips[pi]) html += '<li style="margin-bottom:6px">' + esc(tips[pi]) + '</li>';
-                    }
-                    html += '</ul>';
+                for (let pi = 0; pi < tips.length; pi++) {
+                    if (!tips[pi]) continue;
+                    painBody += analysisSpoiler(analysisSummaryTitle('Шаг ' + (pi + 1), truncHint(tips[pi], 40)), '<p class="muted" style="margin:0;font-size:.85rem;line-height:1.5">' + esc(tips[pi]) + '</p>', { nested: true });
                 }
-                html += '</div>';
+                html += analysisSpoiler(analysisSummaryTitle('Фокус по вашей ситуации', pain.label || truncHint(pain.summary, 36)), painBody, { root: true });
             }
             if (d.ai_narrative) {
-                html +=
-                    '<div class="dash-card" style="margin-bottom:16px"><h3>Краткий вывод</h3><p class="analysis-narrative" style="font-size:.9rem;line-height:1.6;margin:0">' +
-                    esc(d.ai_narrative) +
-                    '</p>';
-                html += '</div>';
+                html += analysisSpoiler(
+                    analysisSummaryTitle('Краткий вывод', truncHint(d.ai_narrative, 44)),
+                    '<p class="analysis-narrative" style="font-size:.9rem;line-height:1.6;margin:0">' + esc(d.ai_narrative) + '</p>',
+                    { root: true }
+                );
             }
             const sc = d.scenarios || {};
             const plans = sc.plans || [];
@@ -5156,32 +5515,28 @@
                 const bestPct = sc.best_avg_percent != null ? sc.best_avg_percent : plans[0].score_percent;
                 const bestName = sc.best_plan_name || '';
                 const cap = sc.caption || (schoolMode ? 'согласованность с маршрутами обучения' : 'средний показатель по лучшему сценарию');
-                html += '<div class="dash-card" style="margin-bottom:16px">';
-                html += '<h3 style="margin:0 0 8px;font-size:1rem">' + (schoolMode ? 'Куда идти учиться (A/B/C)' : 'Сценарии развития в сфере') + '</h3>';
-                html += '<div class="scenario-hero">';
-                html += '<div class="big-pct">' + esc(String(bestPct)) + '%</div>';
-                html += '<div class="sub">' + esc(cap) + '</div>';
-                                if (!schoolMode && (d.inferred_profession || sc.inferred_profession || {}).label) {
+                const scenTitle = schoolMode ? 'Куда идти учиться (A/B/C)' : 'Сценарии развития в сфере';
+                let scenBody = '<div class="scenario-hero">';
+                scenBody += '<div class="big-pct">' + esc(String(bestPct)) + '%</div>';
+                scenBody += '<div class="sub">' + esc(cap) + '</div>';
+                if (!schoolMode && (d.inferred_profession || sc.inferred_profession || {}).label) {
                     var infLbl = (d.inferred_profession || sc.inferred_profession).label;
-                    html +=
+                    scenBody +=
                         '<p class="muted" style="margin:10px 0 0;font-size:.88rem">Специализация по тесту: <strong style="color:var(--text)">' +
                         esc(String(infLbl)) +
                         '</strong></p>';
                 }
-                html += '<div class="plan-name">' + esc(bestName) + '</div></div>';
+                scenBody += '<div class="plan-name">' + esc(bestName) + '</div></div>';
                 for (let i = 0; i < plans.length; i++) {
                     const p = plans[i];
                     const pct = p.score_percent != null ? p.score_percent : 0;
-                    html +=
-                        '<div class="scenario-lane"><div class="lane-label"><span>' +
-                        esc(p.name || '') +
-                        '</span><span class="muted">' +
-                        pct +
-                        '%</span></div><div class="plan-bar-outer"><div class="plan-bar-inner" style="width:' +
-                        pct +
-                        '%"></div></div></div>';
+                    scenBody += analysisSpoiler(
+                        analysisSummaryTitle(p.name || 'Сценарий', pct + '%'),
+                        '<div class="plan-bar-outer"><div class="plan-bar-inner" style="width:' + pct + '%"></div></div>',
+                        { nested: true }
+                    );
                 }
-                html += '</div>';
+                html += analysisSpoiler(analysisSummaryTitle(scenTitle, bestPct + '% · ' + bestName), scenBody, { root: true });
             }
             const mts = (d.mts_matrix && d.mts_matrix.rows) || [];
             if (mts.length) {
@@ -5192,12 +5547,12 @@
                     : mtsTrackLbl
                       ? 'Роли по вашему треку'
                       : 'Роли (матрица направлений)';
-                html += '<div class="dash-card" style="margin-bottom:16px"><h3>' + esc(mtsTitle) + '</h3>';
+                let mtsBody = '';
                 if (mtsSchool) {
-                    html +=
+                    mtsBody +=
                         '<p class="muted" style="margin:0 0 12px;font-size:.82rem">Варианты поступления и обучения, не вакансии на рынке труда.</p>';
                 } else if (mtsTrackLbl) {
-                    html +=
+                    mtsBody +=
                         '<p class="muted" style="margin:0 0 12px;font-size:.82rem">Ранжирование по ответам теста и сфере «' +
                         esc(String(mtsTrackLbl)) +
                         '», не по корпоративным стажировкам.</p>';
@@ -5206,57 +5561,37 @@
                     const row = mts[i];
                     const pct = row.match_percent != null ? row.match_percent : row.percent != null ? row.percent : 0;
                     const rank = row.rank != null ? row.rank : i;
-                    html +=
-                        '<div class="mts-row"><div class="mts-name">' +
-                        esc(row.role_name || '') +
-                        '</div><div class="mts-thermo"><div class="mts-fill" style="width:' +
-                        pct +
-                        '%;background:' +
-                        mtsFillStyle(rank) +
-                        '"></div></div><div class="mts-pct">' +
-                        pct +
-                        '%</div></div>';
+                    mtsBody += analysisSpoiler(
+                        analysisSummaryTitle(row.role_name || 'Роль', pct + '%'),
+                        '<div class="mts-row" style="margin:0"><div class="mts-thermo" style="flex:1"><div class="mts-fill" style="width:' +
+                            pct +
+                            '%;background:' +
+                            mtsFillStyle(rank) +
+                            '"></div></div><div class="mts-pct">' +
+                            pct +
+                            '%</div></div>',
+                        { nested: true }
+                    );
                 }
-                html += '</div>';
+                html += analysisSpoiler(analysisSummaryTitle(mtsTitle, mts.length + ' варианта'), mtsBody, { root: true });
             }
             const learnCards = d.learning || [];
             if (learnCards.length) {
-                html +=
-                    '<div class="dash-card" style="margin-bottom:16px"><h3>Материалы и ссылки</h3>' +
-                    '<p class="muted" style="margin:0 0 12px;font-size:.82rem">Официальные источники (ФИПИ) и тренажёры по предметам — откройте один ресурс на неделю.</p>';
+                let learnBody =
+                    '<p class="muted" style="margin:0 0 10px;font-size:.82rem">Официальные источники (ФИПИ) и тренажёры — откройте один ресурс на неделю.</p>';
                 for (let lc = 0; lc < learnCards.length; lc++) {
-                    const c = learnCards[lc];
-                    const curl = c.url && c.url !== '#' ? c.url : '';
-                    html +=
-                        '<div class="learn-path-resource" style="margin:0 0 10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:.85rem;line-height:1.4">' +
-                        (c.kind
-                            ? '<span class="muted" style="font-size:.72rem;display:block;margin-bottom:4px">' +
-                              esc(String(c.kind)) +
-                              '</span>'
-                            : '') +
-                        (curl
-                            ? '<a href="' +
-                              esc(curl) +
-                              '" target="_blank" rel="noopener" style="color:var(--accent-dark);font-weight:600">' +
-                              esc(c.title || 'Материал') +
-                              '</a>'
-                            : esc(c.title || 'Материал'));
-                    html += learnDescSpoiler(c.description);
-                    html += '</div>';
+                    learnBody += renderLearnResourceSpoiler(learnCards[lc], 'card');
                 }
-                html += '</div>';
+                html += analysisSpoiler(analysisSummaryTitle('Материалы и ссылки', learnCards.length + ' ресурса'), learnBody, { root: true });
             }
             const lp = d.learning_path || {};
             const lpMetrics = lp.metrics || {};
             const lpSteps = lp.steps || [];
             if (lp.path_id && lpSteps.length) {
-                html +=
-                    '<div class="dash-card" style="margin-top:16px"><h3>' +
-                    esc(lp.title || 'Путь развития') +
-                    '</h3>';
+                let lpBody = '';
                 if (lpMetrics.coverage_percent != null) {
-                    html +=
-                        '<p class="muted" style="margin:0 0 12px;font-size:.88rem">Прогресс пути: <strong>' +
+                    lpBody +=
+                        '<p class="muted" style="margin:0 0 12px;font-size:.88rem">Прогресс: <strong>' +
                         esc(String(lpMetrics.coverage_percent)) +
                         '%</strong> · шаг ' +
                         esc(String((lpMetrics.current_step_index || 0) + 1)) +
@@ -5268,85 +5603,55 @@
                     const st = lpSteps[si];
                     const stStatus = st.status || 'pending';
                     const statusLbl =
-                        stStatus === 'done'
-                            ? '✓ сделано'
-                            : stStatus === 'in_progress'
-                              ? 'в работе'
-                              : 'ожидает';
-                    html +=
-                        '<div class="learn-path-step" style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-sm)">' +
-                        '<div class="learn-path-step-head">' +
-                        '<b style="font-size:.92rem;min-width:0;overflow-wrap:break-word">' +
-                        esc(String(st.order || si + 1) + '. ' + (st.title || '')) +
-                        '</b>' +
-                        '<span class="muted" style="font-size:.75rem">' +
-                        esc(statusLbl) +
-                        '</span></div>';
+                        stStatus === 'done' ? '✓ сделано' : stStatus === 'in_progress' ? 'в работе' : 'ожидает';
+                    let stepBody = '';
                     if (st.goal) {
-                        html +=
-                            '<p class="muted" style="margin:6px 0 4px;font-size:.82rem">' +
-                            esc(String(st.goal)) +
-                            '</p>';
+                        stepBody +=
+                            '<p class="muted" style="margin:0 0 6px;font-size:.82rem">' + esc(String(st.goal)) + '</p>';
                     }
                     if (st.duration_hint) {
-                        html +=
-                            '<p class="muted" style="margin:0 0 8px;font-size:.78rem">Срок: ' +
-                            esc(String(st.duration_hint)) +
-                            '</p>';
+                        stepBody +=
+                            '<p class="muted" style="margin:0 0 8px;font-size:.78rem">Срок: ' + esc(String(st.duration_hint)) + '</p>';
                     }
                     const resList = st.resources || [];
                     for (let ri = 0; ri < resList.length; ri++) {
-                        const R = resList[ri];
-                        const rurl = R.url && R.url !== '#' ? R.url : '';
-                        const rdesc = R.description && String(R.description).trim();
-                        html += '<div class="learn-path-resource" style="margin:8px 0 0;padding:8px 0 0;border-top:1px solid var(--border);font-size:.85rem;line-height:1.35">';
-                        if (rurl) {
-                            html +=
-                                '<a href="' +
-                                esc(rurl) +
-                                '" target="_blank" rel="noopener" style="color:var(--accent-dark);font-weight:600">' +
-                                esc(R.title || 'Материал') +
-                                '</a>';
-                        } else {
-                            html += esc(R.title || 'Материал');
-                        }
-                        if (R.provider) {
-                            html +=
-                                ' <span class="muted" style="font-size:.75rem">· ' +
-                                esc(String(R.provider)) +
-                                '</span>';
-                        }
-                        html += learnDescSpoiler(rdesc);
-                        html += '</div>';
+                        stepBody += renderLearnResourceSpoiler(resList[ri], 'inline');
                     }
-                    html += '</div>';
+                    lpBody += analysisSpoiler(
+                        analysisSummaryTitle(String(st.order || si + 1) + '. ' + (st.title || 'Шаг'), statusLbl),
+                        stepBody,
+                        { nested: true }
+                    );
                 }
-                html += '</div>';
+                html += analysisSpoiler(
+                    analysisSummaryTitle(lp.title || 'Путь развития', lpSteps.length + ' шагов'),
+                    lpBody,
+                    { root: true }
+                );
             }
             const adv = d.individual_advice && d.individual_advice.by_plan;
             if (adv && typeof adv === 'object') {
-                html += '<h3 style="margin-top:20px">Индивидуальные советы</h3>';
                 const ids = ['A', 'B', 'C'];
+                let advBody = '';
                 for (let k = 0; k < ids.length; k++) {
                     const block = adv[ids[k]];
                     if (!block) continue;
-                    html +=
-                        '<div class="advice-plan-card" style="margin-bottom:16px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--radius-sm)">' +
-                        '<b style="display:block;margin-bottom:6px;font-size:.95rem">' +
-                        esc(block.title || 'План ' + ids[k]) +
-                        '</b>';
+                    let planBody = '';
                     const intro = block.intro && String(block.intro).trim();
                     if (intro) {
-                        html +=
+                        planBody +=
                             '<p style="margin:0 0 10px;font-size:.85rem;line-height:1.5;color:var(--text)">' +
                             esc(intro) +
                             '</p>';
                     }
                     if (block.priority_skills && block.priority_skills.length) {
-                        html +=
-                            '<p class="muted" style="margin:0 0 12px;font-size:.8rem;line-height:1.45"><strong>Сначала подтянуть:</strong> ' +
-                            esc(block.priority_skills.join(', ')) +
-                            '</p>';
+                        planBody += analysisSpoiler(
+                            analysisSummaryTitle('Сначала подтянуть', truncHint(block.priority_skills.join(', '), 40)),
+                            '<p class="muted" style="margin:0;font-size:.8rem;line-height:1.45">' +
+                                esc(block.priority_skills.join(', ')) +
+                                '</p>',
+                            { nested: true }
+                        );
                     }
                     const sections =
                         block.sections && block.sections.length
@@ -5355,70 +5660,26 @@
                               ? [{ title: 'Ваш план', steps: block.steps }]
                               : [];
                     for (let si = 0; si < sections.length; si++) {
-                        const sec = sections[si];
-                        const secTitle = sec.title ? String(sec.title) : '';
-                        if (secTitle) {
-                            html +=
-                                '<p style="margin:12px 0 6px;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--accent-dark)">' +
-                                esc(secTitle) +
-                                '</p>';
-                        }
-                        const secSteps = sec.steps || [];
-                        for (let s = 0; s < secSteps.length; s++) {
-                            const st = secSteps[s];
-                            const stepText =
-                                typeof st === 'string' ? st : st && st.text ? String(st.text) : '';
-                            html +=
-                                '<div class="advice-plan-step" style="margin-bottom:10px;padding:10px 12px;background:var(--bg-soft, rgba(0,0,0,.03));border-radius:var(--radius-sm);font-size:.85rem;line-height:1.45">' +
-                                esc(stepText);
-                            const mats =
-                                st && typeof st === 'object' && st.materials && st.materials.length
-                                    ? st.materials
-                                    : [];
-                            for (let mi = 0; mi < mats.length; mi++) {
-                                const M = mats[mi];
-                                const mu = M.url && M.url !== '#' ? M.url : '';
-                                const mdesc = M.description && String(M.description).trim();
-                                html +=
-                                    '<div class="learn-path-resource" style="margin:8px 0 0;padding:8px 0 0;border-top:1px solid var(--border);font-size:.82rem;line-height:1.35">';
-                                if (mu) {
-                                    html +=
-                                        '<a href="' +
-                                        esc(mu) +
-                                        '" target="_blank" rel="noopener" style="color:var(--accent-dark);font-weight:600">' +
-                                        esc(M.title || 'Материал') +
-                                        '</a>';
-                                } else {
-                                    html += esc(M.title || 'Материал');
-                                }
-                                if (M.provider) {
-                                    html +=
-                                        ' <span class="muted" style="font-size:.72rem">· ' +
-                                        esc(String(M.provider)) +
-                                        '</span>';
-                                }
-                                html += learnDescSpoiler(mdesc);
-                                html += '</div>';
-                            }
-                            html += '</div>';
-                        }
+                        planBody += renderAdvicePlanSectionHtml(sections[si]);
                     }
-                    html += '</div>';
+                    advBody += analysisSpoiler(
+                        analysisSummaryTitle(block.title || 'План ' + ids[k], block.priority_skills && block.priority_skills[0] ? block.priority_skills[0] : ''),
+                        planBody,
+                        { nested: true }
+                    );
+                }
+                if (advBody) {
+                    html += analysisSpoiler(analysisSummaryTitle('Индивидуальные советы', 'планы A / B / C'), advBody, { root: true });
                 }
             }
             const weekly = d.weekly_roadmap || [];
             if (weekly.length) {
-                html +=
-                    '<h3 style="margin-top:20px">План на 4 недели</h3>' +
-                    '<p class="muted" style="margin:0 0 12px;font-size:.8rem;line-height:1.45">Небольшой маршрут: что изучить, что сделать руками и что у вас будет к концу блока.</p>';
+                let weekBody =
+                    '<p class="muted" style="margin:0 0 10px;font-size:.8rem;line-height:1.45">Что изучить, что сделать руками и что будет к концу блока.</p>';
                 for (let wi = 0; wi < weekly.length; wi++) {
                     const w = weekly[wi];
                     const hasMini = w.learn || w.practice || w.outcome;
-                    html +=
-                        '<div class="weekly-plan-card" style="margin-bottom:12px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--radius-sm)">' +
-                        '<b style="display:block;margin-bottom:10px;font-size:.9rem">' +
-                        esc(w.week_range || '') +
-                        '</b>';
+                    let wInner = '';
                     if (hasMini) {
                         const rows = [
                             { label: 'Изучите', text: w.learn },
@@ -5428,131 +5689,108 @@
                         for (let ri = 0; ri < rows.length; ri++) {
                             const row = rows[ri];
                             if (!row.text) continue;
-                            html +=
-                                '<div style="margin-bottom:' +
-                                (ri < rows.length - 1 ? '10px' : '0') +
-                                ';font-size:.84rem;line-height:1.45">' +
-                                '<span style="display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--accent-dark);margin-bottom:3px">' +
-                                esc(row.label) +
-                                '</span>' +
-                                esc(String(row.text)) +
-                                '</div>';
+                            wInner += analysisSpoiler(
+                                analysisSummaryTitle(row.label, truncHint(row.text, 36)),
+                                '<p style="margin:0;font-size:.84rem;line-height:1.45">' + esc(String(row.text)) + '</p>',
+                                { nested: true }
+                            );
                         }
                     } else {
-                        html += '<ul style="margin:0;padding-left:18px;font-size:.85rem;line-height:1.45">';
                         const topics = w.topics || [];
+                        let list = '<ul style="margin:0;padding-left:18px;font-size:.85rem;line-height:1.45">';
                         for (let ti = 0; ti < topics.length; ti++) {
-                            html += '<li>' + esc(topics[ti]) + '</li>';
+                            list += '<li>' + esc(topics[ti]) + '</li>';
                         }
-                        html += '</ul>';
+                        list += '</ul>';
+                        wInner = list;
                     }
-                    html += '</div>';
+                    weekBody += analysisSpoiler(analysisSummaryTitle(w.week_range || 'Неделя ' + (wi + 1), hasMini ? '3 блока' : 'темы'), wInner, { nested: true });
                 }
+                html += analysisSpoiler(analysisSummaryTitle('План на 4 недели', weekly.length + ' недели'), weekBody, { root: true });
             }
             const stages = d.growth_stages || [];
             if (stages.length) {
-                html +=
-                    '<h3 style="margin-top:20px">Этапы роста</h3>' +
-                    '<p class="muted" style="margin:0 0 12px;font-size:.8rem;line-height:1.45">Три шага к цели: что сделать, за какой срок и когда можно идти дальше.</p>';
+                let stagesBody =
+                    '<p class="muted" style="margin:0 0 10px;font-size:.8rem;line-height:1.45">Три шага к цели: что сделать, за какой срок и когда идти дальше.</p>';
                 for (let i = 0; i < stages.length; i++) {
                     const s = stages[i];
                     const intro = (s.intro || s.body || '').trim();
                     const tags = s.focus_tags || [];
-                    let tagH = '<div class="growth-tags">';
-                    for (let t = 0; t < tags.length; t++) tagH += '<span>' + esc(tags[t]) + '</span>';
-                    tagH += '</div>';
-                    html +=
-                        '<div class="growth-card"><div class="num">' +
-                        esc(String(s.stage != null ? s.stage : i + 1)) +
-                        '</div><h3 style="margin:0 0 4px;font-size:1rem">' +
-                        esc(s.title || '') +
-                        '</h3><p class="muted" style="margin:0 0 8px;font-size:.82rem;font-weight:600">' +
-                        esc(s.subtitle || '') +
-                        '</p>';
+                    let stBody = '';
                     if (intro) {
-                        html +=
+                        stBody +=
                             '<p style="margin:0 0 10px;font-size:.85rem;line-height:1.5;color:var(--text)">' +
                             esc(intro) +
                             '</p>';
                     }
-                    html += tagH;
-                    html +=
-                        '<p class="muted" style="font-size:.75rem;margin:0 0 10px"><strong>Срок этапа:</strong> ' +
-                        esc(s.horizon || '') +
-                        '</p>';
+                    if (tags.length) {
+                        let tagH = '<div class="growth-tags">';
+                        for (let t = 0; t < tags.length; t++) tagH += '<span>' + esc(tags[t]) + '</span>';
+                        tagH += '</div>';
+                        stBody += tagH;
+                    }
+                    if (s.horizon) {
+                        stBody += analysisSpoiler(
+                            analysisSummaryTitle('Срок этапа', s.horizon),
+                            '<p class="muted" style="margin:0;font-size:.75rem">' + esc(s.horizon) + '</p>',
+                            { nested: true }
+                        );
+                    }
                     if (s.continues_from) {
-                        html +=
-                            '<p class="muted" style="font-size:.8rem;margin:0 0 10px;padding:8px 10px;background:var(--bg-soft,rgba(0,0,0,.03));border-radius:var(--radius-sm)">' +
-                            esc(String(s.continues_from)) +
-                            '</p>';
+                        stBody += analysisSpoiler(
+                            analysisSummaryTitle('Связь с прошлым этапом', truncHint(s.continues_from, 36)),
+                            '<p class="muted" style="margin:0;font-size:.8rem;line-height:1.45">' + esc(String(s.continues_from)) + '</p>',
+                            { nested: true }
+                        );
                     }
                     const plan = s.plan || [];
-                    if (plan.length) {
-                        html +=
-                            '<p style="margin:0 0 6px;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--accent-dark)">План этапа</p>';
-                        for (let pi = 0; pi < plan.length; pi++) {
-                            const ps = plan[pi];
-                            html +=
-                                '<div style="margin-bottom:8px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:.84rem;line-height:1.45">' +
-                                '<span style="display:block;font-size:.72rem;font-weight:700;color:var(--accent-dark);margin-bottom:3px">' +
-                                esc(ps.label || 'Шаг') +
-                                '</span>' +
-                                esc(ps.text || '') +
-                                '</div>';
-                        }
+                    for (let pi = 0; pi < plan.length; pi++) {
+                        const ps = plan[pi];
+                        stBody += analysisSpoiler(
+                            analysisSummaryTitle(ps.label || 'Шаг плана', truncHint(ps.text, 32)),
+                            '<p style="margin:0;font-size:.84rem;line-height:1.45">' + esc(ps.text || '') + '</p>',
+                            { nested: true }
+                        );
                     }
                     const checklist = s.checklist || s.milestones || [];
                     if (checklist.length) {
-                        html +=
-                            '<p style="margin:10px 0 6px;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--accent-dark)">Чеклист</p>' +
-                            '<ul style="margin:0 0 10px;padding-left:18px;color:var(--text-muted);font-size:.84rem;line-height:1.45">';
+                        let list = '<ul style="margin:0;padding-left:18px;color:var(--text-muted);font-size:.84rem;line-height:1.45">';
                         for (let m = 0; m < checklist.length; m++) {
-                            html += '<li style="margin-bottom:4px">' + esc(checklist[m]) + '</li>';
+                            list += '<li style="margin-bottom:4px">' + esc(checklist[m]) + '</li>';
                         }
-                        html += '</ul>';
+                        list += '</ul>';
+                        stBody += analysisSpoiler(analysisSummaryTitle('Чеклист', checklist.length + ' пункта'), list, { nested: true });
                     }
                     const route = (s.path_route || '').trim();
                     if (route) {
-                        html +=
-                            '<p class="muted" style="font-size:.8rem;margin:0 0 10px;line-height:1.45"><strong>Маршрут обучения:</strong> ' +
-                            esc(route) +
-                            '</p>';
+                        stBody += analysisSpoiler(
+                            analysisSummaryTitle('Маршрут обучения', truncHint(route, 36)),
+                            '<p class="muted" style="margin:0;font-size:.8rem;line-height:1.45">' + esc(route) + '</p>',
+                            { nested: true }
+                        );
                     }
                     const stMats = s.materials || [];
-                    if (stMats.length) {
-                        html +=
-                            '<p style="margin:0 0 6px;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--accent-dark)">Материалы</p>';
-                        for (let sm = 0; sm < stMats.length; sm++) {
-                            const M = stMats[sm];
-                            const mu = M.url && M.url !== '#' ? M.url : '';
-                            const mdesc = M.description && String(M.description).trim();
-                            html +=
-                                '<div class="learn-path-resource" style="margin:0 0 8px;padding:8px 0;border-top:1px solid var(--border);font-size:.82rem;line-height:1.35">';
-                            if (mu) {
-                                html +=
-                                    '<a href="' +
-                                    esc(mu) +
-                                    '" target="_blank" rel="noopener" style="color:var(--accent-dark);font-weight:600">' +
-                                    esc(M.title || 'Материал') +
-                                    '</a>';
-                            } else {
-                                html += esc(M.title || 'Материал');
-                            }
-                            if (M.path_step) {
-                                html +=
-                                    ' <span class="muted" style="font-size:.72rem">· ' +
-                                    esc(String(M.path_step)) +
-                                    '</span>';
-                            }
-                            html += learnDescSpoiler(mdesc);
-                            html += '</div>';
-                        }
+                    for (let sm = 0; sm < stMats.length; sm++) {
+                        stBody += renderLearnResourceSpoiler(stMats[sm], 'inline');
                     }
-                    html +=
-                        '<p style="font-size:.84rem;margin:12px 0 0;padding:10px 12px;border-left:3px solid var(--accent-dark);background:var(--bg-soft,rgba(0,0,0,.03));line-height:1.45"><strong>Когда идти дальше:</strong> ' +
-                        esc(s.when_next || '') +
-                        '</p></div>';
+                    if (s.when_next) {
+                        stBody += analysisSpoiler(
+                            analysisSummaryTitle('Когда идти дальше', truncHint(s.when_next, 36)),
+                            '<p style="margin:0;font-size:.84rem;line-height:1.45">' + esc(s.when_next) + '</p>',
+                            { nested: true }
+                        );
+                    }
+                    const stageHint = (s.subtitle || s.horizon || '').trim();
+                    stagesBody += analysisSpoiler(
+                        analysisSummaryTitle(
+                            'Этап ' + (s.stage != null ? s.stage : i + 1) + ': ' + (s.title || ''),
+                            stageHint
+                        ),
+                        stBody,
+                        { nested: true }
+                    );
                 }
+                html += analysisSpoiler(analysisSummaryTitle('Этапы роста', stages.length + ' этапа'), stagesBody, { root: true });
             }
         return html;
     }
