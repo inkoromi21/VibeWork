@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <meta name="vibework-build" content="20260521-auth-layout-fix">
+    <meta name="vibework-build" content="20260521-keyboard-chrome">
     <script>
     (function () {
-        var BUILD = '20260521-auth-layout-fix';
+        var BUILD = '20260521-keyboard-chrome';
         var key = 'vw_miniapp_build';
         try {
             var prev = localStorage.getItem(key);
@@ -97,7 +97,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=20260521-auth-layout-fix">
+    <link rel="stylesheet" href="/static/style.css?v=20260521-keyboard-chrome">
     <style>
         /* Токены страницы — из /static/style.css; здесь только алиасы legacy-миниаппа */
         html[data-miniapp] {
@@ -1099,11 +1099,22 @@
             line-height: 1.45;
         }
         .multiselect-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
-        .radio-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 14px; }
+        .radio-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 8px 0 14px;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
         .radio-opt {
             display: flex;
             align-items: flex-start;
             gap: 10px;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
             padding: 12px 14px;
             border: 1.5px solid var(--field-outline);
             border-radius: 14px;
@@ -1111,13 +1122,34 @@
             font-size: 0.88rem;
             line-height: 1.35;
             cursor: pointer;
+            margin: 0;
         }
         .radio-opt:has(input:checked) {
             border-color: var(--btn-anketa-border-strong);
             background: var(--btn-anketa-bg-selected);
         }
-        .radio-opt input[type="radio"] { margin-top: 2px; accent-color: var(--green); flex-shrink: 0; }
-        .radio-opt span { flex: 1; }
+        .radio-opt input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            min-width: 18px;
+            flex: 0 0 18px;
+            margin: 2px 0 0;
+            padding: 0;
+            min-height: 0;
+            border: none;
+            border-radius: 50%;
+            background: transparent;
+            box-shadow: none;
+            accent-color: var(--green);
+            -webkit-appearance: radio;
+            appearance: auto;
+        }
+        .radio-opt span {
+            flex: 1 1 0;
+            min-width: 0;
+            overflow-wrap: break-word;
+            word-break: normal;
+        }
         .chip {
             display: inline-flex;
             align-items: center;
@@ -1731,6 +1763,8 @@
         .auth-hh-agree-text a {
             color: var(--accent-dark);
             font-weight: 500;
+            overflow-wrap: break-word;
+            word-break: normal;
         }
         .pwd-input { margin-bottom: 6px; }
         .pwd-reveal { display: flex; flex-direction: row; align-items: center; gap: 10px; margin: 0 0 14px; }
@@ -2360,7 +2394,18 @@
             flex: 1 1 0;
             min-width: 0;
         }
-        html[data-miniapp] #app .profile-card label,
+        html[data-miniapp] #app .radio-opt {
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        html[data-miniapp] #app .radio-opt span {
+            flex: 1 1 0;
+            min-width: 0;
+            overflow-wrap: break-word;
+            word-break: normal;
+        }
+        html[data-miniapp] #app .profile-card label:not(.radio-opt),
         html[data-miniapp] #app .profile-card input,
         html[data-miniapp] #app .profile-card p {
             max-width: 100%;
@@ -2392,7 +2437,7 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="/static/miniapp-shell.css?v=20260521-auth-layout-fix">
+    <link rel="stylesheet" href="/static/miniapp-shell.css?v=20260521-keyboard-chrome">
     <script src="/static/auth-password-toggle.js?v=20260521-mobile-ui-fix"></script>
 </head>
 <body>
@@ -2484,9 +2529,138 @@
         });
     }
 
+    /** На телефоне: при вводе в поле — скрыть нижнее меню и кнопки шапки; после закрытия клавиатуры — вернуть. */
+    function initMobileKeyboardMenuHide() {
+        if (window.__vwKeyboardMenuHideInit) return;
+        window.__vwKeyboardMenuHideInit = true;
+
+        var mobileMq = window.matchMedia('(max-width: 860px), (pointer: coarse)');
+        var hideTimer = null;
+        var openFromFocus = false;
+
+        function isMobileChrome() {
+            return mobileMq.matches;
+        }
+
+        function isTextInput(el) {
+            if (!el || el.nodeType !== 1) return false;
+            var tag = el.tagName ? el.tagName.toLowerCase() : '';
+            if (tag === 'textarea') return true;
+            if (tag === 'select') return true;
+            if (tag === 'input') {
+                var t = String(el.type || 'text').toLowerCase();
+                return (
+                    t !== 'button' &&
+                    t !== 'submit' &&
+                    t !== 'reset' &&
+                    t !== 'checkbox' &&
+                    t !== 'radio' &&
+                    t !== 'hidden' &&
+                    t !== 'range' &&
+                    t !== 'file' &&
+                    t !== 'image'
+                );
+            }
+            return !!el.isContentEditable;
+        }
+
+        function anyTextInputFocused() {
+            var active = document.activeElement;
+            if (active && isTextInput(active)) return true;
+            var root = document.getElementById('app');
+            if (!root) return false;
+            var fields = root.querySelectorAll(
+                'input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]):not([type="file"]):not([type="image"]), textarea, select'
+            );
+            for (var i = 0; i < fields.length; i++) {
+                if (fields[i] === active) return true;
+            }
+            return false;
+        }
+
+        function setKeyboardChromeOpen(open) {
+            var root = document.documentElement;
+            if (!isMobileChrome() || !open) {
+                root.removeAttribute('data-vw-keyboard-open');
+                openFromFocus = false;
+                return;
+            }
+            root.setAttribute('data-vw-keyboard-open', '1');
+        }
+
+        function syncKeyboardChrome() {
+            clearTimeout(hideTimer);
+            if (!isMobileChrome()) {
+                setKeyboardChromeOpen(false);
+                return;
+            }
+            if (openFromFocus || anyTextInputFocused()) {
+                setKeyboardChromeOpen(true);
+                return;
+            }
+            setKeyboardChromeOpen(false);
+        }
+
+        function scheduleSync(delay) {
+            clearTimeout(hideTimer);
+            hideTimer = setTimeout(syncKeyboardChrome, delay == null ? 140 : delay);
+        }
+
+        document.addEventListener(
+            'focusin',
+            function (e) {
+                if (!isMobileChrome() || !isTextInput(e.target)) return;
+                openFromFocus = true;
+                setKeyboardChromeOpen(true);
+            },
+            true
+        );
+
+        document.addEventListener(
+            'focusout',
+            function (e) {
+                if (!isMobileChrome() || !isTextInput(e.target)) return;
+                openFromFocus = false;
+                scheduleSync(160);
+            },
+            true
+        );
+
+        document.addEventListener('touchstart', function () {
+            if (!isMobileChrome()) return;
+            scheduleSync(280);
+        }, { passive: true });
+
+        if (window.visualViewport) {
+            var vvBaseline = window.visualViewport.height;
+            window.visualViewport.addEventListener('resize', function () {
+                if (!isMobileChrome()) return;
+                var vv = window.visualViewport;
+                if (!vv) return;
+                var h = vv.height;
+                var keyboardLikely = h < Math.min(vvBaseline, window.innerHeight) * 0.82;
+                if (keyboardLikely && anyTextInputFocused()) {
+                    setKeyboardChromeOpen(true);
+                } else if (!keyboardLikely) {
+                    vvBaseline = h;
+                    scheduleSync(100);
+                } else {
+                    vvBaseline = Math.max(vvBaseline, h);
+                }
+            });
+        }
+
+        mobileMq.addEventListener('change', syncKeyboardChrome);
+        window.addEventListener('orientationchange', function () {
+            scheduleSync(400);
+        });
+    }
+
+    initMobileKeyboardMenuHide();
+
     const HOME_TAB = { id: 'home', label: 'Разделы', ico: '☰' };
     const ACCOUNT_TAB = { id: 'account', label: 'Аккаунт', ico: '✦' };
-    const VW_BUILD = '20260521-auth-layout-fix';
+    const VW_BUILD = '20260521-keyboard-chrome';
     const SECTION_TABS = [
         { id: 'profile', label: 'Профиль', short: 'Анкета', snIco: '◇', ico: '📋' },
         { id: 'test', label: 'Тестирование', short: 'Тест', snIco: '☑', ico: '🎯' },
@@ -4156,7 +4330,7 @@
                     esc(opts[i].id) +
                     '"' +
                     checked +
-                    '> <span>' +
+                    '><span>' +
                     esc(opts[i].label) +
                     '</span></label>';
             }
