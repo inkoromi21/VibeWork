@@ -144,7 +144,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         "• Первая кнопка — <b>сайт</b> в браузере.\n"
 
-        "• Вторая — <b>мини-приложение</b> в Telegram.\n\n"
+        "• Вторая кнопка — <b>мини-приложение</b> в Telegram.\n\n"
 
         "Удачного старта!"
 

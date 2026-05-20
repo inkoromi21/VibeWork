@@ -2830,6 +2830,7 @@
     };
     let jobsFilterReloadTimer = null;
     let jobsListCache = [];
+    let jobsListingMeta = {};
     let jobsHhPage = 0;
     let jobsHhHasMore = false;
     let tinderIndex = 0;
@@ -6555,6 +6556,47 @@
         });
     }
 
+    function jobsListingNoticeText(meta, hasItems) {
+        const st = (meta && meta.vacancy_listing_status) || 'ok';
+        const exp = (meta && meta.profile_experience_label) || '';
+        const expPart = exp ? ' (' + exp + ')' : '';
+        const fb = meta && meta.found_broader;
+        const fl = meta && meta.found_for_level;
+        if (st === 'none_total') {
+            return 'По запросу и фильтрам вакансий на hh.ru сейчас не найдено. Попробуйте другой город, ослабить «Опыт» или снять ограничение по зарплате.';
+        }
+        if (st === 'none_for_level') {
+            const approx = fb != null ? ' (≈' + fb + ' без учёта уровня)' : '';
+            return (
+                'Вакансии по запросу есть' +
+                approx +
+                ', но под ваш уровень' +
+                expPart +
+                ' в подборе ничего не попало. Измените «Опыт» в фильтрах или откройте поиск на hh.ru.'
+            );
+        }
+        if (st === 'direction_filtered') {
+            const n = fl != null ? ' (≈' + fl + ')' : '';
+            return (
+                'На hh.ru есть вакансии по запросу' +
+                n +
+                ', но в IT-подборе по заголовкам ничего не осталось. Смените «Область» или откройте полный поиск на hh.ru.'
+            );
+        }
+        if (hasItems) {
+            return (
+                'Показаны вакансии под ваш профиль и уровень' +
+                expPart +
+                '. Часть может подходить не идеально — сверяйтесь с требованиями в карточке.'
+            );
+        }
+        return (
+            'Подбор под ваш уровень' +
+            expPart +
+            '. Вакансии могут чуть не совпадать с ожиданиями или временно отсутствовать — см. результат ниже.'
+        );
+    }
+
     function paintJobsList(root) {
         if (jobsViewMode === 'compact') jobsViewMode = 'classic';
         const inner = root.querySelector('#jobsInner');
@@ -6564,7 +6606,9 @@
         if (tinderIndex >= list.length) tinderIndex = 0;
         if (!list.length) {
             inner.innerHTML =
-                '<div class="banner-warn">По запросу ничего не найдено. Снимите фильтры или укажите город в анкете.</div>';
+                '<div class="banner-warn">' +
+                esc(jobsListingNoticeText(jobsListingMeta, false)) +
+                '</div>';
             const emptyHost = root.querySelector('#tinderActionsHost');
             if (emptyHost) {
                 emptyHost.innerHTML = '';
@@ -6653,6 +6697,13 @@
             jobsListCache = jobsListCache.concat(items);
         } else {
             jobsListCache = items;
+            jobsListingMeta = {
+                vacancy_listing_status: d.vacancy_listing_status,
+                found_for_level: d.found_for_level,
+                found_broader: d.found_broader,
+                profile_experience_label: d.profile_experience_label,
+                profile_experience_code: d.profile_experience_code
+            };
         }
         const found = d.found != null ? d.found : '?';
         const sh = d.search_hint || {};
@@ -6670,7 +6721,12 @@
             if (notice) {
                 note = '<div class="banner-warn" style="margin-top:8px">' + esc(String(notice)) + '</div>';
             }
+            const levelLine =
+                '<p class="jobs-level-notice" style="margin:0 0 8px;font-size:.82rem;line-height:1.45">' +
+                esc(jobsListingNoticeText(jobsListingMeta, jobsListCache.length > 0)) +
+                '</p>';
             hint.innerHTML =
+                levelLine +
                 'Запрос: <strong>' +
                 esc(String(sh.text || '—')) +
                 '</strong>' +
@@ -6736,7 +6792,7 @@
         const lead =
             jobsSectionMode === 'simulator'
                 ? 'Короткий сценарий рабочего дня под сферу из анкеты — выбирайте действия на шагах.'
-                : 'Подбор по анкете, разбору и сферам интересов. Фильтры можно изменить ниже.';
+                : 'Подбор по анкете, разбору и вашему уровню. Вакансии могут чуть не совпадать с ожиданиями или временно отсутствовать — ниже пояснение по результату.';
         el.innerHTML =
             '<h2>Вакансии</h2>' +
             '<p class="muted" style="margin:0 0 12px;font-size:.88rem">' +

@@ -417,6 +417,58 @@ HH_EXPERIENCE_API_IDS = frozenset(
     {"noExperience", "between1And3", "between3And6", "moreThan6"}
 )
 
+_HH_EXPERIENCE_LABELS: Dict[str, str] = {
+    "noExperience": "без опыта",
+    "between1And3": "от 1 до 3 лет",
+    "between3And6": "от 3 до 6 лет",
+    "moreThan6": "более 6 лет",
+}
+
+
+def _experience_display_label(code: Optional[str]) -> str:
+    if not code:
+        return ""
+    return _HH_EXPERIENCE_LABELS.get(str(code), str(code))
+
+
+def _vacancy_listing_meta(
+    params: Dict[str, Any],
+    raw: Dict[str, Any],
+    items: List[Dict[str, Any]],
+    *,
+    direction: str = "",
+) -> Dict[str, Any]:
+    """Статус подбора для UI: есть ли вакансии под уровень / вообще."""
+    found_for_level = int(raw.get("found") or 0)
+    exp_code = params.get("experience")
+    exp_label = _experience_display_label(exp_code) if exp_code else ""
+    found_broader: Optional[int] = None
+
+    if items:
+        status = "ok"
+    elif found_for_level > 0:
+        status = (
+            "direction_filtered"
+            if _is_it_search_direction(direction)
+            else "ok"
+        )
+    elif exp_code:
+        broader = dict(params)
+        broader.pop("experience", None)
+        raw_b = search_vacancies(broader)
+        found_broader = int(raw_b.get("found") or 0)
+        status = "none_for_level" if found_broader > 0 else "none_total"
+    else:
+        status = "none_total"
+
+    return {
+        "vacancy_listing_status": status,
+        "found_for_level": found_for_level,
+        "found_broader": found_broader,
+        "profile_experience_label": exp_label,
+        "profile_experience_code": exp_code or None,
+    }
+
 
 def apply_user_experience_filter(
     params: Dict[str, Any],
@@ -577,6 +629,9 @@ def fetch_live_hh_vacancies(
         min_salary=min_salary or params.get("salary"),
         work_format="remote" if only_remote else None,
     )
+    listing = _vacancy_listing_meta(
+        params, raw, items, direction=direction
+    )
     return {
         "source": "hh.ru",
         "found": raw.get("found"),
@@ -595,6 +650,7 @@ def fetch_live_hh_vacancies(
             "search_field": params.get("search_field"),
             "employment": params.get("employment"),
         },
+        **listing,
     }
 
 
@@ -649,6 +705,13 @@ def build_hh_demo_fallback(
         work_format="remote" if only_remote else None,
     )
     items = demo_hh_items(hh_url)
+    direction = str(rec.get("primary_direction") or "")
+    listing = _vacancy_listing_meta(
+        params,
+        {"found": len(items)},
+        items,
+        direction=direction,
+    )
     return {
         "source": "demo",
         "notice": notice
@@ -667,6 +730,7 @@ def build_hh_demo_fallback(
         "page": 0,
         "per_page": per_page,
         "items": items,
+        **listing,
     }
 
 

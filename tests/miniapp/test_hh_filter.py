@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 _REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO / "miniapp" / "backend"))
@@ -13,6 +14,7 @@ from wibe_work.services.hh_filter import (
     _hh_search_phrase,
     _map_employment,
     _map_experience,
+    _vacancy_listing_meta,
     build_hh_query_params,
     hh_search_phrase_for_it_track,
 )
@@ -91,3 +93,40 @@ def test_it_query_no_search_field_name() -> None:
     params = build_hh_query_params(profile, rec, "47", [], use_profile_salary=False)
     assert "search_field" not in params
     assert params.get("employment") is None
+
+
+def test_vacancy_listing_ok_with_items() -> None:
+    meta = _vacancy_listing_meta(
+        {"experience": "noExperience"},
+        {"found": 10},
+        [{"id": "1"}],
+    )
+    assert meta["vacancy_listing_status"] == "ok"
+    assert meta["profile_experience_label"] == "без опыта"
+
+
+def test_vacancy_listing_none_total() -> None:
+    meta = _vacancy_listing_meta({}, {"found": 0}, [])
+    assert meta["vacancy_listing_status"] == "none_total"
+
+
+@patch("wibe_work.services.hh_filter.search_vacancies")
+def test_vacancy_listing_none_for_level(mock_search) -> None:
+    mock_search.return_value = {"found": 42}
+    meta = _vacancy_listing_meta(
+        {"experience": "noExperience", "text": "python"},
+        {"found": 0},
+        [],
+    )
+    assert meta["vacancy_listing_status"] == "none_for_level"
+    assert meta["found_broader"] == 42
+
+
+def test_vacancy_listing_direction_filtered() -> None:
+    meta = _vacancy_listing_meta(
+        {"experience": "noExperience"},
+        {"found": 8},
+        [],
+        direction="IT / разработка",
+    )
+    assert meta["vacancy_listing_status"] == "direction_filtered"
