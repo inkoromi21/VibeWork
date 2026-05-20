@@ -39,50 +39,111 @@ def _http_session() -> requests.Session:
     return s
 
 
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name, "").strip().lower()
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    if raw in ("0", "false", "no", "off"):
+        return False
+    return default
+
+
+def _looks_like_ollama_model(name: str) -> bool:
+    low = (name or "").lower()
+    return any(
+        x in low
+        for x in (
+            "gpt-oss",
+            "llama",
+            "mistral",
+            "qwen",
+            "deepseek-r1",
+            ":",
+            "ollama",
+        )
+    )
+
+
+def _cloud_url_for_provider(provider: str, key: str) -> str:
+    p = (provider or "").strip().lower()
+    if p == "groq":
+        return "https://api.groq.com/openai/v1/chat/completions"
+    if p in ("openai", "gpt"):
+        return "https://api.openai.com/v1/chat/completions"
+    if p in ("zai", "z.ai", "glm"):
+        return "https://api.z.ai/api/paas/v4/chat/completions"
+    if key.startswith("gsk_"):
+        return "https://api.groq.com/openai/v1/chat/completions"
+    if key.startswith("sk-or-"):
+        return "https://api.openai.com/v1/chat/completions"
+    if "." in key and not key.startswith("sk-"):
+        return "https://api.z.ai/api/paas/v4/chat/completions"
+    return "https://api.deepseek.com/v1/chat/completions"
+
+
+def _default_model_for_url(url: str) -> str:
+    u = url.lower()
+    if "groq.com" in u:
+        return "llama-3.1-8b-instant"
+    if "api.openai.com" in u:
+        return "gpt-4o-mini"
+    if "z.ai" in u or "bigmodel.cn" in u:
+        return "glm-4-flash"
+    if _is_local_llm_url(url):
+        return "llama3.2"
+    return "deepseek-chat"
+
+
+def _resolve_chat_url(key: str, explicit_url: str, *, use_local: bool) -> str:
+    url = (explicit_url or "").strip()
+    if use_local:
+        return url or "http://127.0.0.1:11434/v1/chat/completions"
+    if url and not _is_local_llm_url(url):
+        return url
+    provider = os.getenv("CHAT_PROVIDER", "").strip()
+    return _cloud_url_for_provider(provider, key)
+
+
+def _resolve_chat_model(url: str, explicit_model: str) -> str:
+    model = (
+        (explicit_model or "").strip()
+        or os.getenv("DEEPSEEK_MODEL", "").strip()
+        or os.getenv("OPENAI_MODEL", "").strip()
+    )
+    if _is_local_llm_url(url):
+        return model or _default_model_for_url(url)
+    if not model or _looks_like_ollama_model(model):
+        return _default_model_for_url(url)
+    return model
+
+
 def get_llm_settings() -> Optional[Tuple[str, str, str]]:
     """
     (url, api_key, model). Провайдер с POST .../v1/chat/completions.
 
-    Облако: CHAT_API_KEY (или DEEPSEEK_*/OPENAI_*), CHAT_API_URL, CHAT_MODEL.
-    Локальный URL без ключа: если в CHAT_API_URL указан 127.0.0.1 / localhost — ключ не обязателен.
+    USE_OLLAMA=1 — локальный URL (Ollama и т.п.), ключ не обязателен.
+    USE_OLLAMA=0 — облако; localhost в CHAT_API_URL игнорируется, URL выводится из ключа/CHAT_PROVIDER.
     """
     chat_key = os.getenv("CHAT_API_KEY", "").strip()
     ds_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
     oa_key = os.getenv("OPENAI_API_KEY", "").strip()
     key = chat_key or ds_key or oa_key
 
-    url = (
+    explicit_url = (
         os.getenv("CHAT_API_URL", "").strip()
         or os.getenv("DEEPSEEK_API_URL", "").strip()
     )
-    if not url:
-        base = os.getenv("DEEPSEEK_BASE_URL", "").strip().rstrip("/")
-        if base and "api.openai.com" not in base:
-            url = f"{base}/v1/chat/completions"
-        elif oa_key and not ds_key:
-            url = "https://api.openai.com/v1/chat/completions"
-        else:
-            url = "https://api.deepseek.com/v1/chat/completions"
+    use_local = _env_flag("USE_OLLAMA", default=_is_local_llm_url(explicit_url))
+    url = _resolve_chat_url(key, explicit_url, use_local=use_local)
+    local = _is_local_llm_url(url)
 
-    local = "127.0.0.1" in url or "localhost" in url
-
-    model = (
-        os.getenv("CHAT_MODEL", "").strip()
-        or os.getenv("DEEPSEEK_MODEL", "").strip()
-        or os.getenv("OPENAI_MODEL", "").strip()
-    )
-    if not model:
-        if "api.openai.com" in url:
-            model = "gpt-4o-mini"
-        elif local:
-            model = "llama3.2"
-        else:
-            model = "deepseek-chat"
+    explicit_model = os.getenv("CHAT_MODEL", "").strip()
+    model = _resolve_chat_model(url, explicit_model)
 
     if local:
-        key = chat_key
+        return (url, chat_key, model)
 
-    if not key and not local:
+    if not key:
         return None
     return (url, key, model)
 

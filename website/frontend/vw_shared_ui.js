@@ -339,9 +339,101 @@
         return 'career';
     }
 
+    var DEFAULT_SPHERE_GROUPS = {
+        tech: ['it_dev', 'data', 'engineering'],
+        creative: ['design', 'creative', 'marketing'],
+        people: ['sales', 'hr_edu', 'education'],
+        health: ['medicine'],
+        business: ['mgmt', 'finance', 'logistics', 'sport'],
+        general: ['other'],
+    };
+
+    function sphereGroupForId(sid, groups) {
+        groups = groups || DEFAULT_SPHERE_GROUPS;
+        var s = String(sid || '').trim();
+        for (var g in groups) {
+            if (groups.hasOwnProperty(g) && groups[g].indexOf(s) >= 0) return g;
+        }
+        return 'general';
+    }
+
+    function sphereGroupsForIds(sphereIds, groups) {
+        var out = {};
+        groups = groups || DEFAULT_SPHERE_GROUPS;
+        for (var i = 0; i < sphereIds.length; i++) {
+            out[sphereGroupForId(sphereIds[i], groups)] = true;
+        }
+        return out;
+    }
+
+    function fieldVisibleForSpheres(field, sphereIds, groups) {
+        var onlySpheres = field.only_spheres;
+        var onlyGroups = field.only_sphere_groups;
+        var skipSpheres = field.skip_spheres || [];
+        var skipGroups = field.skip_sphere_groups || [];
+        if (!sphereIds || !sphereIds.length) {
+            if (onlySpheres || onlyGroups) return false;
+            return true;
+        }
+        var i;
+        if (onlySpheres) {
+            var hit = false;
+            for (i = 0; i < sphereIds.length; i++) {
+                if (onlySpheres.indexOf(sphereIds[i]) >= 0) {
+                    hit = true;
+                    break;
+                }
+            }
+            if (!hit) return false;
+        }
+        for (i = 0; i < sphereIds.length; i++) {
+            if (skipSpheres.indexOf(sphereIds[i]) >= 0) return false;
+        }
+        var gmap = sphereGroupsForIds(sphereIds, groups);
+        if (onlyGroups) {
+            var ghit = false;
+            for (i = 0; i < onlyGroups.length; i++) {
+                if (gmap[onlyGroups[i]]) {
+                    ghit = true;
+                    break;
+                }
+            }
+            if (!ghit) return false;
+        }
+        for (i = 0; i < skipGroups.length; i++) {
+            if (gmap[skipGroups[i]]) return false;
+        }
+        return true;
+    }
+
+    function resolveFieldForSpheres(field, sphereIds, groups) {
+        var out = Object.assign({}, field);
+        var bySphere = field.label_by_sphere || {};
+        var byGroup = field.label_by_group || {};
+        var i;
+        for (i = 0; i < sphereIds.length; i++) {
+            if (bySphere[sphereIds[i]]) {
+                Object.assign(out, bySphere[sphereIds[i]]);
+                return out;
+            }
+        }
+        for (i = 0; i < sphereIds.length; i++) {
+            var g = sphereGroupForId(sphereIds[i], groups);
+            if (byGroup[g]) {
+                Object.assign(out, byGroup[g]);
+                return out;
+            }
+        }
+        if ((!sphereIds || !sphereIds.length) && byGroup.general) {
+            Object.assign(out, byGroup.general);
+        }
+        return out;
+    }
+
     function resolveProfileSchema(schema, audienceOrProfile) {
         if (!schema) return { sections: [], completion: {} };
         var audience;
+        var profile = null;
         if (typeof audienceOrProfile === 'string') {
             var s = audienceOrProfile.trim();
             if (s === 'school' || s === 'career') {
@@ -350,12 +442,15 @@
                 audience = questionnaireAudience(s);
             }
         } else {
+            profile = audienceOrProfile || null;
             audience = questionnaireAudience(
-                (audienceOrProfile && audienceOrProfile.education_detail) || ''
+                (profile && profile.education_detail) || ''
             );
         }
         var completions = schema.completions || {};
         var comp = completions[audience] || schema.completion || {};
+        var groups = schema.sphere_groups || DEFAULT_SPHERE_GROUPS;
+        var sphereIds = profile ? parseInterestSpheres(profile) : [];
         var sectionsOut = [];
         var sections = schema.sections || [];
         for (var si = 0; si < sections.length; si++) {
@@ -374,7 +469,8 @@
                     var fList = Array.isArray(fAud) ? fAud : [fAud];
                     if (fList.indexOf(audience) < 0) continue;
                 }
-                fields.push(f);
+                if (!fieldVisibleForSpheres(f, sphereIds, groups)) continue;
+                fields.push(resolveFieldForSpheres(f, sphereIds, groups));
             }
             if (!fields.length) continue;
             sectionsOut.push(Object.assign({}, sec, { fields: fields }));

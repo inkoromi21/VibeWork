@@ -50,7 +50,7 @@ def test_schema_exports_sphere_map() -> None:
     assert schema.get("sphere_to_web_interest") == SPHERE_TO_WEB_INTEREST
     assert sphere_to_web_interest("it_dev") == "IT"
     assert sphere_to_web_interest("design") == "дизайн"
-    assert sphere_to_web_interest("unknown") == "IT"
+    assert sphere_to_web_interest("unknown") == "общий"
 
 
 def test_schema_has_product_blocks() -> None:

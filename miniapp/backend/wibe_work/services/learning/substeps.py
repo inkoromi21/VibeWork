@@ -23,18 +23,9 @@ def build_substeps_for_step(
     goal: str | None,
     resources: List[Dict[str, Any]] | None,
 ) -> List[Dict[str, Any]]:
-    """Контракт подшага для UI и прогресса."""
+    """Контракт подшага для UI и прогресса (только материалы; цель — в шапке этапа)."""
     substeps: List[Dict[str, Any]] = []
     goal_txt = (goal or "").strip()
-    if goal_txt:
-        substeps.append(
-            {
-                "sub_id": "goal",
-                "title": "Понять цель этапа",
-                "description": goal_txt,
-                "status": "pending",
-            }
-        )
     for i, res in enumerate(resources or []):
         title = str(res.get("title") or "Материал").strip() or "Материал"
         substeps.append(

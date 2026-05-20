@@ -346,6 +346,124 @@ def _direction_interest_key(interest: str) -> str:
     return k if k in DIRECTION_POOLS else "default"
 
 
+def _it_track_scores_from_answers(answers: List[Dict[str, Any]]) -> Dict[str, float]:
+    """Баллы IT-треков по техническим вопросам 1–10 (IT-опросник)."""
+    scores: Dict[str, float] = {
+        "backend": 0.0,
+        "frontend": 0.0,
+        "devops": 0.0,
+        "data": 0.0,
+        "qa": 0.0,
+    }
+    for a in answers:
+        qid = int(a.get("question_id") or 0)
+        if qid < 1 or qid > 10:
+            continue
+        w = 2.0 if qid <= 5 else 1.0
+        letter = _answer_letter(a)
+        if qid == 3 and letter == "B":
+            scores["data"] += w * 1.4
+            scores["frontend"] += w * 0.2
+        elif letter == "A":
+            if qid <= 2:
+                scores["backend"] += w
+            elif qid == 3:
+                scores["backend"] += w * 0.55
+                scores["data"] += w * 0.45
+            elif qid in (4, 5):
+                scores["backend"] += w * 0.72
+                scores["data"] += w * 0.22
+            else:
+                scores["backend"] += w
+        elif letter == "B":
+            scores["frontend"] += w
+            if qid in (4, 5, 9):
+                scores["data"] += w * 0.35
+        elif letter == "C":
+            scores["backend"] += w * 0.15
+            if qid in (2, 4, 5, 9):
+                scores["data"] += w * 0.5
+        elif letter == "D":
+            scores["devops"] += w
+            if qid in (1, 2):
+                scores["qa"] += w * 0.4
+    return scores
+
+
+def _profile_hints_data_sphere(profile: Dict[str, Any]) -> bool:
+    blob = _profile_blob(profile, {}).lower()
+    if any(
+        k in blob
+        for k in (
+            "аналит",
+            "данн",
+            " sql",
+            "статистик",
+            "дашборд",
+            "метрик",
+            "excel",
+            "bi ",
+            "tableau",
+            "power bi",
+        )
+    ):
+        return True
+    from wibe_work.services.user_context import parse_interest_spheres
+
+    spheres = parse_interest_spheres(profile)
+    if "data" in spheres:
+        if "it_dev" not in spheres:
+            return True
+        return spheres.index("data") < spheres.index("it_dev")
+    return False
+
+
+def infer_interest_from_test_answers(
+    profile: Dict[str, Any],
+    answers: List[Dict[str, Any]],
+    stated_interest: str,
+) -> str:
+    """
+    Сфера для разбора: ответы теста → анкета (main_sphere / interest_spheres).
+    IT-техблок: при лидерстве data — «Данные и аналитика», иначе «Разработка».
+    """
+    base = _resolve_effective_interest(profile, stated_interest)
+    from wibe_work.services.assessment_bundle import get_assessment_bundle
+
+    if base == "data":
+        return "data"
+
+    bundle = get_assessment_bundle(profile, base)
+    tech_n = int(bundle.get("technical_count") or 0)
+
+    if tech_n > 0:
+        from wibe_work.services.role_confirmation import rank_it_track_scores
+
+        ranked = rank_it_track_scores(answers)
+        if ranked:
+            best_tid, best_sc = ranked[0]
+            second_sc = ranked[1][1] if len(ranked) > 1 else 0.0
+            data_sc = next((v for k, v in ranked if k == "data"), 0.0)
+            dev_sc = sum(
+                v for k, v in ranked if k in ("backend", "frontend", "devops", "qa")
+            )
+            hints_data = _profile_hints_data_sphere(profile)
+            if best_tid == "data" or (
+                data_sc >= max(dev_sc * 0.85, second_sc * 0.75) and data_sc >= 2.0
+            ):
+                return "data"
+            if hints_data and data_sc >= max(1.5, dev_sc * 0.55):
+                return "data"
+            if best_tid in ("backend", "frontend", "devops", "qa") and best_sc >= second_sc:
+                return "it_dev"
+
+    if _profile_hints_data_sphere(profile) and base in ("it_dev", "other", ""):
+        if tech_n == 0:
+            return "data"
+
+    return base
+
+
 def _resolve_effective_interest(profile: Dict[str, Any], interest: str) -> str:
     """Сфера для разбора: явная → main_sphere → первая из анкеты."""
     k = (interest or "").strip()
@@ -428,40 +546,11 @@ def _answer_letter(ans: Dict[str, Any]) -> str:
 
 
 def infer_it_track_from_answers(answers: List[Dict[str, Any]]) -> Optional[str]:
-    """
-    По техническим вопросам IT (1–10): A → backend/data, B → frontend,
-    D → devops/QA, C → меньший вес (люди/PM).
-    """
-    scores: Dict[str, float] = {
-        "backend": 0.0,
-        "frontend": 0.0,
-        "devops": 0.0,
-        "data": 0.0,
-        "qa": 0.0,
-    }
-    for a in answers:
-        qid = int(a.get("question_id") or 0)
-        if qid < 1 or qid > 10:
-            continue
-        w = 2.0 if qid <= 5 else 1.0
-        letter = _answer_letter(a)
-        if letter == "A":
-            scores["backend"] += w
-            if qid in (4, 5):
-                scores["data"] += w * 0.35
-        elif letter == "B":
-            scores["frontend"] += w
-        elif letter == "C":
-            scores["backend"] += w * 0.15
-        elif letter == "D":
-            scores["devops"] += w
-            if qid in (1, 2):
-                scores["qa"] += w * 0.4
+    """По техническим вопросам IT (1–10): трек backend / frontend / data / devops / qa."""
+    scores = _it_track_scores_from_answers(answers)
     best = max(scores.items(), key=lambda x: x[1])
     if best[1] < 1.0:
         return None
-    if best[0] == "data" and scores["backend"] >= scores["data"]:
-        return "backend"
     if best[0] == "qa" and scores["devops"] >= scores["qa"]:
         return "devops"
     return str(best[0])
@@ -1817,16 +1906,17 @@ def build_analysis_result(
         min_core = int(b.get("technical_count") or 10) + int(
             b.get("career_count") or b.get("personality_count") or 5
         )
+    fp = _answer_fingerprint(answers)
+    eff_interest = infer_interest_from_test_answers(profile, answers, interest)
+    mode = analysis_mode_for_profile(profile)
+
     if len(answers) >= min_core:
-        axes = _proforientation_radar_axes(answers, interest, profile=profile)
+        axes = _proforientation_radar_axes(answers, eff_interest, profile=profile)
         axis_avg = sum(a["value_percent"] for a in axes) / max(1, len(axes))
         readiness = int(max(12, min(100, round(0.35 * readiness_vec + 0.65 * axis_avg))))
     else:
         axes = _radar_axes(vec)
         readiness = readiness_vec
-    fp = _answer_fingerprint(answers)
-    eff_interest = _resolve_effective_interest(profile, interest)
-    mode = analysis_mode_for_profile(profile)
 
     if mode == "school":
         scenarios = pick_school_path_plans(profile, eff_interest, axes, fp)

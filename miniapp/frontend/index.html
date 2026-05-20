@@ -3136,7 +3136,7 @@
     };
     /** id сферы анкеты → значение фильтра «Область» (как в run_recommendations). */
     const SPHERE_TO_JOB_DIRECTION = {
-        it_dev: 'IT / разработка',
+        it_dev: 'Разработка',
         data: 'Аналитика и данные',
         design: 'Дизайн и креатив',
         creative: 'Дизайн и креатив',
@@ -4316,7 +4316,12 @@
     }
 
     async function fetchJson(path, opts) {
-        const res = await fetch(apiUrl(path), Object.assign({ headers: apiFetchHeaders() }, opts || {}));
+        const o = opts || {};
+        const mergedHeaders = Object.assign({}, apiFetchHeaders(), o.headers || {});
+        const res = await fetch(
+            apiUrl(path),
+            Object.assign({}, o, { headers: mergedHeaders })
+        );
         if (res.status === 401) {
             clearAuth();
             showAuthScreen();
@@ -4922,7 +4927,7 @@
 
     function buildProfilePayload(schema, draft) {
         const out = {};
-        const sections = schema.sections || [];
+        const sections = effectiveProfileSchema(schema, draft).sections || [];
         for (let si = 0; si < sections.length; si++) {
             const fields = sections[si].fields || [];
             for (let fi = 0; fi < fields.length; fi++) {
@@ -5159,6 +5164,20 @@
                     chip.classList.add('on');
                 }
                 profileDraft[fid] = arr;
+                if (fid === 'interest_spheres') {
+                    const secs = wizardProfileSections(schema, profileDraft);
+                    let interestStep = -1;
+                    for (let si = 0; si < secs.length; si++) {
+                        if ((secs[si].fields || []).some(function (f) { return f.id === 'interest_spheres'; })) {
+                            interestStep = si;
+                            break;
+                        }
+                    }
+                    if (interestStep >= 0 && profileWizardStep > interestStep) {
+                        syncProfileDraftFromCurrentStep(schema, profileWizardStep);
+                        renderProfileTab();
+                    }
+                }
             };
         });
         wireProfileCityAutocomplete(root);
@@ -5386,7 +5405,7 @@
                 testSphereSelection != null ? testSphereSelection : savedTestInterest,
                 schema
             );
-            await loadQuiz(sphereIdToWebInterest(testSphereSelection, schema));
+            await loadQuiz(testSphereSelection);
             const syncedSphere = webInterestToSphereId(quizState.interest, schema);
             if (syncedSphere) testSphereSelection = syncedSphere;
             const qs = quizState.questions;
@@ -5618,8 +5637,8 @@
                         body: JSON.stringify({
                             answers: answers,
                             interest:
+                                testSphereSelection ||
                                 quizState.interest ||
-                                sphereIdToWebInterest(testSphereSelection, schema) ||
                                 undefined
                         })
                     });
@@ -5989,6 +6008,35 @@
         });
     }
 
+    async function refreshChatLlmStatus(hostEl) {
+        const box = (hostEl || document).querySelector('#chatLlmStatus');
+        if (!box) return;
+        try {
+            const res = await fetchJson('/api/health/llm');
+            const data = await res.json();
+            if (data.ok) {
+                box.style.display = 'none';
+                box.textContent = '';
+                return;
+            }
+            const parts = [];
+            if (data.config_warning) parts.push(data.config_warning);
+            if (data.notice) parts.push(data.notice);
+            if (data.hint) parts.push(data.hint);
+            if (!parts.length) {
+                parts.push(
+                    'ИИ временно недоступен. Проверьте CHAT_API_KEY и CHAT_API_URL в .env на сервере и перезапустите API.'
+                );
+            }
+            box.textContent = parts.join(' ');
+            box.style.display = 'block';
+        } catch (e) {
+            box.textContent =
+                'Не удалось проверить ИИ на сервере. Ответы могут быть шаблонными. ' + (e.message || '');
+            box.style.display = 'block';
+        }
+    }
+
     async function postLearningStepStatus(pathId, stepId, status) {
         const res = await fetchJson(
             '/vibework/learning/progress/' + encodeURIComponent(userId),
@@ -6019,14 +6067,6 @@
         const subs = [];
         const goal = String(st.goal || '').trim();
         const resList = st.resources || [];
-        if (goal) {
-            subs.push({
-                sub_id: 'goal',
-                title: 'Понять цель этапа',
-                description: goal,
-                status: st.status || 'pending'
-            });
-        }
         for (let ri = 0; ri < resList.length; ri++) {
             const r = resList[ri];
             subs.push({
@@ -6063,7 +6103,6 @@
             const storageId = stepId + '__' + subId;
             const showDesc =
                 sub.description &&
-                sub.sub_id !== 'goal' &&
                 String(sub.description).trim().length > 0 &&
                 String(sub.description).trim() !== String(st.goal || '').trim();
             h +=
@@ -6164,10 +6203,6 @@
                 '" data-step-index="' +
                 si +
                 '">';
-            const subsList = ensureSubstepsForStep(st);
-            const hasGoalSub = subsList.some(function (s) {
-                return s.sub_id === 'goal';
-            });
             html += '<div class="anydo-step__head">';
             html +=
                 '<input type="checkbox" class="anydo-step__check" aria-label="Отметить этап выполненным"' +
@@ -6183,7 +6218,7 @@
                 html += '<div class="anydo-step__meta">Срок: ' + esc(String(st.duration_hint)) + '</div>';
             }
             html += '</div></div>';
-            if (st.goal && !hasGoalSub) {
+            if (st.goal) {
                 html += '<p class="anydo-step__goal">' + esc(String(st.goal)) + '</p>';
             }
             const subsHtml = renderAnyDoSubsteps(st, stepId, isLocked);
@@ -6986,6 +7021,7 @@
             '<div class="chat-main-col">' +
             '<div class="chat-shell">' +
             '<div class="chat-shell-hd">Карьерный ассистент</div>' +
+            '<div id="chatLlmStatus" class="muted" style="display:none;padding:8px 14px;font-size:.82rem;border-bottom:1px solid var(--border);background:var(--surface-muted)"></div>' +
             '<div class="chat-log" id="chatLog"></div>' +
             '<div class="chat-foot">' +
             '<label for="chatInput">Сообщение</label>' +
@@ -6993,6 +7029,7 @@
             '<button type="button" class="btn-primary" style="margin-top:8px" id="btnSendChat">Отправить</button></div></div></div></div>';
         paintChatLogFromMessages();
         refreshChatHistoryList(el);
+        refreshChatLlmStatus(el);
         const btnNew = document.getElementById('btnNewAiChat');
         if (btnNew) {
             btnNew.onclick = function () {

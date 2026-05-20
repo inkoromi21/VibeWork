@@ -249,21 +249,34 @@ async def health_llm():
     from wibe_work.services.llm_client import fetch_llm_completion, get_llm_settings
 
     cfg = get_llm_settings()
-    out: dict = {"llm_configured": cfg is not None, "ok": False}
+    use_ollama = (os.getenv("USE_OLLAMA", "").strip().lower() in ("1", "true", "yes", "on"))
+    raw_url = (os.getenv("CHAT_API_URL", "").strip())
+    out: dict = {
+        "llm_configured": cfg is not None,
+        "ok": False,
+        "use_ollama": use_ollama,
+        "chat_api_url_env": raw_url or None,
+    }
     if not cfg:
         out["hint"] = (
-            "Задайте CHAT_API_KEY и CHAT_API_URL в корневом .env (или локальный URL без ключа). "
-            "Перезапустите API."
+            "Задайте CHAT_API_KEY в корневом .env (Groq: gsk_… + CHAT_PROVIDER=groq "
+            "или CHAT_API_URL=https://api.groq.com/openai/v1/chat/completions). "
+            "При USE_OLLAMA=0 не указывайте localhost. Перезапустите API."
         )
         return out
     url, _, model = cfg
     out["model"] = model
+    out["resolved_url"] = url.split("?")[0]
     local = "127.0.0.1" in url or "localhost" in url
     out["endpoint_local"] = local
-    if local:
+    if not use_ollama and raw_url and local:
+        out["config_warning"] = (
+            "В .env CHAT_API_URL указывает на localhost, но USE_OLLAMA=0 — "
+            "запросы идут на облачный endpoint (см. resolved_url)."
+        )
+    if local and use_ollama:
         out["hint"] = (
-            "CHAT_API_URL указывает на localhost — на VPS нужен облачный URL "
-            "(Groq, DeepSeek, …). Локально запустите Ollama: ollama serve && ollama pull <model>."
+            "Локальный LLM: запустите Ollama (ollama serve) и модель из CHAT_MODEL."
         )
     text, notice = fetch_llm_completion("Ответь одним словом: ок", max_tokens=8, temperature=0)
     out["ok"] = bool(text)

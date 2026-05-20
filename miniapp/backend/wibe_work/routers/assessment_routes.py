@@ -107,14 +107,16 @@ def _load_analysis_snapshot(user_id: str) -> Optional[Dict[str, Any]]:
 
 
 def _interest_for_user(profile: Dict[str, Any], override: Optional[str]) -> str:
+    from wibe_work.services.aptitude_quiz_content_bridge import normalize_sphere_id
+
     if override and str(override).strip():
-        return str(override).strip()
+        return normalize_sphere_id(str(override).strip())
     ms = (profile.get("main_sphere") or "").strip()
     if ms:
-        return ms
+        return normalize_sphere_id(ms)
     spheres = parse_interest_spheres(profile)
     if spheres:
-        return spheres[0]
+        return normalize_sphere_id(spheres[0])
     return "other"
 
 

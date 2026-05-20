@@ -65,7 +65,7 @@ _DIRECTION_KEYWORDS: List[Tuple[str, List[str]]] = [
 
 _SPHERE_TO_DIRECTION = {
     "it": "IT / разработка",
-    "it_dev": "IT / разработка",
+    "it_dev": "Разработка",
     "айти": "IT / разработка",
     "data": "Аналитика и данные",
     "marketing": "Маркетинг и продажи",

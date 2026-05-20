@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 # Сферы для мультивыбора (до 5) — id совпадают с тестом и hh-подбором
 # id сферы анкеты → значение Interest в веб-API (тест, разбор, вакансии)
@@ -12,26 +12,26 @@ SPHERE_TO_WEB_INTEREST: Dict[str, str] = {
     "design": "дизайн",
     "sales": "продажи",
     "logistics": "логистика",
-    "medicine": "поддержка_и_сервис",
-    "education": "HR_и_рекрутинг",
+    "medicine": "медицина",
+    "education": "образование",
     "engineering": "инженерия",
     "creative": "дизайн",
-    "sport": "бизнес",
+    "sport": "спорт",
     "data": "данные_и_AI",
     "mgmt": "бизнес",
     "finance": "финансы_и_контроль",
     "hr_edu": "HR_и_рекрутинг",
-    "other": "IT",
+    "other": "общий",
 }
 
 
 def sphere_to_web_interest(sphere_id: str) -> str:
-    return SPHERE_TO_WEB_INTEREST.get((sphere_id or "").strip(), "IT")
+    return SPHERE_TO_WEB_INTEREST.get((sphere_id or "").strip(), "общий")
 
 
 # Короткие подписи (одна строка в сетке) — сверху; длинные — внизу.
 INTEREST_SPHERES: List[Dict[str, str]] = [
-    {"id": "it_dev", "label": "IT"},
+    {"id": "it_dev", "label": "Разработка"},
     {"id": "marketing", "label": "Маркетинг"},
     {"id": "design", "label": "Дизайн"},
     {"id": "sales", "label": "Продажи"},
@@ -107,6 +107,162 @@ COMPLETION_BY_AUDIENCE: Dict[str, Dict[str, Any]] = {
 # Обратная совместимость
 COMPLETION_REQUIRED: List[str] = COMPLETION_BY_AUDIENCE[AUDIENCE_CAREER]["required"]
 
+# Группы сфер для показа полей анкеты (как в тесте)
+SPHERE_GROUPS: Dict[str, Tuple[str, ...]] = {
+    "tech": ("it_dev", "data", "engineering"),
+    "creative": ("design", "creative", "marketing"),
+    "people": ("sales", "hr_edu", "education"),
+    "health": ("medicine",),
+    "business": ("mgmt", "finance", "logistics", "sport"),
+    "general": ("other",),
+}
+
+# Доп. правила полей: видимость и подписи по сферам (мержатся в схему)
+FIELD_SPHERE_RULES: Dict[str, Dict[str, Any]] = {
+    "programming_skills": {"only_sphere_groups": ["tech"]},
+    "social_media_skills": {"only_sphere_groups": ["creative"]},
+    "software_skills": {
+        "label_by_group": {
+            "tech": {
+                "label": "Программы и инструменты",
+                "placeholder": "IDE, Git, Docker, Python, SQL…",
+            },
+            "creative": {
+                "label": "Дизайн и контент-инструменты",
+                "placeholder": "Figma, Photoshop, CapCut, Notion…",
+            },
+            "health": {
+                "label": "Медицинские системы и инструменты",
+                "placeholder": "ЭМК, лабораторные системы, справочники…",
+            },
+            "people": {
+                "label": "Рабочие программы",
+                "placeholder": "Office, CRM, сервисы для общения с клиентами…",
+            },
+            "business": {
+                "label": "Инструменты учёта и аналитики",
+                "placeholder": "Excel, 1С, ERP, BI…",
+            },
+            "general": {
+                "label": "Программы и инструменты",
+                "placeholder": "Чем пользуетесь в учёбе или на практике…",
+            },
+        },
+    },
+    "experience_projects": {
+        "label_by_group": {
+            "tech": {
+                "label": "Учебные и IT-проекты",
+                "placeholder": "Сайт, приложение, хакатон, GitHub…",
+            },
+            "creative": {
+                "label": "Портфолио и творческие работы",
+                "placeholder": "Макеты, рилсы, дизайн, выставки…",
+            },
+            "health": {
+                "label": "Практика, стажировки, клинические кейсы",
+                "placeholder": "Стажировка в поликлинике, симуляции, волонтёрство…",
+            },
+            "people": {
+                "label": "Проекты с людьми",
+                "placeholder": "Волонтёрство, наставничество, мероприятия…",
+            },
+            "business": {
+                "label": "Проекты и инициативы",
+                "placeholder": "Кейс, стажировка, учебный бизнес-проект…",
+            },
+            "general": {
+                "label": "Учебные и личные проекты",
+                "placeholder": "Кружок, конкурс, свой проект…",
+            },
+        },
+    },
+    "has_resume_portfolio": {
+        "label_by_group": {
+            "creative": {"label": "Есть портфолио / кейсы"},
+            "health": {"label": "Есть практика / стажировки в профиле"},
+            "tech": {"label": "Есть резюме / GitHub / портфолио"},
+        },
+    },
+    "internship_ready": {
+        "label_by_group": {
+            "health": {"label": "Готовность к практике / стажировке"},
+        },
+    },
+    "extra_education": {
+        "label_by_group": {
+            "health": {
+                "label": "Дополнительное обучение",
+                "placeholder": "Курсы, симуляции, конференции по медицине…",
+            },
+        },
+    },
+}
+
+
+def _sphere_groups_for_ids(sphere_ids: List[str]) -> set[str]:
+    groups: set[str] = set()
+    for sid in sphere_ids:
+        for gname, members in SPHERE_GROUPS.items():
+            if sid in members:
+                groups.add(gname)
+                break
+    return groups
+
+
+def _field_visible_for_spheres(field: Dict[str, Any], sphere_ids: List[str]) -> bool:
+    only_spheres = field.get("only_spheres")
+    only_groups = field.get("only_sphere_groups")
+    skip_spheres = tuple(field.get("skip_spheres") or ())
+    skip_groups = tuple(field.get("skip_sphere_groups") or ())
+    if not sphere_ids:
+        if only_spheres or only_groups:
+            return False
+        return True
+    if only_spheres and not set(sphere_ids) & set(only_spheres):
+        return False
+    if skip_spheres and set(sphere_ids) & set(skip_spheres):
+        return False
+    groups = _sphere_groups_for_ids(sphere_ids)
+    if only_groups and not groups & set(only_groups):
+        return False
+    if skip_groups and groups & set(skip_groups):
+        return False
+    return True
+
+
+def _resolve_field_for_spheres(
+    field: Dict[str, Any], sphere_ids: List[str]
+) -> Dict[str, Any]:
+    out = dict(field)
+    by_sphere = field.get("label_by_sphere") or {}
+    for sid in sphere_ids:
+        patch = by_sphere.get(sid)
+        if patch:
+            out.update(patch)
+            return out
+    by_group = field.get("label_by_group") or {}
+    for sid in sphere_ids:
+        g = next(
+            (gn for gn, mem in SPHERE_GROUPS.items() if sid in mem),
+            "general",
+        )
+        patch = by_group.get(g)
+        if patch:
+            out.update(patch)
+            return out
+    if not sphere_ids and by_group.get("general"):
+        out.update(by_group["general"])
+    return out
+
+
+def _enrich_field(field: Dict[str, Any]) -> Dict[str, Any]:
+    rules = FIELD_SPHERE_RULES.get(field.get("id") or "")
+    if not rules:
+        return field
+    merged = {**field, **rules}
+    return merged
+
 
 def questionnaire_audience(
     education_detail: Any = None, profile: Optional[Dict[str, Any]] = None
@@ -137,15 +293,32 @@ def _section_visible_for_audience(section: Dict[str, Any], audience: str) -> boo
     return audience in _normalize_audience_list(section.get("audience"))
 
 
-def resolve_profile_schema(schema: Dict[str, Any], audience: str) -> Dict[str, Any]:
-    """Схема анкеты для выбранного уровня образования (секции + правила completion)."""
+def resolve_profile_schema(
+    schema: Dict[str, Any],
+    audience: str,
+    profile: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Схема анкеты: уровень образования + видимые поля по сферам интересов."""
+    from wibe_work.services.user_context import parse_interest_spheres
+
     completions = schema.get("completions") or {}
     comp = completions.get(audience) or schema.get("completion") or {}
+    sphere_ids: List[str] = []
+    if profile:
+        sphere_ids = parse_interest_spheres(profile)
+        if not sphere_ids and (profile.get("main_sphere") or "").strip():
+            sphere_ids = [str(profile.get("main_sphere")).strip()]
     sections_out: List[Dict[str, Any]] = []
     for sec in schema.get("sections") or []:
         if not _section_visible_for_audience(sec, audience):
             continue
-        fields = [f for f in (sec.get("fields") or []) if _field_visible_for_audience(f, audience)]
+        fields: List[Dict[str, Any]] = []
+        for f in sec.get("fields") or []:
+            if not _field_visible_for_audience(f, audience):
+                continue
+            if not _field_visible_for_spheres(f, sphere_ids):
+                continue
+            fields.append(_resolve_field_for_spheres(f, sphere_ids))
         if not fields:
             continue
         sections_out.append({**sec, "fields": fields})
@@ -343,6 +516,7 @@ def get_profile_schema() -> Dict[str, Any]:
         "wizard": True,
         "interest_spheres": INTEREST_SPHERES,
         "school_subjects": SCHOOL_SUBJECT_OPTIONS,
+        "sphere_groups": {k: list(v) for k, v in SPHERE_GROUPS.items()},
         "sphere_to_web_interest": dict(SPHERE_TO_WEB_INTEREST),
         "completions": {k: dict(v) for k, v in COMPLETION_BY_AUDIENCE.items()},
         "completion": dict(COMPLETION_BY_AUDIENCE[AUDIENCE_CAREER]),
@@ -557,12 +731,14 @@ def get_profile_schema() -> Dict[str, Any]:
                 "optional": True,
                 "audience": [AUDIENCE_SCHOOL],
                 "fields": [
-                    {
-                        "id": "experience_projects",
-                        "type": "textarea",
-                        "label": "Проекты и хобби",
-                        "placeholder": "Сайт, канал, хакатон, свой магазин…",
-                    },
+                    _enrich_field(
+                        {
+                            "id": "experience_projects",
+                            "type": "textarea",
+                            "label": "Проекты и хобби",
+                            "placeholder": "Кружок, олимпиада, волонтёрство…",
+                        }
+                    ),
                     {
                         "id": "achievements",
                         "type": "textarea",
@@ -646,36 +822,44 @@ def get_profile_schema() -> Dict[str, Any]:
                 "optional": True,
                 "audience": [AUDIENCE_CAREER],
                 "fields": [
-                    {
-                        "id": "software_skills",
-                        "type": "textarea",
-                        "label": "Программы и инструменты",
-                        "placeholder": "Excel, Figma, Python, Canva — и уровень 1–5 при желании",
-                    },
+                    _enrich_field(
+                        {
+                            "id": "software_skills",
+                            "type": "textarea",
+                            "label": "Программы и инструменты",
+                            "placeholder": "Excel, Figma, Python, Canva — и уровень 1–5 при желании",
+                        }
+                    ),
                     {
                         "id": "languages",
                         "type": "text",
                         "label": "Иностранные языки",
                         "placeholder": "English B1, Deutsch A2…",
                     },
-                    {
-                        "id": "programming_skills",
-                        "type": "textarea",
-                        "label": "Программирование",
-                        "placeholder": "HTML/CSS, Python…",
-                    },
-                    {
-                        "id": "social_media_skills",
-                        "type": "textarea",
-                        "label": "Соцсети и digital",
-                        "placeholder": "Telegram-канал, таргет, SMM…",
-                    },
-                    {
-                        "id": "extra_education",
-                        "type": "textarea",
-                        "label": "Дополнительное обучение",
-                        "placeholder": "Курсы, школы, олимпиады…",
-                    },
+                    _enrich_field(
+                        {
+                            "id": "programming_skills",
+                            "type": "textarea",
+                            "label": "Программирование",
+                            "placeholder": "HTML/CSS, Python…",
+                        }
+                    ),
+                    _enrich_field(
+                        {
+                            "id": "social_media_skills",
+                            "type": "textarea",
+                            "label": "Соцсети и digital",
+                            "placeholder": "Telegram-канал, таргет, SMM…",
+                        }
+                    ),
+                    _enrich_field(
+                        {
+                            "id": "extra_education",
+                            "type": "textarea",
+                            "label": "Дополнительное обучение",
+                            "placeholder": "Курсы, школы, олимпиады…",
+                        }
+                    ),
                 ],
             },
             {
@@ -759,12 +943,14 @@ def get_profile_schema() -> Dict[str, Any]:
                         "type": "textarea",
                         "label": "Волонтёрство",
                     },
-                    {
-                        "id": "experience_projects",
-                        "type": "textarea",
-                        "label": "Личные проекты",
-                        "placeholder": "Канал, сайт, хакатон…",
-                    },
+                    _enrich_field(
+                        {
+                            "id": "experience_projects",
+                            "type": "textarea",
+                            "label": "Личные проекты",
+                            "placeholder": "Канал, сайт, хакатон…",
+                        }
+                    ),
                     {
                         "id": "achievements",
                         "type": "textarea",
@@ -788,16 +974,18 @@ def get_profile_schema() -> Dict[str, Any]:
                         "max": 500000,
                         "required": True,
                     },
-                    {
-                        "id": "internship_ready",
-                        "type": "select",
-                        "label": "Готовность к стажировке",
-                        "options": [
+                    _enrich_field(
+                        {
+                            "id": "internship_ready",
+                            "type": "select",
+                            "label": "Готовность к стажировке",
+                            "options": [
                             {"id": "yes", "label": "Да"},
                             {"id": "no", "label": "Нет"},
                             {"id": "paid_only", "label": "Только оплачиваемая"},
                         ],
-                    },
+                        }
+                    ),
                     {
                         "id": "hours_per_week",
                         "type": "number",
@@ -807,15 +995,17 @@ def get_profile_schema() -> Dict[str, Any]:
                         "max": 80,
                         "required": True,
                     },
-                    {
-                        "id": "has_resume_portfolio",
-                        "type": "select",
-                        "label": "Есть резюме / портфолио",
-                        "options": [
-                            {"id": "yes", "label": "Да"},
-                            {"id": "no", "label": "Нет"},
-                        ],
-                    },
+                    _enrich_field(
+                        {
+                            "id": "has_resume_portfolio",
+                            "type": "select",
+                            "label": "Есть резюме / портфолио",
+                            "options": [
+                                {"id": "yes", "label": "Да"},
+                                {"id": "no", "label": "Нет"},
+                            ],
+                        }
+                    ),
                     {
                         "id": "career_priority",
                         "type": "select",

@@ -24,16 +24,50 @@ INTEREST_TO_WEBSITE_QUIZ_KEY: Dict[str, str] = {
     "finance": "финансы_и_контроль",
     "hr_edu": "HR_и_рекрутинг",
     "logistics": "логистика",
-    "medicine": "наука",
-    "education": "бизнес",
+    "medicine": "медицина",
+    "education": "образование",
     "creative": "дизайн",
-    "sport": "бизнес",
-    "other": "IT",
+    "sport": "спорт",
+    "other": "общий",
+}
+
+# Старые веб-ключи анкеты → id сферы (обратная совместимость)
+_LEGACY_WEB_INTEREST_TO_SPHERE: Dict[str, str] = {
+    "поддержка_и_сервис": "medicine",
+    "IT": "it_dev",
+    "Разработка": "it_dev",
 }
 
 TECHNICAL_COUNT = 10
 PERSONALITY_COUNT = 5
 PERSONALITY_ID_START = 11
+
+
+def normalize_sphere_id(interest: str) -> str:
+    """Приводит id сферы, веб-ключ или legacy к id сферы анкеты."""
+    raw = (interest or "").strip()
+    if not raw:
+        return "other"
+    if raw in INTEREST_TO_WEBSITE_QUIZ_KEY:
+        return raw
+    if raw in _LEGACY_WEB_INTEREST_TO_SPHERE:
+        return _LEGACY_WEB_INTEREST_TO_SPHERE[raw]
+    try:
+        from wibe_work.questionnaire_fields import SPHERE_TO_WEB_INTEREST
+
+        if raw in SPHERE_TO_WEB_INTEREST:
+            return raw
+        rev = {v: k for k, v in SPHERE_TO_WEB_INTEREST.items()}
+        if raw in rev:
+            return rev[raw]
+    except ImportError:
+        pass
+    return "other"
+
+
+def website_quiz_key_for_sphere(sphere_id: str) -> str:
+    sid = normalize_sphere_id(sphere_id)
+    return INTEREST_TO_WEBSITE_QUIZ_KEY.get(sid, "общий")
 
 
 def _normalize_website_question(raw: Dict[str, Any], qid: int) -> Dict[str, Any]:
@@ -58,11 +92,15 @@ def fetch_technical_from_website(interest: str) -> Optional[List[Dict[str, Any]]
     except ImportError:
         return None
 
-    key = INTEREST_TO_WEBSITE_QUIZ_KEY.get((interest or "").strip(), "IT")
+    sid = normalize_sphere_id(interest)
+    key = website_quiz_key_for_sphere(sid)
     try:
         bank, _resolved = pick_quiz_questions(key, None)
     except Exception:
-        return None
+        try:
+            bank, _resolved = pick_quiz_questions(sid, None)
+        except Exception:
+            return None
     if not bank or len(bank) < TECHNICAL_COUNT:
         return None
     out: List[Dict[str, Any]] = []
@@ -72,11 +110,13 @@ def fetch_technical_from_website(interest: str) -> Optional[List[Dict[str, Any]]
 
 
 def personality_track_for_interest(interest: str) -> str:
-    k = (interest or "").strip()
+    k = normalize_sphere_id(interest)
     if k in ("it_dev", "data", "engineering"):
         return "tech"
     if k in ("design", "creative", "marketing"):
         return "creative"
     if k in ("sales", "hr_edu", "mgmt", "education"):
         return "people"
+    if k == "medicine":
+        return "health"
     return "general"

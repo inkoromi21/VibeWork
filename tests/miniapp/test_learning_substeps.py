@@ -19,9 +19,10 @@ def test_build_substeps_from_resources() -> None:
         goal="Понять основы",
         resources=[{"title": "Курс A", "url": "https://example.com/a", "kind": "курс"}],
     )
-    assert subs[0]["sub_id"] == "goal"
-    assert subs[1]["sub_id"] == "res0"
-    assert subs[1]["title"] == "Курс A"
+    assert len(subs) == 1
+    assert subs[0]["sub_id"] == "res0"
+    assert subs[0]["title"] == "Курс A"
+    assert not any(s["sub_id"] == "goal" for s in subs)
 
 
 def test_substep_progress_updates_parent_and_metrics() -> None:
@@ -35,15 +36,14 @@ def test_substep_progress_updates_parent_and_metrics() -> None:
         }
     )
     snap = {"learning_path": {"path_id": "p_sub", "steps": [step]}}
-    set_step_status(uid, "p_sub", "be-1__goal", "done", steps=[step])
+    set_step_status(uid, "p_sub", "be-1__res0", "done", steps=[step])
     merged = merge_learning_progress_in_snapshot(snap, uid)
     lp = merged["learning_path"]
     assert lp["steps"][0]["substeps"][0]["status"] == "done"
-    assert lp["steps"][0]["status"] == "in_progress"
+    assert lp["steps"][0]["status"] == "done"
     m = lp["metrics"]
-    assert m["total_substeps"] >= 2
+    assert m["total_substeps"] >= 1
     assert m["completed_substeps"] == 1
-    assert m["coverage_percent"] < 100
 
 
 def test_parent_checkbox_marks_all_substeps() -> None:

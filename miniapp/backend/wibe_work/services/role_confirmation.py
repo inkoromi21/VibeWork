@@ -115,33 +115,9 @@ _PUBLIC_FULL_KEYS = (
 
 
 def rank_it_track_scores(answers: List[Dict[str, Any]]) -> List[Tuple[str, float]]:
-    from wibe_work.services.career_analysis import _answer_letter
+    from wibe_work.services.career_analysis import _it_track_scores_from_answers
 
-    scores: Dict[str, float] = {
-        "backend": 0.0,
-        "frontend": 0.0,
-        "devops": 0.0,
-        "data": 0.0,
-        "qa": 0.0,
-    }
-    for a in answers:
-        qid = int(a.get("question_id") or 0)
-        if qid < 1 or qid > 10:
-            continue
-        w = 2.0 if qid <= 5 else 1.0
-        letter = _answer_letter(a)
-        if letter == "A":
-            scores["backend"] += w
-            if qid in (4, 5):
-                scores["data"] += w * 0.35
-        elif letter == "B":
-            scores["frontend"] += w
-        elif letter == "C":
-            scores["backend"] += w * 0.15
-        elif letter == "D":
-            scores["devops"] += w
-            if qid in (1, 2):
-                scores["qa"] += w * 0.4
+    scores = _it_track_scores_from_answers(answers)
     return sorted(
         [(k, v) for k, v in scores.items() if v >= 0.5],
         key=lambda x: -x[1],

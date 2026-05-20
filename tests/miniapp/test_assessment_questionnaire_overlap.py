@@ -208,8 +208,7 @@ def test_orientation_respects_interest_filters(interest: str) -> None:
     "interest,need,forbid",
     [
         ("it_dev", ("программ", "код", "api", "данн", "информ"), ("медицин", "сестрин")),
-        # medicine → общий банк сферы (без IT-лексики)
-        ("medicine", ("задач", "мотивац", "навык", "обратн"), ("api", "git", "deploy", "ci/cd")),
+        ("medicine", ("медиц", "пациент", "практик", "стаж"), ("пет", "pet", "api", "git", "deploy", "ci/cd")),
         ("design", ("дизайн", "figma", "визуал", "макет"), ("api", "баз данных sql")),
     ],
 )
