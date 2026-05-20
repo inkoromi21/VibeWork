@@ -731,8 +731,16 @@ def _personality_questions(interest: str, grade: str) -> List[Dict[str, Any]]:
     return expert
 
 
-def get_quiz_bundle(interest: str, grade: str = "university") -> Dict[str, Any]:
-    """10 технических по сфере + 5 личностных (сфера × уровень образования)."""
+def get_quiz_bundle(
+    interest: str,
+    grade: str = "university",
+    profile: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """Модули профориентации + 10 по сфере + 5 карьерных (по профилю или grade)."""
+    if profile:
+        from wibe_work.services.assessment_bundle import get_assessment_bundle
+
+        return get_assessment_bundle(profile, interest)
     technical = _technical_questions(interest)
     personality = _personality_questions(interest, grade)
     combined = technical + personality
@@ -744,16 +752,31 @@ def get_quiz_bundle(interest: str, grade: str = "university") -> Dict[str, Any]:
         "technical": technical,
         "personality": personality,
         "questions": combined,
+        "orientation_count": 0,
+        "total_count": len(combined),
+        "core_offset": 0,
     }
 
 
-def get_questions_for_interest(interest: str, grade: str = "university") -> List[Dict[str, Any]]:
-    """Совместимость: плоский список id 1–15."""
-    return get_quiz_bundle(interest, grade)["questions"]
+def get_questions_for_interest(
+    interest: str,
+    grade: str = "university",
+    profile: Dict[str, Any] | None = None,
+) -> List[Dict[str, Any]]:
+    """Совместимость: плоский список вопросов опроса."""
+    return get_quiz_bundle(interest, grade, profile=profile)["questions"]
 
 
-def get_pro_weights_matrix_for_interest(interest: str) -> WRow:
-    """15 строк весов в порядке question_id 1…15."""
+def get_pro_weights_matrix_for_interest(
+    interest: str,
+    profile: Dict[str, Any] | None = None,
+) -> WRow:
+    """Строки весов в порядке question_id (с учётом orientation-блока в профиле)."""
+    if profile:
+        from wibe_work.services.assessment_bundle import get_assessment_bundle
+
+        bundle = get_assessment_bundle(profile, interest)
+        return list(bundle.get("weights_matrix") or [])
     k = _interest_key(interest)
     tech_w = _WEIGHT_PROFILE.get(k, _W_DEFAULT)
     return list(tech_w) + list(_EXPERT_WEIGHTS)

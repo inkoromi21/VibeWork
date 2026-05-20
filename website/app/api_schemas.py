@@ -59,8 +59,9 @@ class SkillKey(str, Enum):
 TEST_QUESTION_COUNT = 10
 _TEST_IDS = list(range(1, TEST_QUESTION_COUNT + 1))
 
-PERSONALITY_TEST_QUESTION_COUNT = 8
-_PERSONALITY_TEST_IDS = list(range(1, PERSONALITY_TEST_QUESTION_COUNT + 1))
+PERSONALITY_TEST_QUESTION_COUNT = 8  # legacy default; фактическое число — 4–22 по треку
+PERSONALITY_TEST_MIN = 4
+PERSONALITY_TEST_MAX = 22
 
 
 class QuestionTiming(BaseModel):
@@ -69,7 +70,7 @@ class QuestionTiming(BaseModel):
 
 
 class PersonalityQuestionTiming(BaseModel):
-    question_id: int = Field(ge=1, le=PERSONALITY_TEST_QUESTION_COUNT)
+    question_id: int = Field(ge=1, le=PERSONALITY_TEST_MAX)
     ms: int = Field(ge=0, le=600_000)
 
 
@@ -79,7 +80,7 @@ class TestAnswer(BaseModel):
 
 
 class PersonalityTestAnswer(BaseModel):
-    question_id: int = Field(ge=1, le=PERSONALITY_TEST_QUESTION_COUNT)
+    question_id: int = Field(ge=1, le=PERSONALITY_TEST_MAX)
     choice: Literal["A", "B", "C", "D"]
 
 
@@ -92,9 +93,9 @@ class DiagnosisPayload(BaseModel):
         max_length=TEST_QUESTION_COUNT,
     )
     personality_test_answers: list[PersonalityTestAnswer] = Field(
-        min_length=PERSONALITY_TEST_QUESTION_COUNT,
-        max_length=PERSONALITY_TEST_QUESTION_COUNT,
-        description="Отдельный тест «тип личности», вопросы 1–8",
+        min_length=PERSONALITY_TEST_MIN,
+        max_length=PERSONALITY_TEST_MAX,
+        description="Профориентация: интересы, мотивы, тип среды (число вопросов зависит от класса/курса)",
     )
     skills: list[SkillKey] = Field(default_factory=list)
     question_timings: list[QuestionTiming] = Field(default_factory=list)
@@ -126,9 +127,12 @@ class DiagnosisPayload(BaseModel):
     def unique_personality_questions(cls, v: list[PersonalityTestAnswer]) -> list[PersonalityTestAnswer]:
         ids = [a.question_id for a in v]
         if len(ids) != len(set(ids)):
-            raise ValueError("Каждый вопрос теста личности должен отвечаться один раз")
-        if sorted(ids) != _PERSONALITY_TEST_IDS:
-            raise ValueError(f"Нужны ответы на все вопросы теста личности 1–{PERSONALITY_TEST_QUESTION_COUNT}")
+            raise ValueError("Каждый вопрос блока профориентации должен отвечаться один раз")
+        expected = list(range(1, len(ids) + 1))
+        if sorted(ids) != expected:
+            raise ValueError(
+                f"Нужны ответы на все вопросы блока 2 подряд (1–{len(ids)}), без пропусков"
+            )
         return v
 
 
@@ -276,15 +280,16 @@ class MtsPreviewPayload(BaseModel):
     def personality_all_or_empty(cls, v: list[PersonalityTestAnswer]) -> list[PersonalityTestAnswer]:
         if not v:
             return v
-        if len(v) != PERSONALITY_TEST_QUESTION_COUNT:
+        if len(v) < PERSONALITY_TEST_MIN or len(v) > PERSONALITY_TEST_MAX:
             raise ValueError(
-                f"Укажите все {PERSONALITY_TEST_QUESTION_COUNT} ответов теста личности или не передавайте поле"
+                f"Укажите от {PERSONALITY_TEST_MIN} до {PERSONALITY_TEST_MAX} ответов блока профориентации "
+                "или не передавайте поле"
             )
         ids = [a.question_id for a in v]
         if len(ids) != len(set(ids)):
-            raise ValueError("Дубли в ответах теста личности")
-        if sorted(ids) != _PERSONALITY_TEST_IDS:
-            raise ValueError(f"Нужны ответы на вопросы 1–{PERSONALITY_TEST_QUESTION_COUNT} теста личности")
+            raise ValueError("Дубли в ответах блока профориентации")
+        if sorted(ids) != list(range(1, len(ids) + 1)):
+            raise ValueError(f"Нужны ответы на вопросы 1–{len(ids)} блока профориентации подряд")
         return v
 
 
@@ -363,6 +368,18 @@ class AnalysisResult(BaseModel):
     directions: list[CareerDirection]
     gap_analysis: GapAnalysis
     learning_path: list[LearningResource]
+    learning_path_detail: dict | None = Field(
+        None,
+        description="Путь обучения: шаги, ресурсы из каталога, прогресс",
+    )
+    individual_advice: dict | None = Field(
+        None,
+        description="Советы по планам A/B/C с привязкой к материалам",
+    )
+    growth_stages_rich: list[dict] | None = Field(
+        None,
+        description="Этапы роста с материалами и чеклистами",
+    )
     career_stages: list[CareerStage]
     skill_plan: list[SkillPlanPhase]
     weekly_roadmap: list[WeekPlanItem]

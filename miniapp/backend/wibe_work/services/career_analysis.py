@@ -196,24 +196,43 @@ def _choice_index(ans: Dict[str, Any]) -> int:
     return letter_to_index(str(ch))
 
 
-def _proforientation_radar_axes(answers: List[Dict[str, Any]], interest: str) -> List[Dict[str, Any]]:
-    """15 вопросов: веса по question_id; нормализация по достижимому максимуму на каждую ось."""
-    matrix = get_pro_weights_matrix_for_interest(interest)
+def _proforientation_radar_axes(
+    answers: List[Dict[str, Any]],
+    interest: str,
+    profile: Dict[str, Any] | None = None,
+) -> List[Dict[str, Any]]:
+    """Веса по question_id; нормализация по достижимому максимуму на каждую ось."""
+    matrix = get_pro_weights_matrix_for_interest(interest, profile=profile)
     by_id = {int(a.get("question_id") or 0): a for a in answers}
+    core_offset = 0
+    core_len = 15
+    if profile:
+        from wibe_work.services.assessment_bundle import get_assessment_bundle
+
+        bundle = get_assessment_bundle(profile, interest)
+        core_offset = int(bundle.get("core_offset") or 0)
+        core_len = int(bundle.get("technical_count") or 10) + int(
+            bundle.get("career_count") or bundle.get("personality_count") or 5
+        )
     totals = [0, 0, 0, 0]
-    for qi, row in enumerate(matrix):
+    core_end = min(len(matrix), core_offset + core_len)
+    for qi in range(core_offset, core_end):
+        row = matrix[qi]
         qid = qi + 1
         ans = by_id.get(qid)
         if not ans:
             continue
         idx = _choice_index(ans)
+        if idx < 0 or idx >= len(row):
+            continue
         w = row[idx]
         for k in range(4):
             totals[k] += int(w[k])
     max_per = [0, 0, 0, 0]
-    for row in matrix:
+    for qi in range(core_offset, core_end):
+        row = matrix[qi]
         for k in range(4):
-            max_per[k] += max(int(row[j][k]) for j in range(4))
+            max_per[k] += max(int(row[j][k]) for j in range(len(row)))
     axes: List[Dict[str, Any]] = []
     for i, (key, label) in enumerate(_RADAR_META):
         denom = max_per[i] or 1
@@ -1734,8 +1753,16 @@ def build_analysis_result(
 ) -> Dict[str, Any]:
     vec = _answer_vector(answers)
     readiness_vec = _readiness_percent(vec, preparation_level)
-    if len(answers) >= 15:
-        axes = _proforientation_radar_axes(answers, interest)
+    min_core = 15
+    if profile:
+        from wibe_work.services.assessment_bundle import get_assessment_bundle
+
+        b = get_assessment_bundle(profile, interest)
+        min_core = int(b.get("technical_count") or 10) + int(
+            b.get("career_count") or b.get("personality_count") or 5
+        )
+    if len(answers) >= min_core:
+        axes = _proforientation_radar_axes(answers, interest, profile=profile)
         axis_avg = sum(a["value_percent"] for a in axes) / max(1, len(axes))
         readiness = int(max(12, min(100, round(0.35 * readiness_vec + 0.65 * axis_avg))))
     else:

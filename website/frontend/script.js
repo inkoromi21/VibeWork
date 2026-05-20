@@ -232,6 +232,7 @@ function setTab(name) {
   if (name === "account" && window.serverLoggedIn) renderAccountPage();
   if (name === "jobs") wireJobCityAutocomplete();
   if (name === "sim") loadSimRoleOptions().catch(() => {});
+  if (name === "profile") refreshProfilePanelMode();
   schedulePushServerSnapshot();
 }
 
@@ -255,31 +256,137 @@ function getPreparationLevel() {
   return mapPreparationForApi(sheet.preparation_level);
 }
 
+function profileForAssessmentApi() {
+  const extra = collectSheetExtra();
+  const out = {
+    education_detail: String(extra.education_detail || "").trim(),
+    course_grade: String(extra.course_grade || "").trim(),
+  };
+  const age = parseInt(String(extra.age ?? ""), 10);
+  if (Number.isFinite(age)) out.age = age;
+  return out;
+}
+
+function courseGradeOptionsForEducation(eduDetail) {
+  const d = String(eduDetail || "").trim();
+  if (d === "school_8_11") {
+    return [
+      { v: "8 класс", l: "8 класс" },
+      { v: "9 класс", l: "9 класс" },
+      { v: "10 класс", l: "10 класс" },
+      { v: "11 класс", l: "11 класс" },
+    ];
+  }
+  if (d === "spo") {
+    return [1, 2, 3, 4].map((n) => ({ v: `${n} курс`, l: `${n} курс` }));
+  }
+  if (d === "univ_bachelor" || d === "univ_master") {
+    return [1, 2, 3, 4, 5, 6].map((n) => ({ v: `${n} курс`, l: `${n} курс` }));
+  }
+  if (d === "graduate") {
+    return [{ v: "выпускник", l: "Выпускник" }];
+  }
+  return null;
+}
+
+function syncCourseGradeField() {
+  const edu = document.querySelector('[data-sheet-field="education_detail"]');
+  const cg = document.querySelector('[data-sheet-field="course_grade"]');
+  if (!edu || !cg) return;
+  const opts = courseGradeOptionsForEducation(edu.value);
+  const prev = String(cg.value || "").trim();
+  if (!opts) {
+    if (cg.tagName !== "INPUT") {
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.setAttribute("data-sheet-field", "course_grade");
+      inp.placeholder = "10 класс, 2 курс…";
+      inp.className = cg.className || "";
+      inp.value = prev;
+      cg.replaceWith(inp);
+    }
+    return;
+  }
+  let sel = cg;
+  if (cg.tagName !== "SELECT") {
+    sel = document.createElement("select");
+    sel.setAttribute("data-sheet-field", "course_grade");
+    cg.replaceWith(sel);
+    sel.addEventListener("change", () => {
+      scheduleSaveProfileDraft();
+      updateFlowUI();
+      debouncedQuizReload();
+    });
+  }
+  sel.innerHTML =
+    '<option value="">— выберите —</option>' +
+    opts.map((o) => `<option value="${esc(o.v)}">${esc(o.l)}</option>`).join("");
+  if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+}
+
+let ASSESSMENT_TRACK = null;
+let ASSESSMENT_MODULES = [];
+
+function updateTestPanelHeadings() {
+  const h1 = document.querySelector("#panel-test .card-head h1");
+  if (h1 && ASSESSMENT_TRACK?.track_label) {
+    h1.textContent = `Этап 2 — тест (${ASSESSMENT_TRACK.track_label})`;
+  } else if (h1) {
+    h1.textContent = "Этап 2 — тест";
+  }
+  const h2a = document.querySelector(".quiz-test-section:not(.quiz-test-section--personality) .quiz-test-heading");
+  const h2b = document.querySelector(".quiz-test-section--personality .quiz-test-heading");
+  const hintTrack = document.getElementById("quiz-track-hint");
+  if (hintTrack) {
+    hintTrack.textContent = ASSESSMENT_TRACK?.track_hint || "";
+    hintTrack.hidden = !ASSESSMENT_TRACK?.track_hint;
+  }
+  if (h2a) h2a.textContent = "Тест 1 — задачи в вашей сфере";
+  if (h2b) {
+    h2b.textContent =
+      ASSESSMENT_MODULES.length > 1
+        ? "Тест 2 — профориентация (несколько блоков)"
+        : "Тест 2 — интересы и тип среды";
+  }
+}
+
 async function fetchAndRenderQuiz() {
   const form = document.getElementById("diag-form");
   if (!form) return;
-  const fd = new FormData(form);
   const interest = getPrimaryQuizInterest();
+  const prof = profileForAssessmentApi();
   try {
     const url = new URL("/api/quiz/questions", window.location.origin);
     url.searchParams.set("interest", interest);
+    if (prof.education_detail) url.searchParams.set("education_detail", prof.education_detail);
+    if (prof.course_grade) url.searchParams.set("course_grade", prof.course_grade);
+    if (prof.age != null) url.searchParams.set("age", String(prof.age));
     const res = await fetch(url.toString());
     if (!res.ok) throw new Error("quiz");
     const data = await res.json();
+    ASSESSMENT_TRACK = {
+      track_id: data.track_id,
+      track_label: data.track_label,
+      track_hint: data.track_hint,
+    };
+    ASSESSMENT_MODULES = Array.isArray(data.modules) ? data.modules : [];
     if (data.questions && data.questions.length >= 10) {
       QUIZ = data.questions;
     } else {
       QUIZ = [...QUIZ_FALLBACK];
     }
-    if (data.personality_questions && data.personality_questions.length >= 8) {
+    if (data.personality_questions && data.personality_questions.length >= 4) {
       PERSONALITY_QUIZ = data.personality_questions;
     } else {
       PERSONALITY_QUIZ = [...PERSONALITY_QUIZ_FALLBACK];
     }
   } catch (_) {
+    ASSESSMENT_TRACK = null;
+    ASSESSMENT_MODULES = [];
     QUIZ = [...QUIZ_FALLBACK];
     PERSONALITY_QUIZ = [...PERSONALITY_QUIZ_FALLBACK];
   }
+  updateTestPanelHeadings();
   Object.keys(questionStartedAt).forEach((k) => delete questionStartedAt[k]);
   Object.keys(questionStartedAtPersonality).forEach((k) => delete questionStartedAtPersonality[k]);
   renderQuiz();
@@ -444,6 +551,16 @@ function renderSheetField(f) {
 
 let profileWizardStep = 0;
 let profileWizardWired = false;
+let profileForceWizard = false;
+
+const PREP_LEVEL_RU = {
+  weak: "Слабый",
+  medium: "Средний",
+  strong: "Сильный",
+  слабый: "Слабый",
+  средний: "Средний",
+  сильный: "Сильный",
+};
 
 const WIZARD_SECTION_THEMES = {
   pain: "Ваша ситуация",
@@ -657,8 +774,10 @@ function wireSheetFieldListeners(root) {
   root.querySelectorAll('[data-sheet-field="education_detail"]').forEach((el) => {
     el.addEventListener("change", () => {
       syncEducationFromDetail();
+      syncCourseGradeField();
       scheduleSaveProfileDraft();
       updateFlowUI();
+      debouncedQuizReload();
     });
   });
 
@@ -783,9 +902,10 @@ function wireProfileWizardNav() {
       );
       return;
     }
+    profileForceWizard = false;
     saveProfileDraft();
     debouncedQuizReload();
-    setTab("test");
+    renderProfileSummaryView();
   });
 }
 
@@ -793,6 +913,10 @@ function renderSheetProfileFromSchema() {
   const root = document.getElementById("sheet-profile-root");
   const items = wizardSectionItems();
   if (!root || !items.length) return;
+  if (shouldShowProfileSummary()) {
+    renderProfileSummaryView();
+    return;
+  }
 
   const stepsHtml = items
     .map(({ sec }, stepIndex) => renderSheetSectionHtml(sec, stepIndex))
@@ -830,24 +954,7 @@ function renderSheetProfileFromSchema() {
 }
 
 function buildProfileForCompletion() {
-  const sheet = collectSheetExtra();
-  const p = { ...sheet };
-  if (Array.isArray(p.interest_spheres)) {
-    p.interest_spheres = JSON.stringify(p.interest_spheres);
-  }
-  if (p.age != null && p.age !== "") {
-    const a = parseInt(String(p.age), 10);
-    if (Number.isFinite(a)) p.age = a;
-  }
-  if (p.target_salary != null && p.target_salary !== "") {
-    const s = parseInt(String(p.target_salary), 10);
-    if (Number.isFinite(s)) p.target_salary = s;
-  }
-  if (p.hours_per_week != null && p.hours_per_week !== "") {
-    const h = parseInt(String(p.hours_per_week), 10);
-    if (Number.isFinite(h)) p.hours_per_week = h;
-  }
-  return p;
+  return normalizeProfilePayload(collectSheetExtra());
 }
 
 function fieldFilledClient(p, fieldId) {
@@ -1077,19 +1184,232 @@ function applySheetFieldValue(key, val) {
   }
 }
 
-function profileBasicsOk() {
+function normalizeProfilePayload(sheet) {
+  const p = { ...(sheet || {}) };
+  if (Array.isArray(p.interest_spheres)) {
+    p.interest_spheres = JSON.stringify(p.interest_spheres);
+  }
+  if (p.age != null && p.age !== "") {
+    const a = parseInt(String(p.age), 10);
+    if (Number.isFinite(a)) p.age = a;
+  }
+  if (p.target_salary != null && p.target_salary !== "") {
+    const s = parseInt(String(p.target_salary), 10);
+    if (Number.isFinite(s)) p.target_salary = s;
+  }
+  if (p.hours_per_week != null && p.hours_per_week !== "") {
+    const h = parseInt(String(p.hours_per_week), 10);
+    if (Number.isFinite(h)) p.hours_per_week = h;
+  }
+  return p;
+}
+
+function profilePayloadForCompletion() {
+  if (document.querySelector("[data-sheet-field]")) {
+    return buildProfileForCompletion();
+  }
+  try {
+    const raw = localStorage.getItem(STORAGE_PROFILE_DRAFT);
+    if (!raw) return {};
+    const draft = JSON.parse(raw);
+    const sheet = draft?.sheet && typeof draft.sheet === "object" ? draft.sheet : {};
+    return normalizeProfilePayload(sheet);
+  } catch (_) {
+    return {};
+  }
+}
+
+function profileBasicsOkFromPayload(p) {
   const comp = PROFILE_SCHEMA?.completion;
   if (!comp) return false;
-  const p = buildProfileForCompletion();
   for (const fid of comp.required || []) {
     if (!fieldFilledClient(p, fid)) return false;
   }
   for (const group of comp.any_of || []) {
     if (!group.some((fid) => fieldFilledClient(p, fid))) return false;
   }
-  const edu = document.getElementById("field-education-sync");
-  if (edu && !String(edu.value || "").trim()) return false;
   return true;
+}
+
+function profileBasicsOk() {
+  if (document.querySelector("[data-sheet-field]")) {
+    const edu = document.getElementById("field-education-sync");
+    if (edu && !String(edu.value || "").trim()) return false;
+    return profileBasicsOkFromPayload(buildProfileForCompletion());
+  }
+  try {
+    const raw = localStorage.getItem(STORAGE_PROFILE_DRAFT);
+    if (!raw) return false;
+    const draft = JSON.parse(raw);
+    const sheet = draft?.sheet && typeof draft.sheet === "object" ? draft.sheet : {};
+    const edu = String(draft?.education || "").trim();
+    if (!edu && !String(sheet.education_detail || "").trim()) return false;
+    return profileBasicsOkFromPayload(normalizeProfilePayload(sheet));
+  } catch (_) {
+    return false;
+  }
+}
+
+function shouldShowProfileSummary() {
+  return profileBasicsOk() && !profileForceWizard;
+}
+
+function optionLabelForField(field, rawVal) {
+  if (rawVal == null || rawVal === "") return "";
+  const s = String(rawVal).trim();
+  if (!s) return "";
+  if (field?.id === "preparation_level") {
+    return PREP_LEVEL_RU[s] || s;
+  }
+  if (field?.options) {
+    for (const o of field.options) {
+      if (sheetOptValue(o) === s) return String(o.label || s);
+    }
+  }
+  return s;
+}
+
+function profileFieldDisplay(field, profile) {
+  if (!field || field.type === "hidden") return null;
+  const id = field.id;
+  if (id === "interest_spheres") {
+    let ids = [];
+    const v = profile[id];
+    if (Array.isArray(v)) ids = v.map(String);
+    else if (typeof v === "string" && v.trim()) {
+      try {
+        const arr = JSON.parse(v);
+        if (Array.isArray(arr)) ids = arr.map(String);
+      } catch (_) {
+        ids = [];
+      }
+    }
+    if (!ids.length) return null;
+    return { chips: ids.map((sid) => sphereLabelById(sid)) };
+  }
+  let v = profile[id];
+  if (v == null || v === "") {
+    if (id === "course_grade" && profile.course_or_grade != null && profile.course_or_grade !== "") {
+      v = profile.course_or_grade;
+    } else if (id === "work_format_preference") {
+      v = profile.work_format_preference || profile.work_format_pref;
+    } else {
+      return null;
+    }
+  }
+  if (field.type === "select" || field.type === "radio") {
+    const lbl = optionLabelForField(field, v);
+    return lbl ? { text: lbl } : null;
+  }
+  if (field.type === "number") {
+    if (id === "target_salary") {
+      const n = parseInt(String(v), 10);
+      return Number.isFinite(n)
+        ? { text: `${String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ")} ₽/мес` }
+        : null;
+    }
+    if (id === "age") return { text: `${v} лет` };
+    if (id === "hours_per_week") return { text: `${v} ч/нед` };
+    return { text: String(v) };
+  }
+  if (field.type === "textarea" || field.type === "text") {
+    const t = String(v).trim();
+    return t ? { text: t, wide: true } : null;
+  }
+  if (field.type === "scale" || field.type === "scale_1_5") {
+    const n = parseInt(String(v), 10);
+    if (!Number.isFinite(n)) return null;
+    const def = field.default ?? 3;
+    if (n === def) return null;
+    return { text: `${n} / ${field.scale_max || 5}` };
+  }
+  return null;
+}
+
+function buildProfileCompleteHtml() {
+  const profile = profilePayloadForCompletion();
+  const blocks = [];
+  for (const sec of schemaSections()) {
+    const title = sectionTheme(sec);
+    let itemsHtml = "";
+    for (const f of sec.fields || []) {
+      const disp = profileFieldDisplay(f, profile);
+      if (!disp) continue;
+      const wide = disp.wide ? " profile-complete-item--wide" : "";
+      let valueHtml = "";
+      if (disp.chips?.length) {
+        valueHtml = `<span class="profile-complete-chips">${disp.chips
+          .map((c) => `<span class="profile-complete-chip">${esc(c)}</span>`)
+          .join("")}</span>`;
+      } else {
+        valueHtml = esc(disp.text || "—");
+      }
+      itemsHtml += `<div class="profile-complete-item${wide}"><span class="profile-complete-label">${esc(f.label || f.id)}</span><span class="profile-complete-value">${valueHtml}</span></div>`;
+    }
+    if (!itemsHtml) continue;
+    blocks.push(
+      `<section class="profile-complete-block"><h3 class="profile-complete-block-title">${esc(title)}</h3><div class="profile-complete-grid">${itemsHtml}</div></section>`
+    );
+  }
+  return blocks.length
+    ? blocks.join("")
+    : '<p class="muted">Нет сохранённых ответов.</p>';
+}
+
+function setProfileCardTitle(text) {
+  const head = document.querySelector("#panel-profile .cdek-card-head h1");
+  if (head) head.textContent = text;
+}
+
+function wireProfileRetakeButton() {
+  const btn = document.getElementById("btn-profile-retake");
+  if (!btn || btn.dataset.bound) return;
+  btn.dataset.bound = "1";
+  btn.addEventListener("click", () => {
+    profileForceWizard = true;
+    profileWizardWired = false;
+    profileWizardStep = 0;
+    try {
+      localStorage.setItem("vibework_profile_wizard_step", "0");
+    } catch (_) {}
+    loadProfileDraft();
+    renderSheetProfileFromSchema();
+    setProfileCardTitle("Этап 1 — профиль");
+  });
+}
+
+function renderProfileSummaryView() {
+  const root = document.getElementById("sheet-profile-root");
+  if (!root) return;
+  if (document.querySelector("[data-sheet-field]")) saveProfileDraft();
+  setProfileCardTitle("Профиль заполнен");
+  root.innerHTML = `
+    <div class="profile-complete">
+      <p class="profile-complete-lead muted">Ваши ответы по всем блокам анкеты.</p>
+      ${buildProfileCompleteHtml()}
+      <div class="profile-complete-actions">
+        <button type="button" class="btn secondary" id="btn-profile-retake">Пройти заново</button>
+      </div>
+    </div>
+  `;
+  wireProfileRetakeButton();
+}
+
+function refreshProfilePanelMode() {
+  const root = document.getElementById("sheet-profile-root");
+  if (!root || !schemaSections().length) return;
+  if (shouldShowProfileSummary()) {
+    renderProfileSummaryView();
+    return;
+  }
+  if (!document.querySelector(".profile-wizard")) {
+    setProfileCardTitle("Этап 1 — профиль");
+    renderSheetProfileFromSchema();
+  }
+}
+
+function isProfilePanelActive() {
+  return document.getElementById("panel-profile")?.classList.contains("active");
 }
 
 function quizComplete() {
@@ -1298,12 +1618,11 @@ function renderQuiz() {
 function renderPersonalityQuiz() {
   const root = document.getElementById("quiz-personality");
   if (!root) return;
-  root.innerHTML = PERSONALITY_QUIZ.map(
-    (q) => `
+  const renderOne = (q) => `
     <div class="quiz-item" data-pq="${q.id}">
       <p>${q.id}. ${esc(q.text)}</p>
       <div class="quiz-options">
-        ${q.options
+        ${(q.options || [])
           .map(
             (o) => `
           <label>
@@ -1313,8 +1632,20 @@ function renderPersonalityQuiz() {
           )
           .join("")}
       </div>
-    </div>`
-  ).join("");
+    </div>`;
+  if (ASSESSMENT_MODULES.length > 0) {
+    let html = "";
+    for (const mod of ASSESSMENT_MODULES) {
+      const qs = mod.questions || [];
+      if (!qs.length) continue;
+      html += `<div class="quiz-module-block"><h3 class="quiz-module-title">${esc(mod.title || mod.id)}</h3>`;
+      html += qs.map((q) => renderOne(q)).join("");
+      html += "</div>";
+    }
+    root.innerHTML = html || PERSONALITY_QUIZ.map((q) => renderOne(q)).join("");
+  } else {
+    root.innerHTML = PERSONALITY_QUIZ.map((q) => renderOne(q)).join("");
+  }
 
   root.querySelectorAll('.quiz-item input[type="radio"]').forEach((inp) => {
     inp.addEventListener("focus", () =>
@@ -1358,7 +1689,7 @@ function collectPayload() {
     throw new Error(`Ответьте на все вопросы теста 1 — сфера (${QUIZ.length} шт., вкладка «Тест»).`);
   }
   if (personality_test_answers.some((a) => !a)) {
-    throw new Error(`Ответьте на все вопросы теста 2 — тип личности (${PERSONALITY_QUIZ.length} шт.).`);
+    throw new Error(`Ответьте на все вопросы теста 2 — профориентация (${PERSONALITY_QUIZ.length} шт.).`);
   }
 
   const skills = [];
@@ -1367,7 +1698,8 @@ function collectPayload() {
   const motivationRaw = String(extra.motivation_ai || extra.motivation || "").trim();
   const motivation = motivationRaw || null;
   const preparation_level = mapPreparationForApi(extra.preparation_level);
-  const profile_extra = Object.keys(extra).length ? extra : null;
+  const profile_extra = Object.keys(extra).length ? { ...extra } : {};
+  if (ASSESSMENT_TRACK?.track_id) profile_extra.assessment_track_id = ASSESSMENT_TRACK.track_id;
 
   return {
     age,
@@ -1379,7 +1711,7 @@ function collectPayload() {
     question_timings,
     personality_question_timings,
     motivation,
-    profile_extra,
+    profile_extra: Object.keys(profile_extra).length ? profile_extra : null,
     preparation_level,
     target_mts_role_id: null,
   };
@@ -1464,6 +1796,7 @@ function applyProfileToForm(p) {
     applySheetFieldValue(k, v);
   }
   syncEducationFromDetail();
+  syncCourseGradeField();
   syncJobSphereSelect();
 }
 
@@ -1488,6 +1821,7 @@ function scheduleSaveProfileDraft() {
   saveProfileDraftTimer = setTimeout(() => {
     saveProfileDraftTimer = null;
     saveProfileDraft();
+    if (isProfilePanelActive() && shouldShowProfileSummary()) refreshProfilePanelMode();
     schedulePushServerSnapshot();
   }, 400);
 }
@@ -1564,6 +1898,44 @@ function applyServerSnapshot(snap) {
   }
 }
 
+const NEW_ACCOUNT_FLAG = "vibework_new_account";
+
+function isNewAccountOnboarding() {
+  try {
+    if (localStorage.getItem(NEW_ACCOUNT_FLAG) === "1") return true;
+    return new URLSearchParams(window.location.search).get("onboarding") === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+function clearNewAccountOnboardingFlag() {
+  try {
+    localStorage.removeItem(NEW_ACCOUNT_FLAG);
+    const u = new URL(window.location.href);
+    if (u.searchParams.has("onboarding")) {
+      u.searchParams.delete("onboarding");
+      window.history.replaceState({}, "", u.pathname + u.hash);
+    }
+  } catch (_) {}
+}
+
+/** После регистрации: вкладка «Профиль», мастер с первого этапа анкеты */
+function startProfileOnboarding() {
+  profileForceWizard = true;
+  profileWizardWired = false;
+  profileWizardStep = 0;
+  try {
+    localStorage.setItem("vibework_last_tab", "profile");
+    localStorage.setItem("vibework_profile_wizard_step", "0");
+  } catch (_) {}
+  sheetProfileRendered = false;
+  renderSheetProfileFromSchema();
+  setTab("profile");
+  clearNewAccountOnboardingFlag();
+  updateFlowUI();
+}
+
 /** Новый аккаунт: не переносим в него анонимный localStorage и уже заполненный профиль в этом браузере */
 function resetClientStateForNewAccount() {
   try {
@@ -1572,6 +1944,7 @@ function resetClientStateForNewAccount() {
     localStorage.removeItem("vibework_focus_streak_v2");
     localStorage.removeItem("vibework_streak_demo_v1");
     localStorage.removeItem("vibework_last_tab");
+    localStorage.setItem("vibework_profile_wizard_step", "0");
   } catch (_) {}
   window.lastAnalysis = null;
   chatMessages = [];
@@ -2213,8 +2586,117 @@ function renderMtsMetrics(root, items) {
     .join("");
 }
 
+function renderLearningPathDetail(host, lp) {
+  if (!host || !lp || !lp.path_id) return;
+  const steps = lp.steps || [];
+  if (!steps.length) return;
+  const metrics = lp.metrics || {};
+  let html = `<div class="learn-path-wrap"><h3 class="learn-path-title">${esc(lp.title || "Путь обучения")}</h3>`;
+  if (metrics.coverage_percent != null) {
+    html += `<p class="muted small learn-path-metrics">Прогресс: <strong>${esc(String(metrics.coverage_percent))}%</strong> · шаг ${esc(String((metrics.current_step_index || 0) + 1))} из ${esc(String(metrics.total_steps || steps.length))}</p>`;
+  }
+  for (const st of steps) {
+    const status = st.status || "pending";
+    const statusLbl =
+      status === "done" ? "✓ сделано" : status === "in_progress" ? "в работе" : "ожидает";
+    html += `<div class="learn-path-step"><div class="learn-path-step-head"><strong>${esc(String(st.order || "") + ". " + (st.title || ""))}</strong><span class="muted small">${esc(statusLbl)}</span></div>`;
+    if (st.goal) html += `<p class="muted small">${esc(st.goal)}</p>`;
+    if (st.duration_hint) html += `<p class="muted small">Срок: ${esc(st.duration_hint)}</p>`;
+    for (const R of st.resources || []) {
+      const rurl = R.url && R.url !== "#" ? R.url : "";
+      html += `<div class="learn-path-resource">`;
+      if (rurl) {
+        html += `<a href="${esc(rurl)}" target="_blank" rel="noopener" class="learn-path-link">${esc(R.title || "Материал")}</a>`;
+      } else {
+        html += esc(R.title || "Материал");
+      }
+      if (R.provider) html += ` <span class="muted small">· ${esc(String(R.provider))}</span>`;
+      if (R.description) html += `<p class="muted small learn-path-res-desc">${esc(R.description)}</p>`;
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+  host.insertAdjacentHTML("beforeend", html);
+}
+
+function renderIndividualAdviceBlock(root, advice) {
+  if (!root || !advice?.by_plan) return false;
+  const ids = ["A", "B", "C"];
+  let html = "";
+  for (const id of ids) {
+    const block = advice.by_plan[id];
+    if (!block) continue;
+    html += `<section class="advice-plan-card"><h3 class="advice-plan-title">${esc(block.title || "План " + id)}</h3>`;
+    if (block.intro) html += `<p class="advice-plan-intro">${esc(block.intro)}</p>`;
+    if (block.priority_skills?.length) {
+      html += `<p class="muted small"><strong>Сначала подтянуть:</strong> ${block.priority_skills.map((x) => esc(x)).join(", ")}</p>`;
+    }
+    const sections =
+      block.sections?.length ? block.sections : block.steps?.length ? [{ title: "Ваш план", steps: block.steps }] : [];
+    for (const sec of sections) {
+      if (sec.title) html += `<p class="advice-sec-title">${esc(sec.title)}</p>`;
+      html += `<ul class="advice-steps">`;
+      for (const st of sec.steps || []) {
+        const t = typeof st === "string" ? st : st?.text || "";
+        if (t) html += `<li>${esc(t)}</li>`;
+      }
+      html += `</ul>`;
+    }
+    html += `</section>`;
+  }
+  if (!html) return false;
+  root.innerHTML = html;
+  return true;
+}
+
+function renderGrowthStagesRich(host, stages) {
+  if (!host || !stages?.length) return false;
+  host.innerHTML = stages
+    .map((s, idx) => {
+      const intro = (s.intro || s.body || "").trim();
+      const tags = (s.focus_tags || []).map((t) => `<span class="stage-tag">${esc(t)}</span>`).join("");
+      const plan = (s.plan || [])
+        .map(
+          (ps) =>
+            `<div class="growth-plan-step"><span class="growth-plan-label">${esc(ps.label || "Шаг")}</span>${esc(ps.text || "")}</div>`
+        )
+        .join("");
+      const checklist = (s.checklist || s.milestones || [])
+        .map((m) => `<li>${esc(m)}</li>`)
+        .join("");
+      const mats = (s.materials || [])
+        .map((M) => {
+          const mu = M.url && M.url !== "#" ? M.url : "";
+          let mh = `<div class="learn-path-resource">`;
+          if (mu) mh += `<a href="${esc(mu)}" target="_blank" rel="noopener" class="learn-path-link">${esc(M.title || "Материал")}</a>`;
+          else mh += esc(M.title || "Материал");
+          if (M.description) mh += `<p class="muted small learn-path-res-desc">${esc(M.description)}</p>`;
+          return mh + `</div>`;
+        })
+        .join("");
+      return `<article class="growth-card stage-card">
+        <header class="stage-card-head"><span class="stage-idx">${esc(String(s.stage != null ? s.stage : idx + 1))}</span>
+        <div><h3 class="stage-card-title">${esc(s.title || "")}</h3>
+        ${s.subtitle ? `<p class="stage-card-sub muted small">${esc(s.subtitle)}</p>` : ""}</div></header>
+        ${intro ? `<p class="stage-desc">${esc(intro)}</p>` : ""}
+        ${tags ? `<div class="stage-tags">${tags}</div>` : ""}
+        ${s.horizon ? `<p class="muted small"><strong>Срок этапа:</strong> ${esc(s.horizon)}</p>` : ""}
+        ${s.continues_from ? `<p class="muted small growth-continues">${esc(s.continues_from)}</p>` : ""}
+        ${plan ? `<p class="growth-sec-label">План этапа</p>${plan}` : ""}
+        ${checklist ? `<ul class="stage-milestones">${checklist}</ul>` : ""}
+        ${s.path_route ? `<p class="muted small"><strong>Маршрут:</strong> ${esc(s.path_route)}</p>` : ""}
+        ${mats ? `<p class="growth-sec-label">Материалы</p>${mats}` : ""}
+        ${s.when_next ? `<p class="muted small growth-when-next"><strong>Дальше:</strong> ${esc(s.when_next)}</p>` : ""}
+      </article>`;
+    })
+    .join("");
+  return true;
+}
+
 function renderAdviceBlock(root, res) {
   if (!root) return;
+  if (renderIndividualAdviceBlock(root, res.individual_advice)) return;
   const dirs = res.directions || [];
   const chunks = dirs.map((d) => {
     const steps = (d.first_steps || []).map((s) => `<li>${esc(s)}</li>`).join("");
@@ -2342,24 +2824,32 @@ function renderResults(res) {
 
   renderInsightTilesFromResult(res);
 
-  document.getElementById("learning-block").innerHTML = res.learning_path
-    .map(
-      (r) => `
+  const learnHost = document.getElementById("learning-block");
+  if (learnHost) {
+    const cards = (res.learning_path || [])
+      .map(
+        (r) => `
       <div class="learn-card">
         <span class="badge">${esc(r.type)}</span>
         <h4 style="margin:0.5rem 0 0.35rem">${esc(r.title)}</h4>
         <p class="muted small" style="margin:0">${esc(r.description)}</p>
         ${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" class="btn secondary">Открыть →</a>` : ""}
       </div>`
-    )
-    .join("");
+      )
+      .join("");
+    learnHost.innerHTML = cards || "";
+    if (res.learning_path_detail) renderLearningPathDetail(learnHost, res.learning_path_detail);
+  }
 
   const adviceRoot = document.getElementById("advice-block");
   if (adviceRoot) renderAdviceBlock(adviceRoot, res);
 
   renderGradePlan(res.grade_plan || []);
 
-  document.getElementById("stages-block").innerHTML = (res.career_stages || [])
+  const stagesHost = document.getElementById("stages-block");
+  if (stagesHost) {
+    if (!renderGrowthStagesRich(stagesHost, res.growth_stages_rich)) {
+      stagesHost.innerHTML = (res.career_stages || [])
     .map(
       (s, idx) => `
       <article class="stage-card">
@@ -2386,6 +2876,8 @@ function renderResults(res) {
       </article>`
     )
     .join("");
+    }
+  }
 
 }
 
@@ -3014,7 +3506,10 @@ document.getElementById("btn-auth-logout").addEventListener("click", async () =>
   syncJobSphereSelect();
   loadSimRoleOptions().catch(() => {});
   const me = await refreshAuthState();
-  if (!me.authenticated) {
+  const onboarding = me.authenticated && isNewAccountOnboarding();
+  if (onboarding) {
+    resetClientStateForNewAccount();
+  } else if (!me.authenticated) {
     const storedOnLoad = loadResult();
     if (storedOnLoad && storedOnLoad.profile) {
       applyProfileToForm(storedOnLoad.profile);
@@ -3031,16 +3526,22 @@ document.getElementById("btn-auth-logout").addEventListener("click", async () =>
   updateFlowUI();
   updateAvatarBubble();
 
-  try {
-    const t = localStorage.getItem("vibework_last_tab");
-    if (t && t !== "mts") setTab(t);
-  } catch (_) {}
+  if (onboarding) {
+    startProfileOnboarding();
+  } else {
+    refreshProfilePanelMode();
+    try {
+      const t = localStorage.getItem("vibework_last_tab");
+      if (t && t !== "mts") setTab(t);
+    } catch (_) {}
+  }
 
   await fetchAndRenderQuiz();
 
   const stored = loadResult();
   if (!me.authenticated && stored?.profile) {
     applyProfileToForm(stored.profile);
+    refreshProfilePanelMode();
   }
 
   if (me.authenticated && me.snapshot?.test_answers?.length === QUIZ.length) {

@@ -133,20 +133,30 @@ async def quiz_questions(
     require_bearer_matches_user(request, user_id)
     profile = load_profile(user_id)
     intr = _interest_for_user(profile, interest)
-    grade = compute_quiz_grade(profile)
     from wibe_work.services.aptitude_quiz import get_quiz_bundle
+    from wibe_work.services.assessment_bundle import expected_question_ids
 
-    bundle = get_quiz_bundle(intr, grade)
+    bundle = get_quiz_bundle(intr, profile=profile)
+    grade = bundle.get("test_grade") or compute_quiz_grade(profile)
     return {
         "interest": bundle["interest"],
+        "track_id": bundle.get("track_id"),
+        "track_label": bundle.get("track_label"),
+        "track_hint": bundle.get("track_hint"),
         "test_grade": grade,
-        "test_grade_label": quiz_grade_label(grade),
-        "test_grade_hint": quiz_grade_hint(grade),
+        "test_grade_label": bundle.get("test_grade_label") or quiz_grade_label(grade),
+        "test_grade_hint": bundle.get("test_grade_hint") or quiz_grade_hint(grade),
+        "orientation_count": bundle.get("orientation_count", 0),
         "technical_count": bundle["technical_count"],
         "personality_count": bundle["personality_count"],
+        "career_count": bundle.get("career_count", bundle["personality_count"]),
+        "total_count": bundle.get("total_count", len(bundle["questions"])),
+        "modules": bundle.get("modules", []),
+        "orientation": bundle.get("orientation", []),
         "technical": bundle["technical"],
         "personality": bundle["personality"],
         "questions": bundle["questions"],
+        "expected_question_ids": expected_question_ids(profile, intr),
     }
 
 
@@ -156,15 +166,20 @@ async def quiz_analyze(user_id: str, request: Request, body: AnalyzeRequest):
     profile = load_profile(user_id)
     if not body.answers:
         raise HTTPException(status_code=400, detail="Нужны ответы на вопросы")
+    interest = _interest_for_user(profile, body.interest)
+    from wibe_work.services.assessment_bundle import expected_question_ids
+
+    expected = set(expected_question_ids(profile, interest))
     qids = {int(a.question_id) for a in body.answers}
-    expected = set(range(1, 16))
     if qids != expected:
         missing = sorted(expected - qids)
-        raise HTTPException(
-            status_code=400,
-            detail=f"Нужны ответы на все 15 вопросов (1–10 по сфере, 11–15 личностные). Не хватает: {missing}",
-        )
-    interest = _interest_for_user(profile, body.interest)
+        extra = sorted(qids - expected)
+        detail = f"Нужны ответы на все {len(expected)} вопросов опроса."
+        if missing:
+            detail += f" Не хватает id: {missing[:12]}{'…' if len(missing) > 12 else ''}."
+        if extra:
+            detail += f" Лишние id: {extra[:8]}."
+        raise HTTPException(status_code=400, detail=detail)
     preparation = _prep_for_user(profile, body.preparation_level)
     education = (profile.get("education_level") or "не указано").strip()
     answers_dicts = [

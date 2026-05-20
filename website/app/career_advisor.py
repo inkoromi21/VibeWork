@@ -56,6 +56,8 @@ from app.api_schemas import (
     MockVacancy,
     MtsMatrixMatch,
     MtsPreviewPayload,
+    PERSONALITY_TEST_MAX,
+    PERSONALITY_TEST_MIN,
     PERSONALITY_TEST_QUESTION_COUNT,
     PreparationBranch,
     StyleFitBar,
@@ -460,13 +462,16 @@ def rank_mts_tracks(
     return out
 
 
+def _personality_block_complete(answers: list[Any] | None) -> bool:
+    if not answers or len(answers) < PERSONALITY_TEST_MIN:
+        return False
+    ids = sorted(int(a.question_id) for a in answers)
+    return ids == list(range(1, len(ids) + 1))
+
+
 def mts_preview_rank(payload: MtsPreviewPayload) -> list[MtsMatrixMatch]:
     ta = payload.test_answers if len(payload.test_answers) == TEST_QUESTION_COUNT else None
-    pt = (
-        payload.personality_test_answers
-        if len(payload.personality_test_answers) == PERSONALITY_TEST_QUESTION_COUNT
-        else None
-    )
+    pt = payload.personality_test_answers if _personality_block_complete(payload.personality_test_answers) else None
     return rank_mts_tracks(
         payload.interests[0],
         payload.skills,
@@ -476,12 +481,22 @@ def mts_preview_rank(payload: MtsPreviewPayload) -> list[MtsMatrixMatch]:
     )
 
 
-def quiz_questions_bundle(form_interest: str, target_mts_role_id: str | None) -> dict[str, Any]:
+def quiz_questions_bundle(
+    form_interest: str,
+    target_mts_role_id: str | None = None,
+    profile: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if profile and (profile.get("education_detail") or profile.get("course_grade") is not None):
+        from app.assessment_bundle_bridge import quiz_bundle_for_website
+
+        return quiz_bundle_for_website(profile, form_interest)
     qs, key = pick_quiz_questions(form_interest, target_mts_role_id)
     return {
         "quiz_key": key,
         "questions": qs,
         "personality_questions": pick_personality_quiz_questions(),
+        "track_label": None,
+        "track_hint": None,
     }
 
 
@@ -689,7 +704,7 @@ def _test_scores_from_optional(
     if not test_answers or len(test_answers) != TEST_QUESTION_COUNT:
         return None
     s1 = _score_test(test_answers)
-    if personality_test_answers and len(personality_test_answers) == PERSONALITY_TEST_QUESTION_COUNT:
+    if _personality_block_complete(personality_test_answers):
         s2 = _score_test(personality_test_answers)
         return {k: s1[k] + s2[k] for k in s1}
     return s1
@@ -1466,7 +1481,7 @@ def _prep_support_score(level: str) -> int:
 
 
 def _personality_only_totals(payload: DiagnosisPayload) -> dict[str, int] | None:
-    if not payload.personality_test_answers or len(payload.personality_test_answers) != PERSONALITY_TEST_QUESTION_COUNT:
+    if not _personality_block_complete(payload.personality_test_answers):
         return None
     return _score_test(payload.personality_test_answers)
 
@@ -2070,8 +2085,6 @@ async def build_analysis(payload: DiagnosisPayload) -> AnalysisResult:
     ]
     direction_names = [d.name for d in directions]
     top_track = direction_names[0]
-    learning = build_learning_resources(direction_names, primary_interest)
-    stages = build_career_stages(primary_track=top_track)
     skill_plan = build_skill_plan(payload, direction_names)
     gap = build_gap_analysis(payload, top_track, primary_interest)
     weekly = build_weekly_roadmap(top_track, primary_interest)
@@ -2096,6 +2109,29 @@ async def build_analysis(payload: DiagnosisPayload) -> AnalysisResult:
         if extra_bits:
             summary_parts.append("Профиль (лист): " + "; ".join(extra_bits)[:2200])
     profile_summary = " ".join(summary_parts)
+
+    learning_path_detail = None
+    individual_advice = None
+    growth_stages_rich = None
+    learning = build_learning_resources(direction_names, primary_interest)
+    try:
+        from app.learning_bridge import build_learning_pack_for_website
+
+        lpack = build_learning_pack_for_website(
+            payload,
+            directions=directions,
+            gap=gap,
+            profile_summary=profile_summary,
+        )
+        if lpack.get("learning_resources"):
+            learning = lpack["learning_resources"]
+        learning_path_detail = lpack.get("learning_path_detail")
+        individual_advice = lpack.get("individual_advice")
+        growth_stages_rich = lpack.get("growth_stages_rich")
+    except Exception:
+        logger.exception("learning_bridge: каталог обучения недоступен, fallback на статичные карточки")
+
+    stages = build_career_stages(primary_track=top_track)
     behavioral = _behavioral_hint(payload)
 
     sph = primary_interest.value.replace("_", " ")
@@ -2140,6 +2176,9 @@ async def build_analysis(payload: DiagnosisPayload) -> AnalysisResult:
         directions=directions,
         gap_analysis=gap,
         learning_path=learning,
+        learning_path_detail=learning_path_detail,
+        individual_advice=individual_advice,
+        growth_stages_rich=growth_stages_rich,
         career_stages=stages,
         skill_plan=skill_plan,
         weekly_roadmap=weekly,

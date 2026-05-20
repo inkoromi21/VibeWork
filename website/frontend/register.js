@@ -15,7 +15,7 @@ async function redirectIfAuthenticated() {
     const r = await fetch("/api/auth/me", { credentials: "include" });
     const j = await r.json();
     if (j.authenticated) {
-      window.location.replace("/");
+      window.location.replace("/?onboarding=1");
     }
   } catch (_) {}
 }
@@ -49,7 +49,12 @@ document.getElementById("btn-auth-register")?.addEventListener("click", async ()
       }, 1500);
       return;
     }
-    window.location.replace("/");
+    try {
+      localStorage.setItem("vibework_new_account", "1");
+      localStorage.setItem("vibework_last_tab", "profile");
+      localStorage.setItem("vibework_profile_wizard_step", "0");
+    } catch (_) {}
+    window.location.replace("/?onboarding=1");
   } catch (e) {
     showAuthGateError(e.message || "Регистрация не удалась");
   } finally {

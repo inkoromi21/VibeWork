@@ -117,9 +117,22 @@ async def mts_tracks() -> list[MtsTrack]:
 async def quiz_questions(
     interest: str = Query(..., description="Значение из профиля: IT, дизайн, маркетинг, …"),
     target_mts_role_id: str | None = Query(None, description="id роли из /api/mts/tracks"),
+    education_detail: str | None = Query(None, description="id уровня образования из анкеты"),
+    course_grade: str | None = Query(None, description="Класс или курс"),
+    age: int | None = Query(None, ge=10, le=80),
 ):
-    """Вопросы теста под интерес и (если задано) целевую роль матрицы МТС."""
-    return quiz_questions_bundle(interest, target_mts_role_id)
+    """Вопросы теста под интерес, образование и класс/курс."""
+    profile: dict = {}
+    if education_detail:
+        profile["education_detail"] = education_detail
+    if course_grade is not None:
+        profile["course_grade"] = course_grade
+    if age is not None:
+        profile["age"] = age
+    use_profile = bool(education_detail or course_grade is not None or age is not None)
+    return quiz_questions_bundle(
+        interest, target_mts_role_id, profile=profile if use_profile else None
+    )
 
 
 @app.post("/api/mts/preview", response_model=list[MtsMatrixMatch])
