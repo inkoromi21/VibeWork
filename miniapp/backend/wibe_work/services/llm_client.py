@@ -117,12 +117,19 @@ def _resolve_chat_model(url: str, explicit_model: str) -> str:
     return model
 
 
+def _use_local_llm(explicit_url: str) -> bool:
+    """Локальный Ollama: USE_OLLAMA=1 или CHAT_API_URL на 127.0.0.1/localhost."""
+    if _is_local_llm_url(explicit_url):
+        return True
+    return _env_flag("USE_OLLAMA", default=False)
+
+
 def get_llm_settings() -> Optional[Tuple[str, str, str]]:
     """
     (url, api_key, model). Провайдер с POST .../v1/chat/completions.
 
-    USE_OLLAMA=1 — локальный URL (Ollama и т.п.), ключ не обязателен.
-    USE_OLLAMA=0 — облако; localhost в CHAT_API_URL игнорируется, URL выводится из ключа/CHAT_PROVIDER.
+    Локально (бесплатно): CHAT_API_URL=http://127.0.0.1:11434/... и/или USE_OLLAMA=1.
+    CHAT_API_KEY для Ollama не нужен. Облако: USE_OLLAMA=0 и облачный URL + ключ (Groq и т.д.).
     """
     chat_key = os.getenv("CHAT_API_KEY", "").strip()
     ds_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
@@ -133,7 +140,7 @@ def get_llm_settings() -> Optional[Tuple[str, str, str]]:
         os.getenv("CHAT_API_URL", "").strip()
         or os.getenv("DEEPSEEK_API_URL", "").strip()
     )
-    use_local = _env_flag("USE_OLLAMA", default=_is_local_llm_url(explicit_url))
+    use_local = _use_local_llm(explicit_url)
     url = _resolve_chat_url(key, explicit_url, use_local=use_local)
     local = _is_local_llm_url(url)
 
@@ -141,7 +148,8 @@ def get_llm_settings() -> Optional[Tuple[str, str, str]]:
     model = _resolve_chat_model(url, explicit_model)
 
     if local:
-        return (url, chat_key, model)
+        # Ollama не требует Bearer; ключ в .env не отправляем в облако по ошибке.
+        return (url, "", model)
 
     if not key:
         return None

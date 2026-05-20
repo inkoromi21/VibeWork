@@ -246,11 +246,17 @@ async def health_email():
 @app.get("/api/health/llm")
 async def health_llm():
     """Проверка LLM: переменные в .env и пробный запрос (без секретов в ответе)."""
-    from wibe_work.services.llm_client import fetch_llm_completion, get_llm_settings
+    from wibe_work.services.llm_client import (
+        _is_local_llm_url,
+        fetch_llm_completion,
+        get_llm_settings,
+    )
 
-    cfg = get_llm_settings()
-    use_ollama = (os.getenv("USE_OLLAMA", "").strip().lower() in ("1", "true", "yes", "on"))
     raw_url = (os.getenv("CHAT_API_URL", "").strip())
+    cfg = get_llm_settings()
+    use_ollama = (os.getenv("USE_OLLAMA", "").strip().lower() in ("1", "true", "yes", "on")) or (
+        bool(raw_url) and _is_local_llm_url(raw_url)
+    )
     out: dict = {
         "llm_configured": cfg is not None,
         "ok": False,
@@ -269,12 +275,13 @@ async def health_llm():
     out["resolved_url"] = url.split("?")[0]
     local = "127.0.0.1" in url or "localhost" in url
     out["endpoint_local"] = local
-    if not use_ollama and raw_url and local:
+    use_ollama_env = (os.getenv("USE_OLLAMA", "").strip().lower() in ("0", "false", "no", "off"))
+    if local and use_ollama_env and raw_url and _is_local_llm_url(raw_url):
         out["config_warning"] = (
-            "В .env CHAT_API_URL указывает на localhost, но USE_OLLAMA=0 — "
-            "запросы идут на облачный endpoint (см. resolved_url)."
+            "CHAT_API_URL указывает на Ollama (localhost) — используется локальная модель. "
+            "Для облака уберите 127.0.0.1 из URL и задайте USE_OLLAMA=0."
         )
-    if local and use_ollama:
+    if local:
         out["hint"] = (
             "Локальный LLM: запустите Ollama (ollama serve) и модель из CHAT_MODEL."
         )
