@@ -46,6 +46,39 @@ def test_miniapp_analysis_nested_spoilers():
     assert "renderLearnResourceSpoiler" in html
 
 
+def test_miniapp_role_confirmation_ui():
+    html = MINIAPP_HTML.read_text(encoding="utf-8")
+    assert "buildRoleConfirmationHtml" in html
+    assert "role/accept" in html
+    assert "role/reject" in html
+    assert "roleAcceptBtn" in html
+    assert "Подходит" in html
+    assert "Не подходит" in html
+    assert "Подобрать другое" in html
+
+
+def test_miniapp_path_tab_split():
+    html = MINIAPP_HTML.read_text(encoding="utf-8")
+    assert '{ id: \'analysis\', label: \'Путь\'' in html
+    assert "buildPathStepsActionHtml" in html
+    assert "buildPathAnalysisMetricsHtml" in html
+    assert "buildPathSubtabBar" in html
+    assert "Шаги действия" in html
+    assert "syncPathSubTabForPayload" in html
+    assert "mountPathTabContent" in html
+
+
+def test_miniapp_anydo_learning_path_ui():
+    html = MINIAPP_HTML.read_text(encoding="utf-8")
+    assert "renderLearningPathAnyDo" in html
+    assert "wirePathStepsActions" in html
+    assert "postLearningStepStatus" in html
+    assert "/vibework/learning/progress/" in html
+    assert "anydo-path" in html
+    assert "anydo-step__check" in html
+    assert "Следующий этап" in html
+
+
 def test_miniapp_radar_chart_colored_nodes_and_legend_dots():
     html = MINIAPP_HTML.read_text(encoding="utf-8")
     assert "RADAR_AXIS_COLORS" in html

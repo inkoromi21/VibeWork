@@ -581,15 +581,38 @@ def _pick_scenario_plans(
     axes: List[Dict[str, Any]],
     fp: int,
     answers: Optional[List[Dict[str, Any]]] = None,
+    *,
+    it_track_override: Optional[str] = None,
+    exclude_track_ids: Optional[Set[str]] = None,
 ) -> Dict[str, Any]:
     """Три плана A/B/C из пула сферы + смежные треки по доминанте радара."""
     dk = _direction_interest_key(interest)
-    it_track: Optional[str] = None
+    excluded = set(exclude_track_ids or ())
+    it_track: Optional[str] = it_track_override
     inferred: Optional[Dict[str, Any]] = None
-    if dk == "it_dev" and answers:
+    if dk == "it_dev" and answers and not it_track:
+        from wibe_work.services.role_confirmation import rank_it_track_scores
+
+        for tid, _sc in rank_it_track_scores(answers):
+            if tid in excluded:
+                continue
+            it_track = tid
+            inferred = {
+                "track_id": tid,
+                "label": _IT_TRACK_LABELS.get(tid, tid),
+            }
+            break
+    elif dk == "it_dev" and answers and it_track:
+        inferred = {
+            "track_id": it_track,
+            "label": _IT_TRACK_LABELS.get(it_track, it_track),
+        }
+    elif dk == "it_dev" and answers and not it_track:
         inferred = inferred_it_profession(interest, answers)
-        if inferred:
+        if inferred and str(inferred.get("track_id") or "") not in excluded:
             it_track = str(inferred.get("track_id") or "")
+        else:
+            inferred = None
     pool = list(DIRECTION_POOLS.get(dk, DIRECTION_POOLS["default"]))
     dom = _dominant_radar_key(axes)
     pool = pool + list(ADJACENT_BY_AXIS.get(dom, ()))
@@ -599,16 +622,23 @@ def _pick_scenario_plans(
         if p not in seen:
             seen.add(p)
             uniq.append(p)
-    scored = [
-        (n, _score_direction_name(n, dom, fp, i, it_track=it_track))
-        for i, n in enumerate(uniq)
-    ]
+    from wibe_work.services.role_confirmation import track_from_direction_name
+
+    scored: List[Tuple[float, str]] = []
+    for i, n in enumerate(uniq):
+        if excluded:
+            tid = track_from_direction_name(n)
+            if tid and tid in excluded:
+                continue
+        scored.append((n, _score_direction_name(n, dom, fp, i, it_track=it_track)))
     scored.sort(key=lambda x: -x[1])
     top = scored[:3]
     fallback = list(DIRECTION_POOLS["default"])
     while len(top) < 3:
         added = False
         for x in fallback:
+            if excluded and track_from_direction_name(x) in excluded:
+                continue
             if x not in {t[0] for t in top}:
                 top.append((x, 52))
                 added = True
@@ -719,6 +749,7 @@ def _rank_career_direction_rows(
     limit: int = 6,
     *,
     it_track_override: Optional[str] = None,
+    exclude_track_ids: Optional[Set[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Роли из пула направлений сферы (backend, frontend и т.д.) — по тесту и радару."""
     dk = _direction_interest_key(interest)
@@ -736,8 +767,15 @@ def _rank_career_direction_rows(
         for adj in ADJACENT_BY_AXIS.get(dom, ()):
             if adj not in pool:
                 pool.append(adj)
+    excluded = set(exclude_track_ids or ())
+    from wibe_work.services.role_confirmation import track_from_direction_name
+
     scored: List[Tuple[float, str]] = []
     for i, n in enumerate(pool):
+        if excluded:
+            tid = track_from_direction_name(n)
+            if tid and tid in excluded:
+                continue
         sc = float(_score_direction_name(n, dom, fp, i, it_track=it_track))
         if dk == "it_dev" and it_track and i == 0 and n in _IT_TRACK_LABELS.values():
             sc += 12.0
@@ -1950,32 +1988,7 @@ def build_analysis_result(
 
 
 def public_analysis_payload(full: Dict[str, Any]) -> Dict[str, Any]:
-    """Только то, что видит пользователь в разделе разбора."""
-    keys = (
-        "analyzed_at",
-        "analysis_mode",
-        "readiness",
-        "style_radar",
-        "scenarios",
-        "inferred_profession",
-        "mts_matrix",
-        "learning",
-        "learning_path",
-        "learning_path_detail",
-        "individual_advice",
-        "growth_stages",
-        "growth_stages_rich",
-        "assessment_signals",
-        "gap_analysis",
-        "pain_focus",
-        "weekly_roadmap",
-        "behavioral_hint",
-        "ai_narrative",
-        "ai_narrative_source",
-        "ai_narrative_notice",
-    )
-    out = {k: full[k] for k in keys if k in full}
-    inf = (full.get("scenarios") or {}).get("inferred_profession")
-    if inf and "inferred_profession" not in out:
-        out["inferred_profession"] = inf
-    return out
+    """Только то, что видит пользователь в разделе разбора (с учётом подтверждения роли)."""
+    from wibe_work.services.role_confirmation import public_analysis_payload as _pub
+
+    return _pub(full)

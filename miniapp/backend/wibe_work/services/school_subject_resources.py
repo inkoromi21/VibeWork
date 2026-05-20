@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Iterable, List, Sequence, Set
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
 
 # Общие — всегда в начале списка рекомендаций
 GENERAL_SCHOOL_LINKS: List[Dict[str, str]] = [
@@ -265,7 +265,13 @@ def _interest_key(interest: str) -> str:
     return k if k in INTEREST_DEFAULT_SUBJECTS else "default"
 
 
-def pick_school_subject_ids(profile: Dict[str, Any], interest: str, gap: Dict[str, Any]) -> Set[str]:
+def pick_school_subject_ids(
+    profile: Dict[str, Any],
+    interest: str,
+    gap: Dict[str, Any],
+    *,
+    exclude_subject_ids: Optional[Set[str]] = None,
+) -> Set[str]:
     """Какие предметные блоки ссылок показать (ключи SUBJECT_LINKS)."""
     from wibe_work.questionnaire_fields import parse_favorite_subjects
 
@@ -278,6 +284,11 @@ def pick_school_subject_ids(profile: Dict[str, Any], interest: str, gap: Dict[st
     merged = from_gap | ints | from_profile
     if not merged:
         merged = {"math", "russian", "informatics", "english"}
+    excluded = set(exclude_subject_ids or ())
+    if excluded:
+        merged = {s for s in merged if s not in excluded}
+    if not merged:
+        merged = {s for s in ("math", "russian", "physics", "english", "social") if s not in excluded}
     return merged
 
 
@@ -305,9 +316,12 @@ def build_school_curated_learning_cards(
     *,
     max_subject_cards: int = 8,
     max_total: int = 20,
+    exclude_subject_ids: Optional[Set[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Общие ссылки ФИПИ/тренажёры плюс предметы по разрыву и сфере."""
-    subjects = pick_school_subject_ids(profile, interest, gap)
+    subjects = pick_school_subject_ids(
+        profile, interest, gap, exclude_subject_ids=exclude_subject_ids
+    )
 
     subject_items: List[Dict[str, str]] = []
     for sid in sorted(subjects):
@@ -348,6 +362,213 @@ def augment_school_advice_with_links(advice_text: str) -> str:
         advice_text.rstrip()
         + " Официальные материалы и банк заданий начинайте с ФИПИ (fipi.ru), затем тренируйтесь на тренажёрах из блока «Обучение»."
     )
+
+
+def _subject_resources_for_step(subject_id: str, *, limit: int = 4) -> List[Dict[str, Any]]:
+    """Ресурсы шага в формате learning_path (как career engine)."""
+    out: List[Dict[str, Any]] = []
+    seen: Set[str] = set()
+    for row in GENERAL_SCHOOL_LINKS[:2]:
+        u = _norm_url(row["url"])
+        if u in seen:
+            continue
+        seen.add(u)
+        out.append(
+            {
+                "title": row["title"],
+                "url": row["url"],
+                "kind": row.get("kind") or "ЕГЭ/ОГЭ",
+                "description": row.get("description") or "",
+                "provider": row.get("provider"),
+            }
+        )
+    for row in SUBJECT_LINKS.get(subject_id, ())[:limit]:
+        u = _norm_url(row["url"])
+        if not u or u in seen:
+            continue
+        seen.add(u)
+        out.append(
+            {
+                "title": row["title"],
+                "url": row["url"],
+                "kind": row.get("kind") or "предмет",
+                "description": row.get("description") or "",
+                "provider": row.get("provider"),
+            }
+        )
+    return out[: limit + 2]
+
+
+def build_school_learning_path_payload(
+    *,
+    user_id: Optional[str],
+    profile: Dict[str, Any],
+    interest: str,
+    preparation_level: str,
+    scenarios: Optional[Dict[str, Any]] = None,
+    gap: Optional[Dict[str, Any]] = None,
+    exclude_subject_ids: Optional[Set[str]] = None,
+) -> Dict[str, Any]:
+    """Пошаговый путь школьника — тот же контракт, что career learning_path (Any.do)."""
+    from wibe_work.services.learning.adapters import integration_status
+    from wibe_work.services.learning.assessment_signals import build_assessment_signals
+    from wibe_work.services.learning.progress import (
+        apply_progress_to_steps,
+        compute_metrics,
+        get_progress_map,
+    )
+    from wibe_work.services.profile_analysis_context import SUBJECT_GAP_LABELS
+
+    gap = gap or {}
+    scenarios = scenarios or {}
+    subject_ids = sorted(
+        pick_school_subject_ids(
+            profile, interest, gap, exclude_subject_ids=exclude_subject_ids
+        )
+    )
+    sphere = _interest_key(interest)
+    path_id = f"school_{sphere}"
+    if subject_ids:
+        path_id = f"{path_id}_{'_'.join(subject_ids)}"
+
+    best = re.sub(
+        r"^Вариант\s+[ABC]:\s*",
+        "",
+        str(scenarios.get("best_plan_name") or ""),
+        flags=re.IGNORECASE,
+    ).strip()
+    exam = str(profile.get("exam_focus") or "").strip()
+    exam_note = ""
+    if exam in ("oge_9", "both"):
+        exam_note = " ОГЭ — с демоверсий и банка заданий на ФИПИ."
+    if exam in ("ege_11", "both"):
+        exam_note = (exam_note + " ЕГЭ — по спецификации и открытому банку ФИПИ.").strip()
+
+    steps_out: List[Dict[str, Any]] = []
+    order = 1
+
+    orient_goal = (
+        f"Сравните маршрут «{best[:70]}» с предметами к сдаче и зафиксируйте 2–3 варианта с классным или родителями."
+        if best
+        else "Выберите 2–3 варианта из сценариев A/B/C и обсудите с классным или родителями."
+    )
+    steps_out.append(
+        {
+            "step_id": "school_orient",
+            "order": order,
+            "title": "Сверить маршрут и сферу",
+            "goal": orient_goal,
+            "duration_hint": "1–2 нед.",
+            "skills": ["career_map"],
+            "checkpoint": orient_goal,
+            "resources": [
+                {
+                    "title": GENERAL_SCHOOL_LINKS[0]["title"],
+                    "url": GENERAL_SCHOOL_LINKS[0]["url"],
+                    "kind": GENERAL_SCHOOL_LINKS[0].get("kind") or "профориентация",
+                    "description": GENERAL_SCHOOL_LINKS[0].get("description") or "",
+                    "provider": GENERAL_SCHOOL_LINKS[0].get("provider"),
+                }
+            ],
+            "status": "pending",
+        }
+    )
+    order += 1
+
+    for sid in subject_ids:
+        label = SUBJECT_GAP_LABELS.get(sid, sid)
+        goal = (
+            f"Подтяните «{label}»: 2–3 занятия в неделю по материалам ниже."
+            + (exam_note if exam_note else " Начните с ФИПИ, затем тренажёр.")
+        )
+        if preparation_level == "weak":
+            goal = (
+                f"База по «{label}»: 20–30 минут в день, один блок тем из тренажёра."
+                + (exam_note if exam_note else "")
+            )
+        steps_out.append(
+            {
+                "step_id": f"sub_{sid}",
+                "order": order,
+                "title": label,
+                "goal": goal,
+                "duration_hint": "2–3 нед.",
+                "skills": [sid],
+                "checkpoint": goal,
+                "resources": _subject_resources_for_step(sid),
+                "status": "pending",
+            }
+        )
+        order += 1
+
+    sphere_label = interest
+    try:
+        from wibe_work.questionnaire_fields import INTEREST_SPHERES
+
+        for sp in INTEREST_SPHERES:
+            if sp.get("id") == interest:
+                sphere_label = str(sp.get("label") or interest)
+                break
+    except Exception:
+        pass
+    probe_goal = (
+        f"Проба сферы «{sphere_label}»: кружок, олимпиада или мини-проект на 2–3 недели — "
+        "понять, нравится ли направление."
+    )
+    steps_out.append(
+        {
+            "step_id": "school_sphere_probe",
+            "order": order,
+            "title": "Проба сферы интересов",
+            "goal": probe_goal,
+            "duration_hint": "2–3 нед.",
+            "skills": ["orientation"],
+            "checkpoint": probe_goal,
+            "resources": [],
+            "status": "pending",
+        }
+    )
+
+    progress: Dict[str, str] = {}
+    if user_id and path_id:
+        progress = get_progress_map(user_id, path_id)
+    steps_out = apply_progress_to_steps(steps_out, progress)
+    metrics = compute_metrics(steps_out)
+
+    signals = build_assessment_signals(
+        profile=profile,
+        interest=interest,
+        preparation_level=preparation_level,
+        scenarios=scenarios,
+        gap=gap,
+    )
+
+    priority_skills: List[str] = []
+    for bar in gap.get("bars") or []:
+        lab = bar.get("label") or bar.get("key")
+        if lab:
+            priority_skills.append(str(lab))
+
+    title = "Подготовка к предметам и поступлению"
+    if best:
+        title = f"Школьный путь: {best[:55]}"
+
+    return {
+        "path_id": path_id,
+        "title": title,
+        "sphere": sphere,
+        "track": None,
+        "preparation_level": preparation_level,
+        "steps": steps_out,
+        "metrics": metrics,
+        "priority_skills_from_gap": priority_skills[:5],
+        "assessment_signals": {
+            "sphere": signals.get("sphere"),
+            "analysis_mode": "school",
+            "education_grade": signals.get("education_grade"),
+        },
+        "integration": integration_status(),
+    }
 
 
 def merge_school_cards_with_catalog(

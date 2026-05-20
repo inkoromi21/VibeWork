@@ -131,22 +131,16 @@ def build_learning_path_payload(
         answers=answers,
     )
     if signals.get("analysis_mode") == "school":
-        return {
-            "path_id": "school_orientation",
-            "title": "Подготовка к предметам и поступлению",
-            "sphere": str(signals.get("sphere") or _resolve_sphere(interest, profile)),
-            "track": None,
-            "preparation_level": preparation_level,
-            "steps": [],
-            "metrics": compute_metrics([]),
-            "priority_skills_from_gap": _priority_skills_from_gap(gap),
-            "assessment_signals": {
-                "sphere": signals.get("sphere"),
-                "analysis_mode": "school",
-                "education_grade": signals.get("education_grade"),
-            },
-            "integration": integration_status(),
-        }
+        from wibe_work.services.school_subject_resources import build_school_learning_path_payload
+
+        return build_school_learning_path_payload(
+            user_id=user_id,
+            profile=profile,
+            interest=interest,
+            preparation_level=preparation_level,
+            scenarios=scenarios,
+            gap=gap,
+        )
     sphere = str(signals.get("sphere") or _resolve_sphere(interest, profile))
     track = _infer_track(
         scenarios,

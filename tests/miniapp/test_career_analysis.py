@@ -11,7 +11,11 @@ sys.path.insert(0, str(_REPO / "miniapp" / "backend"))
 from wibe_work.services.career_analysis import (
     build_analysis_result,
     infer_it_track_from_answers,
+)
+from wibe_work.services.role_confirmation import (
+    accept_role_confirmation,
     public_analysis_payload,
+    wrap_fresh_analysis,
 )
 
 
@@ -37,6 +41,8 @@ def test_analysis_has_gap_and_pain() -> None:
         "weak",
         _answers_15(),
     )
+    full = wrap_fresh_analysis(full, profile)
+    full = accept_role_confirmation(full)
     pub = public_analysis_payload(full)
     assert "gap_analysis" in pub
     assert len(pub["gap_analysis"]["bars"]) == 5
@@ -67,6 +73,8 @@ def test_it_backend_track_from_technical_answers() -> None:
     assert "Backend" in str(inf.get("label") or "")
     best = str(scenarios.get("best_plan_name") or "").lower()
     assert "backend" in best or "бэкенд" in best
+    full = wrap_fresh_analysis(full, profile)
+    full = accept_role_confirmation(full)
     pub = public_analysis_payload(full)
     assert pub.get("inferred_profession", {}).get("label")
     mts = pub.get("mts_matrix", {}).get("rows") or []
@@ -78,6 +86,7 @@ def test_it_backend_track_from_technical_answers() -> None:
 
 def test_public_payload_omits_internal_keys() -> None:
     full = build_analysis_result({}, {}, "other", "—", "medium", _answers_15())
+    full = accept_role_confirmation(wrap_fresh_analysis(full, {}))
     pub = public_analysis_payload(full)
     assert "profile_summary" not in pub
     assert "directions_hint" not in pub

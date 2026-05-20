@@ -1184,6 +1184,89 @@
         .analysis-spoiler__body > .advice-sec-spoiler:last-child {
             margin-bottom: 0;
         }
+        .role-confirm-card {
+            margin: 12px 0 20px;
+            padding: 18px 16px;
+            border: 1px solid var(--accent-border);
+            border-radius: var(--radius-lg);
+            background: color-mix(in srgb, var(--accent-soft) 35%, var(--card));
+            box-shadow: var(--shadow-card);
+        }
+        .role-confirm-kicker {
+            margin: 0 0 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--accent-dark);
+        }
+        .role-confirm-lead {
+            margin: 0 0 4px;
+            font-size: 0.88rem;
+            color: var(--text-muted);
+        }
+        .role-confirm-title {
+            margin: 0 0 6px;
+            font-size: 1.15rem;
+            font-weight: 700;
+            line-height: 1.3;
+            color: var(--text);
+        }
+        .role-confirm-pct {
+            margin: 0 0 12px;
+            font-size: 1.05rem;
+            color: var(--accent-dark);
+            font-family: var(--font-mono);
+        }
+        .role-confirm-pct-suffix {
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+        .role-confirm-desc {
+            margin: 0 0 16px;
+            font-size: 0.88rem;
+            line-height: 1.55;
+            color: var(--text);
+        }
+        .role-confirm-subjects {
+            margin: 0 0 14px;
+            padding-left: 18px;
+            font-size: 0.85rem;
+            line-height: 1.45;
+        }
+        .role-confirm-path {
+            margin: 0 0 14px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+        .role-confirm-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .role-confirm-feedback {
+            margin-top: 4px;
+        }
+        .role-confirm-feedback label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        .role-confirm-feedback textarea {
+            width: 100%;
+            min-height: 88px;
+            margin-bottom: 10px;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-family: var(--font);
+            font-size: 0.88rem;
+            line-height: 1.45;
+            resize: vertical;
+            box-sizing: border-box;
+        }
         .multiselect-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
         .radio-list {
             display: flex;
@@ -2123,6 +2206,114 @@
             max-width: 100%;
             overflow-wrap: anywhere;
         }
+        .anydo-path {
+            margin-bottom: 20px;
+            padding: 14px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+        }
+        .anydo-path__head {
+            margin-bottom: 14px;
+        }
+        .anydo-path__title {
+            font-size: 1rem;
+            font-weight: 700;
+            margin: 0 0 8px;
+        }
+        .anydo-progress {
+            height: 8px;
+            border-radius: 999px;
+            background: var(--border);
+            overflow: hidden;
+            margin: 8px 0 6px;
+        }
+        .anydo-progress__fill {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, var(--accent), #6ee7b7);
+            transition: width 0.25s ease;
+        }
+        .anydo-progress__meta {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 14px;
+        }
+        .anydo-steps {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .anydo-step {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            transition: opacity 0.2s, border-color 0.2s;
+        }
+        .anydo-step.is-done {
+            border-color: rgba(110, 231, 183, 0.35);
+            background: rgba(110, 231, 183, 0.06);
+        }
+        .anydo-step.is-active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px rgba(110, 231, 183, 0.15);
+        }
+        .anydo-step.is-locked {
+            opacity: 0.55;
+            pointer-events: none;
+        }
+        .anydo-step__check {
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
+            margin-top: 2px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+        .anydo-step.is-locked .anydo-step__check {
+            cursor: not-allowed;
+        }
+        .anydo-step__body {
+            flex: 1;
+            min-width: 0;
+        }
+        .anydo-step__title {
+            font-size: 0.92rem;
+            font-weight: 600;
+            margin: 0 0 4px;
+            line-height: 1.35;
+        }
+        .anydo-step__meta {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin: 0 0 6px;
+        }
+        .anydo-step__goal {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin: 0 0 8px;
+            line-height: 1.45;
+        }
+        .anydo-step__resources .learn-path-resource {
+            margin-top: 6px;
+        }
+        .anydo-next-wrap {
+            margin-top: 14px;
+            text-align: center;
+        }
+        .anydo-next-wrap .btn-primary {
+            width: 100%;
+            max-width: 320px;
+        }
         .sim-day-recap pre {
             max-width: 100%;
             overflow-x: auto;
@@ -2775,7 +2966,7 @@
     const SECTION_TABS = [
         { id: 'profile', label: 'Профиль', short: 'Анкета', snIco: '◇', ico: '📋' },
         { id: 'test', label: 'Тестирование', short: 'Тест', snIco: '☑', ico: '🎯' },
-        { id: 'analysis', label: 'Разбор', short: 'Разбор', snIco: '📊', ico: '📊' },
+        { id: 'analysis', label: 'Путь', short: 'Путь', snIco: '🛤', ico: '🛤' },
         { id: 'chat', label: 'Чат с ИИ', short: 'ИИ', snIco: '💬', ico: '🤖' },
         { id: 'jobs', label: 'Вакансии', short: 'Вакансии', snIco: '▦', ico: '💼' },
     ];
@@ -2860,6 +3051,9 @@
     let analysisCheckDone = false;
     let cachedAnalysisPayload = null;
     let cachedAnalysisUserId = null;
+    let analysisRoleRejectUi = false;
+    /** Подвкладка «Путь»: steps | analysis (сбрасывается при входе на вкладку). */
+    let pathSubTab = 'analysis';
 
     function clearAnalysisCache() {
         cachedAnalysisPayload = null;
@@ -3372,7 +3566,7 @@
             home: 'Главная страница приложения: выбор раздела.',
             profile: 'Анкета: база, желаемый формат работы, что сейчас важнее — для чата и плана.',
             test: 'Ответьте честно: так точнее разбор по сфере.',
-            analysis: 'Метрики, сценарии и план роста в одном месте.',
+            analysis: 'Шаги развития и разбор с метриками — две вкладки внутри раздела.',
             chat: 'ИИ опирается на ваш сохранённый разбор.',
             jobs: 'Подбор с hh.ru и симулятор рабочего дня — два режима в одном разделе.',
             account: 'Почта, направление из анкеты и смена пароля.',
@@ -4471,7 +4665,7 @@
         const summaryInner =
             sh && sh.buildQuizSummaryHtml
                 ? sh.buildQuizSummaryHtml(blocks, savedQuizAnswersMap, esc, {
-                      lead: 'Тест сохранён. Разбор — на вкладке «Разбор».',
+                      lead: 'Тест сохранён. Путь и разбор — на вкладке «Путь».',
                   })
                 : '<p class="muted">Тест пройден.</p>';
         const spheres = schema.interest_spheres || [];
@@ -4492,7 +4686,7 @@
             '<div class="profile-shell"><div class="profile-card profile-complete">' +
             summaryInner +
             '<div class="profile-complete-actions">' +
-            '<button type="button" class="btn-secondary" id="btnTestOpenAnalysis">Открыть разбор</button>' +
+            '<button type="button" class="btn-secondary" id="btnTestOpenAnalysis">Открыть путь</button>' +
             '<button type="button" class="btn-secondary" id="btnTestRetake">Пройти заново</button>' +
             '</div></div></div>';
         document.getElementById('btnTestOpenAnalysis').onclick = async function () {
@@ -5314,6 +5508,7 @@
                     });
                     const data = await r.json();
                     if (!r.ok) throw new Error(data.detail || 'Ошибка');
+                    analysisRoleRejectUi = false;
                     cachedAnalysisPayload = data;
                     cachedAnalysisUserId = userId;
                     hasSavedAnalysis = true;
@@ -5328,7 +5523,7 @@
                         testSphereSelection ||
                         null;
                     await renderTestTab();
-                    showAppAlert('Тест сохранён. Разбор — на вкладке «Разбор».', 'Готово');
+                    showAppAlert('Тест сохранён. Путь — на вкладке «Путь».', 'Готово');
                 } catch (e) {
                     showAppAlert(String(e.message || e), 'Ошибка');
                     await renderTestTab();
@@ -5465,17 +5660,413 @@
         return h;
     }
 
-    function buildAnalysisTabHtml(d) {
+    function isRoleConfirmationPending(d) {
+        const rc = d && d.role_confirmation;
+        return !!(rc && rc.status === 'pending');
+    }
+
+    function buildRoleConfirmationHtml(d) {
+        const rc = d.role_confirmation || {};
+        const p = rc.proposal || {};
+        const isSchool = p.mode === 'school' || d.analysis_mode === 'school';
+        let html = '<h2>Путь</h2>';
+        html +=
+            '<p class="muted" style="font-size:.88rem;margin:0 0 12px">Сначала подтвердите направление — после этого откроются шаги развития и полный разбор с метриками.</p>';
+        html += '<p class="analysis-ts">Обновлено: ' + esc(d.analyzed_at || '') + '</p>';
+        html += '<div class="role-confirm-card" id="roleConfirmCard">';
+        if (isSchool) {
+            html += '<p class="role-confirm-kicker">Предложение: сфера и предметы</p>';
+            html +=
+                '<div class="role-confirm-pct">Совпадение: <strong>' +
+                esc(String(p.match_percent != null ? p.match_percent : '—')) +
+                '%</strong></div>';
+            html += '<h3 class="role-confirm-title">' + esc(p.sphere_label || 'Сфера интересов') + '</h3>';
+            const subs = p.exam_subjects || [];
+            if (subs.length) {
+                html += '<ul class="role-confirm-subjects">';
+                for (let si = 0; si < subs.length; si++) {
+                    html += '<li>' + esc(subs[si].label || subs[si].id || '') + '</li>';
+                }
+                html += '</ul>';
+            }
+            if (p.path_label) {
+                html +=
+                    '<p class="role-confirm-path"><strong>Маршрут:</strong> ' + esc(p.path_label) + '</p>';
+            }
+        } else {
+            html += '<p class="role-confirm-kicker">Предложение по роли</p>';
+            html += '<p class="role-confirm-lead">Вам подходит роль</p>';
+            html += '<h3 class="role-confirm-title">' + esc(p.label || 'Направление') + '</h3>';
+            html +=
+                '<div class="role-confirm-pct">на <strong>' +
+                esc(String(p.match_percent != null ? p.match_percent : '—')) +
+                '%</strong></div>';
+        }
+        html += '<p class="role-confirm-desc">' + esc(p.description || '') + '</p>';
+        if (analysisRoleRejectUi) {
+            const rejectPh = isSchool
+                ? 'Например: не хочу сдавать информатику, айти не нравится, но хочу ЕГЭ по математике и русскому…'
+                : 'Например: не хочу бэкенд, больше нравится интерфейсы и визуал…';
+            html +=
+                '<div class="role-confirm-feedback">' +
+                '<label for="roleRejectFeedback">Что не подходит?</label>' +
+                '<textarea id="roleRejectFeedback" placeholder="' +
+                esc(rejectPh) +
+                '"></textarea>' +
+                '<div class="role-confirm-actions">' +
+                '<button type="button" class="btn-primary" id="roleRejectSubmit">Подобрать другое</button>' +
+                '<button type="button" class="btn-secondary" id="roleRejectCancel">Назад</button>' +
+                '</div></div>';
+        } else {
+            html +=
+                '<div class="role-confirm-actions">' +
+                '<button type="button" class="btn-primary" id="roleAcceptBtn">Подходит</button>' +
+                '<button type="button" class="btn-secondary" id="roleRejectBtn">Не подходит</button>' +
+                '</div>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    async function postRoleAccept() {
+        const res = await fetchJson(
+            '/vibework/analysis/' + encodeURIComponent(userId) + '/role/accept',
+            { method: 'POST' }
+        );
+        const data = await res.json();
+        if (!res.ok) {
+            let det = data.detail;
+            if (typeof det === 'object') det = JSON.stringify(det);
+            throw new Error(String(det || 'Не удалось подтвердить'));
+        }
+        analysisRoleRejectUi = false;
+        cachedAnalysisPayload = data;
+        cachedAnalysisUserId = userId;
+        return data;
+    }
+
+    async function postRoleReject(feedback) {
+        const res = await fetchJson(
+            '/vibework/analysis/' + encodeURIComponent(userId) + '/role/reject',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ feedback: feedback })
+            }
+        );
+        const data = await res.json();
+        if (!res.ok) {
+            let det = data.detail;
+            if (typeof det === 'object') det = JSON.stringify(det);
+            throw new Error(String(det || 'Не удалось подобрать другое'));
+        }
+        analysisRoleRejectUi = false;
+        cachedAnalysisPayload = data;
+        cachedAnalysisUserId = userId;
+        return data;
+    }
+
+    function wireRoleConfirmation(root) {
+        const acceptBtn = root.querySelector('#roleAcceptBtn');
+        const rejectBtn = root.querySelector('#roleRejectBtn');
+        const submitBtn = root.querySelector('#roleRejectSubmit');
+        const cancelBtn = root.querySelector('#roleRejectCancel');
+        if (acceptBtn) {
+            acceptBtn.onclick = async function () {
+                acceptBtn.disabled = true;
+                if (rejectBtn) rejectBtn.disabled = true;
+                try {
+                    const data = await postRoleAccept();
+                    pathSubTab = 'steps';
+                    root.innerHTML = buildAnalysisTabHtml(data);
+                    wirePathSubtabs(root, data);
+                    wirePathStepsActions(root, data);
+                } catch (e) {
+                    alert(e.message || String(e));
+                    acceptBtn.disabled = false;
+                    if (rejectBtn) rejectBtn.disabled = false;
+                }
+            };
+        }
+        if (rejectBtn) {
+            rejectBtn.onclick = function () {
+                analysisRoleRejectUi = true;
+                root.innerHTML = buildRoleConfirmationHtml(cachedAnalysisPayload);
+                wireRoleConfirmation(root);
+                const ta = root.querySelector('#roleRejectFeedback');
+                if (ta) ta.focus();
+            };
+        }
+        if (cancelBtn) {
+            cancelBtn.onclick = function () {
+                analysisRoleRejectUi = false;
+                root.innerHTML = buildRoleConfirmationHtml(cachedAnalysisPayload);
+                wireRoleConfirmation(root);
+            };
+        }
+        if (submitBtn) {
+            submitBtn.onclick = async function () {
+                const ta = root.querySelector('#roleRejectFeedback');
+                const fb = ta ? String(ta.value || '').trim() : '';
+                if (fb.length < 3) {
+                    alert('Напишите, что именно не подходит (хотя бы несколько слов).');
+                    return;
+                }
+                submitBtn.disabled = true;
+                if (cancelBtn) cancelBtn.disabled = true;
+                try {
+                    const data = await postRoleReject(fb);
+                    root.innerHTML = buildRoleConfirmationHtml(data);
+                    wireRoleConfirmation(root);
+                } catch (e) {
+                    alert(e.message || String(e));
+                    submitBtn.disabled = false;
+                    if (cancelBtn) cancelBtn.disabled = false;
+                }
+            };
+        }
+    }
+
+
+    function syncPathSubTabForPayload(d) {
+        pathSubTab = isRoleConfirmationPending(d) ? 'analysis' : 'steps';
+    }
+
+    function buildPathSubtabBar(activeSub) {
+        const stepsCls = activeSub === 'steps' ? ' active' : '';
+        const analCls = activeSub === 'analysis' ? ' active' : '';
+        return (
+            '<div class="subtab-bar path-subtab-bar" role="tablist" aria-label="Разделы пути">' +
+            '<button type="button" class="subtab' +
+            stepsCls +
+            '" data-path-sub="steps" role="tab" aria-selected="' +
+            (activeSub === 'steps' ? 'true' : 'false') +
+            '">Шаги действия</button>' +
+            '<button type="button" class="subtab' +
+            analCls +
+            '" data-path-sub="analysis" role="tab" aria-selected="' +
+            (activeSub === 'analysis' ? 'true' : 'false') +
+            '">Разбор</button>' +
+            '</div>'
+        );
+    }
+
+    function wirePathSubtabs(root, d) {
+        root.querySelectorAll('[data-path-sub]').forEach(function (btn) {
+            btn.onclick = function () {
+                pathSubTab = btn.getAttribute('data-path-sub') || 'steps';
+                root.querySelectorAll('[data-path-sub]').forEach(function (b) {
+                    b.classList.toggle('active', b === btn);
+                    b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+                });
+                const panel = root.querySelector('#pathSubPanel');
+                if (!panel) return;
+                panel.innerHTML =
+                    pathSubTab === 'analysis'
+                        ? buildPathAnalysisMetricsHtml(d)
+                        : buildPathStepsActionHtml(d);
+                if (pathSubTab === 'steps') {
+                    wirePathStepsActions(root, d);
+                }
+            };
+        });
+    }
+
+    async function postLearningStepStatus(pathId, stepId, status) {
+        const res = await fetchJson(
+            '/vibework/learning/progress/' + encodeURIComponent(userId),
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path_id: pathId, step_id: stepId, status: status })
+            }
+        );
+        const data = await res.json();
+        if (!res.ok) {
+            let det = data.detail;
+            if (typeof det === 'object') det = JSON.stringify(det);
+            throw new Error(String(det || 'Не удалось сохранить прогресс'));
+        }
+        if (data.learning_path && cachedAnalysisPayload) {
+            cachedAnalysisPayload = Object.assign({}, cachedAnalysisPayload, {
+                learning_path: data.learning_path
+            });
+        }
+        return data.learning_path || null;
+    }
+
+    function renderLearningPathAnyDo(lp) {
+        const pathId = String(lp.path_id || '');
+        const steps = lp.steps || [];
+        if (!pathId || !steps.length) {
+            return '';
+        }
+        const metrics = lp.metrics || {};
+        const pct = metrics.coverage_percent != null ? metrics.coverage_percent : 0;
+        const doneN = metrics.completed_steps != null ? metrics.completed_steps : 0;
+        const total = metrics.total_steps != null ? metrics.total_steps : steps.length;
+        const curIdx = metrics.current_step_index != null ? metrics.current_step_index : 0;
+        let html =
+            '<div class="anydo-path" id="anydoPath" data-path-id="' +
+            esc(pathId) +
+            '"><div class="anydo-path__head">';
+        html += '<h3 class="anydo-path__title">' + esc(lp.title || 'Путь развития') + '</h3>';
+        html +=
+            '<div class="anydo-progress" role="progressbar" aria-valuenow="' +
+            esc(String(pct)) +
+            '" aria-valuemin="0" aria-valuemax="100">' +
+            '<div class="anydo-progress__fill" style="width:' +
+            Math.min(100, Math.max(0, pct)) +
+            '%"></div></div>';
+        html +=
+            '<div class="anydo-progress__meta"><span>Выполнение: <strong>' +
+            esc(String(pct)) +
+            '%</strong></span><span>Сделано: <strong>' +
+            esc(String(doneN)) +
+            '</strong> из ' +
+            esc(String(total)) +
+            '</span><span>Текущий этап: <strong>' +
+            esc(String(Math.min(curIdx + 1, total))) +
+            '</strong></span></div></div>';
+        html += '<ul class="anydo-steps">';
+        for (let si = 0; si < steps.length; si++) {
+            const st = steps[si];
+            const stStatus = st.status || 'pending';
+            const isDone = stStatus === 'done';
+            const isActive = si === curIdx && !isDone;
+            const isLocked = si > curIdx;
+            let cls = 'anydo-step';
+            if (isDone) cls += ' is-done';
+            if (isActive) cls += ' is-active';
+            if (isLocked) cls += ' is-locked';
+            const stepId = String(st.step_id || '');
+            html +=
+                '<li class="' +
+                cls +
+                '" data-step-id="' +
+                esc(stepId) +
+                '" data-step-index="' +
+                si +
+                '">';
+            html +=
+                '<input type="checkbox" class="anydo-step__check" aria-label="Отметить этап выполненным"' +
+                (isDone ? ' checked' : '') +
+                (isLocked ? ' disabled' : '') +
+                ' />';
+            html += '<div class="anydo-step__body">';
+            html += '<div class="anydo-step__title">' + esc(String(st.order || si + 1) + '. ' + (st.title || 'Шаг')) + '</div>';
+            if (st.duration_hint) {
+                html += '<div class="anydo-step__meta">Срок: ' + esc(String(st.duration_hint)) + '</div>';
+            }
+            if (st.goal) {
+                html += '<p class="anydo-step__goal">' + esc(String(st.goal)) + '</p>';
+            }
+            const resList = st.resources || [];
+            if (resList.length) {
+                html += '<div class="anydo-step__resources">';
+                for (let ri = 0; ri < resList.length; ri++) {
+                    html += renderLearnResourceSpoiler(resList[ri], 'inline');
+                }
+                html += '</div>';
+            }
+            html += '</div></li>';
+        }
+        html += '</ul>';
+        const curStep = steps[curIdx];
+        const showNext =
+            curStep &&
+            (curStep.status || 'pending') === 'done' &&
+            curIdx < steps.length - 1;
+        if (showNext) {
+            html +=
+                '<div class="anydo-next-wrap"><button type="button" class="btn-primary" id="anydoNextStepBtn">Следующий этап</button></div>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    function refreshPathStepsSubpanel(root, d) {
+        const panel = root.querySelector('#pathSubPanel');
+        if (!panel || pathSubTab !== 'steps') return;
+        panel.innerHTML = buildPathStepsActionHtml(d);
+        wirePathStepsActions(root, d);
+    }
+
+    function wirePathStepsActions(root, d) {
+        const wrap = root.querySelector('#anydoPath');
+        if (!wrap || !d) return;
+        const pathId = wrap.getAttribute('data-path-id') || '';
+        const lp = d.learning_path || {};
+        const steps = lp.steps || [];
+
+        wrap.querySelectorAll('.anydo-step').forEach(function (row) {
+            const check = row.querySelector('.anydo-step__check');
+            if (!check || check.disabled) return;
+            check.onchange = async function () {
+                const stepId = row.getAttribute('data-step-id') || '';
+                if (!stepId || !pathId) return;
+                const wantDone = !!check.checked;
+                check.disabled = true;
+                try {
+                    const updated = await postLearningStepStatus(
+                        pathId,
+                        stepId,
+                        wantDone ? 'done' : 'pending'
+                    );
+                    if (updated && cachedAnalysisPayload) {
+                        cachedAnalysisPayload.learning_path = updated;
+                        d = cachedAnalysisPayload;
+                    }
+                    refreshPathStepsSubpanel(root, d);
+                } catch (e) {
+                    check.checked = !wantDone;
+                    alert(e.message || String(e));
+                    check.disabled = false;
+                }
+            };
+        });
+
+        const nextBtn = root.querySelector('#anydoNextStepBtn');
+        if (nextBtn) {
+            nextBtn.onclick = async function () {
+                const metrics = lp.metrics || {};
+                const curIdx = metrics.current_step_index != null ? metrics.current_step_index : 0;
+                const next = steps[curIdx + 1];
+                if (!next) return;
+                nextBtn.disabled = true;
+                try {
+                    const updated = await postLearningStepStatus(
+                        pathId,
+                        String(next.step_id || ''),
+                        'in_progress'
+                    );
+                    if (updated && cachedAnalysisPayload) {
+                        cachedAnalysisPayload.learning_path = updated;
+                        d = cachedAnalysisPayload;
+                    }
+                    refreshPathStepsSubpanel(root, d);
+                    const panel = root.querySelector('#pathSubPanel');
+                    const target = panel && panel.querySelector('.anydo-step.is-active');
+                    if (target && target.scrollIntoView) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                } catch (e) {
+                    alert(e.message || String(e));
+                    nextBtn.disabled = false;
+                }
+            };
+        }
+    }
+
+    function buildPathAnalysisMetricsHtml(d) {
             const schoolMode = d.analysis_mode === 'school';
             const axes = (d.style_radar && d.style_radar.axes) || [];
             const prepLevel = (cachedProfile && cachedProfile.preparation_level) || '';
-            let html = '<h2>Автоматический разбор</h2>';
+            let html = '';
             if (schoolMode) {
                 html +=
                     '<p class="muted" style="font-size:.88rem;margin:0 0 12px">Школьный разбор: <strong>куда идти учиться</strong> и что подтянуть по предметам. Без карьерных треков и вакансий.</p>';
             }
-            html += '<p class="analysis-ts">Разбор: ' + esc(d.analyzed_at || '') + '</p>';
-
             let summaryInner = '';
             if (d.readiness) {
                 const rv = d.readiness.value_percent != null ? d.readiness.value_percent : 0;
@@ -5542,32 +6133,6 @@
                     );
                 }
                 html += analysisBlock(analysisSummaryTitle(gapTitle, gap.bars.length + ' показателя'), gapBody, { root: true });
-            }
-            const pain = d.pain_focus;
-            if (pain && (pain.summary || pain.label)) {
-                let painBody = '';
-                if (pain.label) {
-                    painBody +=
-                        '<p class="pain-focus-tag" style="margin:0 0 10px;font-size:.88rem"><strong>' +
-                        esc(pain.label) +
-                        '</strong></p>';
-                }
-                if (pain.summary) {
-                    painBody +=
-                        '<p class="pain-focus-summary muted" style="margin:0 0 12px;font-size:.88rem;line-height:1.55">' +
-                        esc(pain.summary) +
-                        '</p>';
-                }
-                const tips = pain.tips || [];
-                for (let pi = 0; pi < tips.length; pi++) {
-                    if (!tips[pi]) continue;
-                    painBody += analysisBlock(
-                        analysisSummaryTitle('Шаг ' + (pi + 1), truncHint(tips[pi], 40)),
-                        '<p class="muted" style="margin:0;font-size:.85rem;line-height:1.5">' + esc(tips[pi]) + '</p>',
-                        { nested: true, neverSpoiler: true }
-                    );
-                }
-                html += analysisBlock(analysisSummaryTitle('Фокус по вашей ситуации', pain.label || truncHint(pain.summary, 36)), painBody, { root: true });
             }
             if (d.ai_narrative) {
                 html += analysisBlock(
@@ -5654,6 +6219,41 @@
                     neverSpoiler: mts.length <= 5
                 });
             }
+            if (!html) {
+                html += '<p class="muted" style="font-size:.9rem;line-height:1.5">Метрики появятся после подтверждения направления.</p>';
+            }
+            return html;
+    }
+
+    function buildPathStepsActionHtml(d) {
+            let html =
+                '<p class="muted" style="font-size:.88rem;margin:0 0 12px">Отмечайте изученные этапы — выполнение растёт, следующие шаги открываются по порядку.</p>';
+            const pain = d.pain_focus;
+            if (pain && (pain.summary || pain.label)) {
+                let painBody = '';
+                if (pain.label) {
+                    painBody +=
+                        '<p class="pain-focus-tag" style="margin:0 0 10px;font-size:.88rem"><strong>' +
+                        esc(pain.label) +
+                        '</strong></p>';
+                }
+                if (pain.summary) {
+                    painBody +=
+                        '<p class="pain-focus-summary muted" style="margin:0 0 12px;font-size:.88rem;line-height:1.55">' +
+                        esc(pain.summary) +
+                        '</p>';
+                }
+                const tips = pain.tips || [];
+                for (let pi = 0; pi < tips.length; pi++) {
+                    if (!tips[pi]) continue;
+                    painBody += analysisBlock(
+                        analysisSummaryTitle('Шаг ' + (pi + 1), truncHint(tips[pi], 40)),
+                        '<p class="muted" style="margin:0;font-size:.85rem;line-height:1.5">' + esc(tips[pi]) + '</p>',
+                        { nested: true, neverSpoiler: true }
+                    );
+                }
+                html += analysisBlock(analysisSummaryTitle('Фокус по вашей ситуации', pain.label || truncHint(pain.summary, 36)), painBody, { root: true });
+            }
             const learnCards = d.learning || [];
             if (learnCards.length) {
                 let learnBody =
@@ -5664,49 +6264,9 @@
                 html += analysisBlock(analysisSummaryTitle('Материалы и ссылки', learnCards.length + ' ресурса'), learnBody, { root: true });
             }
             const lp = d.learning_path || {};
-            const lpMetrics = lp.metrics || {};
-            const lpSteps = lp.steps || [];
-            if (lp.path_id && lpSteps.length) {
-                let lpBody = '';
-                if (lpMetrics.coverage_percent != null) {
-                    lpBody +=
-                        '<p class="muted" style="margin:0 0 12px;font-size:.88rem">Прогресс: <strong>' +
-                        esc(String(lpMetrics.coverage_percent)) +
-                        '%</strong> · шаг ' +
-                        esc(String((lpMetrics.current_step_index || 0) + 1)) +
-                        ' из ' +
-                        esc(String(lpMetrics.total_steps || lpSteps.length)) +
-                        '</p>';
-                }
-                for (let si = 0; si < lpSteps.length; si++) {
-                    const st = lpSteps[si];
-                    const stStatus = st.status || 'pending';
-                    const statusLbl =
-                        stStatus === 'done' ? '✓ сделано' : stStatus === 'in_progress' ? 'в работе' : 'ожидает';
-                    let stepBody = '';
-                    if (st.goal) {
-                        stepBody +=
-                            '<p class="muted" style="margin:0 0 6px;font-size:.82rem">' + esc(String(st.goal)) + '</p>';
-                    }
-                    if (st.duration_hint) {
-                        stepBody +=
-                            '<p class="muted" style="margin:0 0 8px;font-size:.78rem">Срок: ' + esc(String(st.duration_hint)) + '</p>';
-                    }
-                    const resList = st.resources || [];
-                    for (let ri = 0; ri < resList.length; ri++) {
-                        stepBody += renderLearnResourceSpoiler(resList[ri], 'inline');
-                    }
-                    lpBody += analysisBlock(
-                        analysisSummaryTitle(String(st.order || si + 1) + '. ' + (st.title || 'Шаг'), statusLbl),
-                        stepBody,
-                        { nested: true }
-                    );
-                }
-                html += analysisBlock(
-                    analysisSummaryTitle(lp.title || 'Путь развития', lpSteps.length + ' шагов'),
-                    lpBody,
-                    { root: true }
-                );
+            const anydoHtml = renderLearningPathAnyDo(lp);
+            if (anydoHtml) {
+                html += anydoHtml;
             }
             const adv = d.individual_advice && d.individual_advice.by_plan;
             if (adv && typeof adv === 'object') {
@@ -5871,13 +6431,49 @@
                 }
                 html += analysisBlock(analysisSummaryTitle('Этапы роста', stages.length + ' этапа'), stagesBody, { root: true });
             }
-        return html;
+            if (html.indexOf('analysis-block') < 0 && html.indexOf('analysis-spoiler') < 0) {
+                html +=
+                    '<p class="muted" style="font-size:.9rem;line-height:1.5">Пока нет шагов — они появятся после подтверждения направления и обновления разбора.</p>';
+            }
+            return html;
+    }
+
+    function buildAnalysisTabHtml(d) {
+            if (isRoleConfirmationPending(d)) {
+                return buildRoleConfirmationHtml(d);
+            }
+            const sub = pathSubTab === 'analysis' ? 'analysis' : 'steps';
+            let html = '<h2>Путь</h2>';
+            html +=
+                '<p class="muted" style="font-size:.88rem;margin:0 0 8px">Шаги развития и метрики разбора — в двух вкладках ниже.</p>';
+            html += '<p class="analysis-ts">Обновлено: ' + esc(d.analyzed_at || '') + '</p>';
+            html += buildPathSubtabBar(sub);
+            html +=
+                '<div id="pathSubPanel" class="path-sub-panel">' +
+                (sub === 'analysis'
+                    ? buildPathAnalysisMetricsHtml(d)
+                    : buildPathStepsActionHtml(d)) +
+                '</div>';
+            return html;
+        }
+
+    function mountPathTabContent(el, data) {
+        syncPathSubTabForPayload(data);
+        el.innerHTML = buildAnalysisTabHtml(data);
+        if (isRoleConfirmationPending(data)) {
+            wireRoleConfirmation(el);
+        } else {
+            wirePathSubtabs(el, data);
+            if (pathSubTab === 'steps') {
+                wirePathStepsActions(el, data);
+            }
+        }
     }
 
     async function renderAnalysisTab() {
         const el = document.getElementById('tabContent');
         if (cachedAnalysisPayload && cachedAnalysisUserId === userId) {
-            el.innerHTML = buildAnalysisTabHtml(cachedAnalysisPayload);
+            mountPathTabContent(el, cachedAnalysisPayload);
             fetchAnalysisPayload({ force: true })
                 .then(function (pack) {
                     if (
@@ -5886,23 +6482,25 @@
                         currentTab === 'analysis' &&
                         document.getElementById('tabContent') === el
                     ) {
-                        el.innerHTML = buildAnalysisTabHtml(pack.data);
+                        mountPathTabContent(el, pack.data);
                     }
                 })
                 .catch(function () {});
             return;
         }
-        el.innerHTML = loadingBlock('Загружаем разбор…', '');
+        el.innerHTML = loadingBlock('Загружаем путь…', '');
         try {
             const pack = await fetchAnalysisPayload({ force: true });
             if (pack.status === 404) {
-                el.innerHTML = '<h2>Разбор</h2><p class="muted">Сначала пройдите тест на вкладке «Тест» — появятся метрики, сценарии и план развития.</p>';
+                analysisRoleRejectUi = false;
+                el.innerHTML =
+                    '<h2>Путь</h2><p class="muted">Сначала пройдите тест на вкладке «Тест» — появятся шаги развития, метрики и сценарии.</p>';
                 return;
             }
             if (!pack.ok || !pack.data) {
-                throw new Error('Не удалось загрузить разбор');
+                throw new Error('Не удалось загрузить путь');
             }
-            el.innerHTML = buildAnalysisTabHtml(pack.data);
+            mountPathTabContent(el, pack.data);
         } catch (e) {
             el.innerHTML = '<p>' + esc(e.message) + '</p>';
         }
@@ -7413,7 +8011,7 @@
         let html =
             '<div class="hub-page">' +
             '<h2 class="hub-heading">Разделы</h2>' +
-            '<p class="hub-lead">Выберите блок — анкета, тесты, разбор, чат или вакансии (подбор и симулятор дня).</p>' +
+            '<p class="hub-lead">Выберите блок — анкета, тесты, путь, чат или вакансии (подбор и симулятор дня).</p>' +
             '<div class="hub-grid">';
         for (let i = 0; i < SECTION_TABS.length; i++) {
             const t = SECTION_TABS[i];

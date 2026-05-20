@@ -14,8 +14,13 @@ from wibe_work.questionnaire_fields import get_profile_schema
 from wibe_work.services.user_context import coach_profile_snippet, load_profile, parse_interest_spheres
 from wibe_work.services.career_analysis import (
     build_analysis_result,
-    public_analysis_payload,
     refresh_mts_matrix_in_snapshot,
+)
+from wibe_work.services.role_confirmation import (
+    accept_role_confirmation,
+    public_analysis_payload,
+    reject_role_and_regenerate,
+    wrap_fresh_analysis,
 )
 from wibe_work.services.learning.engine import build_learning_path_payload
 from wibe_work.services.learning.progress import set_step_status
@@ -204,6 +209,45 @@ async def quiz_analyze(user_id: str, request: Request, body: AnalyzeRequest):
         answers_dicts,
         question_timings_ms=body.question_timings_ms,
     )
+    full = wrap_fresh_analysis(full, profile)
+    _save_analysis_snapshot(user_id, full)
+    return public_analysis_payload(full)
+
+
+class RoleRejectBody(BaseModel):
+    feedback: str = Field(default="", max_length=2000)
+
+
+@miniapp_prefixed_router.post("/analysis/{user_id}/role/accept")
+async def analysis_role_accept(user_id: str, request: Request):
+    require_bearer_matches_user(request, user_id)
+    snap = _load_analysis_snapshot(user_id)
+    if not snap:
+        raise HTTPException(status_code=404, detail="Сначала пройдите тест и разбор")
+    profile = load_profile(user_id)
+    full = accept_role_confirmation(snap)
+    full["_profile_cache"] = dict(profile)
+    _save_analysis_snapshot(user_id, full)
+    return public_analysis_payload(full)
+
+
+@miniapp_prefixed_router.post("/analysis/{user_id}/role/reject")
+async def analysis_role_reject(user_id: str, request: Request, body: RoleRejectBody):
+    require_bearer_matches_user(request, user_id)
+    snap = _load_analysis_snapshot(user_id)
+    if not snap:
+        raise HTTPException(status_code=404, detail="Сначала пройдите тест и разбор")
+    fb = (body.feedback or "").strip()
+    if len(fb) < 3:
+        raise HTTPException(
+            status_code=400,
+            detail="Напишите, что именно не подходит (хотя бы несколько слов)",
+        )
+    profile = load_profile(user_id)
+    profile = dict(profile)
+    profile["_user_id"] = user_id
+    profile_extra = {"city": profile.get("city"), "age": profile.get("age")}
+    full = reject_role_and_regenerate(snap, profile, profile_extra, fb)
     _save_analysis_snapshot(user_id, full)
     return public_analysis_payload(full)
 
@@ -245,8 +289,13 @@ async def get_saved_analysis(user_id: str, request: Request):
         "age": profile.get("age"),
     }
     refreshed = refresh_mts_matrix_in_snapshot(snap, profile, profile_extra)
+    refreshed = wrap_fresh_analysis(refreshed, profile)
     if refreshed is not snap:
         _save_analysis_snapshot(user_id, refreshed)
+
+    rc = (refreshed.get("role_confirmation") or {}).get("status")
+    if rc != "accepted":
+        return public_analysis_payload(refreshed)
 
     lp = refreshed.get("learning_path")
     has_path = isinstance(lp, dict) and bool(lp.get("steps"))

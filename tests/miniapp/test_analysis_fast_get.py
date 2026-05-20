@@ -136,6 +136,43 @@ def test_get_analysis_skips_full_learning_rebuild(client: TestClient) -> None:
     assert body.get("learning_path", {}).get("path_id") == "it_backend_weak"
 
 
+def test_learning_progress_post_endpoint(client: TestClient) -> None:
+    uid, token = _register_user(client)
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    _save_snapshot(
+        uid,
+        {
+            "role_confirmation": {"status": "accepted"},
+            "learning_path": {
+                "path_id": "p_api",
+                "title": "Тест",
+                "steps": [
+                    {"step_id": "s1", "order": 1, "title": "Шаг 1", "status": "pending"},
+                    {"step_id": "s2", "order": 2, "title": "Шаг 2", "status": "pending"},
+                ],
+                "metrics": {
+                    "coverage_percent": 0,
+                    "completed_steps": 0,
+                    "current_step_index": 0,
+                    "total_steps": 2,
+                },
+            },
+        },
+    )
+    r = client.post(
+        f"/vibework/learning/progress/{uid}",
+        headers=headers,
+        json={"path_id": "p_api", "step_id": "s1", "status": "done"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    lp = body.get("learning_path") or {}
+    assert lp["metrics"]["completed_steps"] == 1
+    assert lp["metrics"]["coverage_percent"] == 50
+    assert lp["steps"][0]["status"] == "done"
+    assert lp["steps"][1]["status"] == "pending"
+
+
 def test_merge_learning_progress_updates_status() -> None:
     from wibe_work.services.learning.engine import merge_learning_progress_in_snapshot
     from wibe_work.services.learning.progress import set_step_status

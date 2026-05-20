@@ -160,14 +160,46 @@ def _boost_score_for_post_school_goal(name: str, goal: str) -> int:
     return 10 if any(k in low for k in kws) else 0
 
 
+def _path_conflicts_exclusions(
+    path_name: str,
+    *,
+    exclude_subject_ids: Set[str],
+    exclude_sphere_ids: Set[str],
+) -> bool:
+    low = path_name.lower()
+    if "informatics" in exclude_subject_ids and any(
+        k in low for k in ("информ", "программ", "it ", " айти")
+    ):
+        return True
+    if "math" in exclude_subject_ids and "матем" in low:
+        return True
+    if exclude_sphere_ids & {"it_dev", "data"} and any(
+        k in low for k in ("it", "информ", "программ", "данн", "аналит")
+    ):
+        return True
+    return False
+
+
 def pick_school_path_plans(
     profile: Dict[str, Any],
     interest: str,
     axes: List[Dict[str, Any]],
     fp: int,
+    *,
+    exclude_sphere_ids: Optional[Set[str]] = None,
+    exclude_subject_ids: Optional[Set[str]] = None,
 ) -> Dict[str, Any]:
     """Три маршрута A/B/C: куда учиться, не кем работать."""
+    ex_sp = set(exclude_sphere_ids or ())
+    ex_sub = set(exclude_subject_ids or ())
     dk = _interest_key(interest)
+    if dk in ex_sp:
+        for alt in parse_interest_spheres(profile):
+            if alt not in ex_sp and alt in _SCHOOL_PATH_POOLS:
+                dk = alt
+                break
+        else:
+            dk = "default"
     pool = list(_SCHOOL_PATH_POOLS.get(dk, _SCHOOL_PATH_POOLS["default"]))
     track = resolve_assessment_track(profile)
     if track == "school_grade9":
@@ -183,9 +215,24 @@ def pick_school_path_plans(
         if p not in seen:
             seen.add(p)
             uniq.append(p)
+    filtered: List[str] = []
+    for p in uniq:
+        if _path_conflicts_exclusions(
+            p, exclude_subject_ids=ex_sub, exclude_sphere_ids=ex_sp
+        ):
+            continue
+        filtered.append(p)
+    if not filtered:
+        filtered = [
+            p
+            for p in _SCHOOL_PATH_POOLS["default"]
+            if not _path_conflicts_exclusions(
+                p, exclude_subject_ids=ex_sub, exclude_sphere_ids=ex_sp
+            )
+        ]
     scored = [
         (n, _score_path(n, dom, fp, i) + _boost_score_for_post_school_goal(n, goal))
-        for i, n in enumerate(uniq)
+        for i, n in enumerate(filtered)
     ]
     scored.sort(key=lambda x: -x[1])
     codes = ["A", "B", "C"]
@@ -223,12 +270,19 @@ def build_school_gap_analysis(
     top_path: str,
     axes: List[Dict[str, Any]],
     fp: int,
+    *,
+    exclude_subject_ids: Optional[Set[str]] = None,
 ) -> Dict[str, Any]:
     """«Разрыв» по предметам и подготовке, не по навыкам вакансии."""
+    ex_sub = set(exclude_subject_ids or ())
     dk = _interest_key(interest)
     subjects = list(_SCHOOL_GAP_BY_INTEREST.get(dk, _SCHOOL_GAP_BY_INTEREST["default"]))
+    if ex_sub:
+        subjects = [(sk, lab) for sk, lab in subjects if sk not in ex_sub]
     existing_labels = {lab for _, lab in subjects}
     for sid in parse_favorite_subjects(profile):
+        if sid in ex_sub:
+            continue
         label = SUBJECT_GAP_LABELS.get(sid)
         if label and label not in existing_labels:
             subjects.insert(0, (sid, label))
@@ -437,6 +491,7 @@ def school_learning_extras(
     profile_summary: str = "",
     user_id: str | None = None,
     eff_interest: str | None = None,
+    exclude_subject_ids: Optional[Set[str]] = None,
 ) -> dict[str, Any]:
     """Обучение для школьника: профориентация и бесплатные треки, без «резюме и откликов»."""
     from wibe_work.services.learning_pack import build_learning_extras
@@ -474,27 +529,41 @@ def school_learning_extras(
         + exam_note
         + " Добавьте один вводный курс/кружок по сфере на 2–3 недели."
     )
-    curated_cards = build_school_curated_learning_cards(profile, eff_interest or interest, gap)
+    curated_cards = build_school_curated_learning_cards(
+        profile,
+        eff_interest or interest,
+        gap,
+        exclude_subject_ids=set(exclude_subject_ids or ()),
+    )
     catalog_cards = pack.get("learning") or []
     pack["learning"] = merge_school_cards_with_catalog(curated_cards, catalog_cards)
 
-    stages = [
-        {
-            "title": "Шаг 1: профориентация",
-            "detail": "Зафиксируйте 2–3 варианта из сценариев A/B/C и обсудите с классным или родителями.",
-        },
-        {
-            "title": "Шаг 2: предметы и ЕГЭ/ОГЭ",
-            "detail": (
-                "Откройте материалы ФИПИ по вашим предметам и выберите один тренажёр из блока «Обучение». "
-                "На fipi.ru — кодификатор и открытый банк заданий."
-            ),
-        },
-        {
-            "title": "Шаг 3: проба сферы",
-            "detail": "Кружок, олимпиада или мини-проект — чтобы понять, нравится ли направление.",
-        },
-    ]
+    from wibe_work.services.learning.growth_stages import build_growth_stages
+    from wibe_work.services.school_subject_resources import build_school_learning_path_payload
+
+    school_lp = build_school_learning_path_payload(
+        user_id=user_id,
+        profile=profile,
+        interest=eff_interest or interest,
+        preparation_level=preparation_level,
+        scenarios=scenarios,
+        gap=gap,
+        exclude_subject_ids=set(exclude_subject_ids or ()),
+    )
+    pack["learning_path"] = school_lp
+    pack["learning_path_detail"] = school_lp
+    readiness = int(gap.get("overall_hp") or 50)
+    stages = build_growth_stages(
+        interest=interest,
+        eff_interest=eff_interest or interest,
+        preparation_level=preparation_level,
+        readiness_percent=readiness,
+        profile=profile,
+        gap=gap,
+        scenarios=scenarios,
+        individual_advice=pack.get("individual_advice"),
+        learning_path=school_lp,
+    )
     pack["individual_advice"] = advice
     pack["growth_stages"] = stages
     pack["growth_stages_rich"] = stages
