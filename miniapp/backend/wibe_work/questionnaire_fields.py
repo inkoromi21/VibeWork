@@ -5,6 +5,30 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 # Сферы для мультивыбора (до 5) — id совпадают с тестом и hh-подбором
+# id сферы анкеты → значение Interest в веб-API (тест, разбор, вакансии)
+SPHERE_TO_WEB_INTEREST: Dict[str, str] = {
+    "it_dev": "IT",
+    "marketing": "маркетинг",
+    "design": "дизайн",
+    "sales": "продажи",
+    "logistics": "логистика",
+    "medicine": "поддержка_и_сервис",
+    "education": "HR_и_рекрутинг",
+    "engineering": "инженерия",
+    "creative": "дизайн",
+    "sport": "бизнес",
+    "data": "данные_и_AI",
+    "mgmt": "бизнес",
+    "finance": "финансы_и_контроль",
+    "hr_edu": "HR_и_рекрутинг",
+    "other": "IT",
+}
+
+
+def sphere_to_web_interest(sphere_id: str) -> str:
+    return SPHERE_TO_WEB_INTEREST.get((sphere_id or "").strip(), "IT")
+
+
 INTEREST_SPHERES: List[Dict[str, str]] = [
     {"id": "it_dev", "label": "IT"},
     {"id": "marketing", "label": "Маркетинг"},
@@ -107,6 +131,7 @@ def get_profile_schema() -> Dict[str, Any]:
         "version": 2,
         "wizard": True,
         "interest_spheres": INTEREST_SPHERES,
+        "sphere_to_web_interest": dict(SPHERE_TO_WEB_INTEREST),
         "completion": {
             "required": list(COMPLETION_REQUIRED),
             "any_of": list(COMPLETION_ANY_OF),

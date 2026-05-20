@@ -68,6 +68,22 @@ class LinkTelegramBody(BaseModel):
     init_data: str = Field(..., min_length=1, description="Telegram WebApp initData")
 
 
+class NicknameBody(BaseModel):
+    nickname: str = Field(default="", max_length=80)
+
+    @field_validator("nickname", mode="before")
+    @classmethod
+    def strip_nick(cls, v: object) -> str:
+        if v is None:
+            return ""
+        return str(v).strip()
+
+
+class ChangePasswordBody(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 def _create_cookie_session(user_id: str) -> tuple[str, str]:
     """Return (raw_token, expires_iso). Stores hashed token in vibework_sessions."""
     raw = uuid.uuid4().hex + "_" + uuid.uuid4().hex
@@ -156,6 +172,15 @@ def _set_cookie(response: Response, token: str) -> None:
         max_age=SESSION_DAYS * 86400,
         path="/",
     )
+
+
+def _load_profile_row(user_id: str) -> dict[str, Any]:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM user_profiles WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+    return dict(row) if row else {}
 
 
 def _load_snapshot(user_id: str) -> dict[str, Any] | None:
@@ -271,7 +296,74 @@ async def me(vw_session: str | None = Cookie(default=None)):
         ).fetchone()
     email = str(row["email"]) if row and row["email"] is not None else None
     snap = _load_snapshot(user_id)
-    return {"authenticated": True, "email": email, "snapshot": snap}
+    prof = _load_profile_row(user_id)
+    nick = str(prof.get("nickname") or "").strip()
+    return {
+        "authenticated": True,
+        "user_id": user_id,
+        "email": email,
+        "nickname": nick or None,
+        "snapshot": snap,
+    }
+
+
+@router.patch("/account/nickname")
+async def patch_account_nickname(
+    body: NicknameBody,
+    user_id: str = Depends(require_user_id),
+):
+    nick = (body.nickname or "").strip()[:80]
+    with get_db() as conn:
+        existing = conn.execute(
+            "SELECT 1 FROM user_profiles WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE user_profiles SET nickname = ? WHERE user_id = ?",
+                (nick, user_id),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO user_profiles (user_id, nickname) VALUES (?, ?)",
+                (user_id, nick),
+            )
+        conn.commit()
+    return {"ok": True, "nickname": nick or None}
+
+
+@router.post("/account/change-password")
+async def post_account_change_password(
+    body: ChangePasswordBody,
+    user_id: str = Depends(require_user_id),
+):
+    cur_pw = sanitize_password_input(body.current_password)
+    new_pw = sanitize_password_input(body.new_password)
+    if len(new_pw) < 8:
+        raise HTTPException(
+            status_code=422,
+            detail="Новый пароль — не короче 8 символов.",
+        )
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT password_hash FROM email_users WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="Пароль можно менять только для аккаунта с входом по почте.",
+        )
+    if not _verify_password(cur_pw, str(row["password_hash"])):
+        raise HTTPException(status_code=401, detail="Текущий пароль указан неверно.")
+    new_hash = _hash_password(new_pw)
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE email_users SET password_hash = ? WHERE user_id = ?",
+            (new_hash, user_id),
+        )
+        conn.commit()
+    return {"ok": True}
 
 
 @router.put("/snapshot")

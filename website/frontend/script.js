@@ -7,6 +7,8 @@ const STORAGE_FOCUS_STREAK = "vibework_focus_streak_v2";
 window.lastAnalysis = null;
 window.serverLoggedIn = false;
 window.serverEmail = null;
+window.serverNickname = null;
+window.serverUserId = null;
 let chatMessages = [];
 /** Прогресс профиля в шапке — только после разбора (тест пройден) */
 let profileProgressUnlocked = false;
@@ -112,9 +114,13 @@ function updateStreakChip() {
 function updateAvatarBubble() {
   const el = document.getElementById("avatar-bubble");
   if (!el) return;
-  const sel = document.getElementById("field-interest");
-  const opt = sel?.selectedOptions?.[0];
-  const raw = (opt?.text || "VW").trim();
+  const sid = getPrimarySphereId();
+  let raw = "VW";
+  if (sid) {
+    const cb = document.querySelector('.sheet-multi[data-sheet-field="interest_spheres"][value="' + sid + '"]');
+    const lbl = cb?.closest(".sheet-multi-opt")?.querySelector("span");
+    raw = (lbl?.textContent || sid).trim();
+  }
   const initials = raw
     .split(/\s+/)
     .map((w) => w[0])
@@ -314,6 +320,7 @@ function setTab(name) {
   updateHeaderStepper(name);
   updateAvatarBubble();
   updateFlowUI();
+  if (name === "account" && window.serverLoggedIn) renderAccountPage();
   schedulePushServerSnapshot();
 }
 
@@ -333,17 +340,15 @@ function ensurePersonalityQuestionTimer(qid) {
 }
 
 function getPreparationLevel() {
-  const el = document.querySelector('input[name="preparation_level"]:checked');
-  const v = el?.value;
-  if (v === "слабый" || v === "сильный" || v === "средний") return v;
-  return "средний";
+  const sheet = collectSheetExtra();
+  return mapPreparationForApi(sheet.preparation_level);
 }
 
 async function fetchAndRenderQuiz() {
   const form = document.getElementById("diag-form");
   if (!form) return;
   const fd = new FormData(form);
-  const interest = String(fd.get("interest") || "IT");
+  const interest = getPrimaryQuizInterest();
   try {
     const url = new URL("/api/quiz/questions", window.location.origin);
     url.searchParams.set("interest", interest);
@@ -447,62 +452,95 @@ async function loadProfileSchema() {
   try {
     const r = await fetch("/api/profile/schema");
     if (!r.ok) throw new Error("schema");
-    const data = await r.json();
-    PROFILE_SCHEMA = Array.isArray(data) ? data : [];
+    PROFILE_SCHEMA = await r.json();
   } catch (_) {
-    PROFILE_SCHEMA = [];
+    PROFILE_SCHEMA = { version: 2, sections: [], completion: { required: [], any_of: [] } };
   }
   return PROFILE_SCHEMA;
 }
 
+function schemaSections() {
+  const s = PROFILE_SCHEMA?.sections;
+  return Array.isArray(s) ? s : [];
+}
+
+function sheetOptValue(o) {
+  return o?.id != null ? String(o.id) : String(o?.value ?? "");
+}
+
+function sheetFieldHint(f) {
+  const h = (f.help || "").trim();
+  return h ? `<p class="field-hint muted small">${esc(h)}</p>` : "";
+}
+
 function renderSheetField(f) {
-  /* Колонка «зачем» из таблицы хранится в схеме для бэкенда/ИИ — в интерфейсе не показываем. */
+  if (!f || f.type === "hidden") return "";
   const ph = f.placeholder ? esc(f.placeholder) : "";
+  const req = f.required ? ' <span class="req" aria-hidden="true">*</span>' : "";
+  const hint = sheetFieldHint(f);
   if (f.type === "text") {
-    return `<label class="field full sheet-field"><span>${esc(f.label)}</span><input type="text" data-sheet-field="${esc(f.id)}" placeholder="${ph}" autocomplete="off" /></label>`;
+    return `<label class="field full sheet-field"><span>${esc(f.label)}${req}</span><input type="text" data-sheet-field="${esc(f.id)}" placeholder="${ph}" autocomplete="off" />${hint}</label>`;
   }
   if (f.type === "number") {
-    return `<label class="field sheet-field"><span>${esc(f.label)}</span><input type="number" data-sheet-field="${esc(f.id)}" placeholder="${ph}" min="0" /></label>`;
+    const min = f.min != null ? ` min="${f.min}"` : ' min="0"';
+    const max = f.max != null ? ` max="${f.max}"` : "";
+    return `<label class="field sheet-field"><span>${esc(f.label)}${req}</span><input type="number" data-sheet-field="${esc(f.id)}" placeholder="${ph}"${min}${max} />${hint}</label>`;
   }
   if (f.type === "textarea") {
-    return `<label class="field full sheet-field"><span>${esc(f.label)}</span><textarea data-sheet-field="${esc(f.id)}" rows="2" placeholder="${ph}"></textarea></label>`;
+    const ml = f.max_length ? ` maxlength="${f.max_length}"` : "";
+    return `<label class="field full sheet-field"><span>${esc(f.label)}${req}</span><textarea data-sheet-field="${esc(f.id)}" rows="3" placeholder="${ph}"${ml}></textarea>${hint}</label>`;
   }
   if (f.type === "select" && f.options) {
-    const opts = f.options
-      .map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`)
-      .join("");
-    return `<label class="field full sheet-field"><span>${esc(f.label)}</span><select data-sheet-field="${esc(f.id)}">${opts}</select></label>`;
+    const opts = [
+      `<option value="">— выберите —</option>`,
+      ...f.options.map(
+        (o) => `<option value="${esc(sheetOptValue(o))}">${esc(o.label)}</option>`
+      ),
+    ].join("");
+    return `<label class="field full sheet-field"><span>${esc(f.label)}${req}</span><select data-sheet-field="${esc(f.id)}">${opts}</select>${hint}</label>`;
   }
   if (f.type === "multiselect" && f.options) {
-    const max = f.max || 5;
+    const maxN = f.max_select ?? f.max ?? 5;
     const opts = f.options
       .map(
         (o) =>
-          `<label class="sheet-multi-opt"><input type="checkbox" class="sheet-multi" data-sheet-field="${esc(f.id)}" value="${esc(o.value)}" /> <span>${esc(o.label)}</span></label>`
+          `<label class="sheet-multi-opt"><input type="checkbox" class="sheet-multi" data-sheet-field="${esc(f.id)}" value="${esc(sheetOptValue(o))}" /> <span>${esc(o.label)}</span></label>`
       )
       .join("");
-    return `<div class="field full sheet-field sheet-multigroup" data-multi-field="${esc(f.id)}" data-multi-max="${max}"><span>${esc(f.label)}</span><div class="sheet-multi-grid">${opts}</div></div>`;
+    return `<div class="field full sheet-field sheet-multigroup" data-multi-field="${esc(f.id)}" data-multi-max="${maxN}"><span>${esc(f.label)}${req}</span><div class="sheet-multi-grid">${opts}</div></div>`;
   }
-  if (f.type === "scale_1_5") {
-    const nums = [1, 2, 3, 4, 5];
+  if (f.type === "scale" || f.type === "scale_1_5") {
+    const lo = f.scale_min ?? 1;
+    const hi = f.scale_max ?? 5;
+    const def = f.default ?? 3;
+    const nums = [];
+    for (let n = lo; n <= hi; n += 1) nums.push(n);
     const radios = nums
       .map(
         (n) =>
-          `<label class="sheet-scale-opt"><input type="radio" name="sheet_sc_${esc(f.id)}" data-sheet-field="${esc(f.id)}" value="${n}" /> <span>${n}</span></label>`
+          `<label class="sheet-scale-opt"><input type="radio" name="sheet_sc_${esc(f.id)}" data-sheet-field="${esc(f.id)}" value="${n}"${n === def ? " checked" : ""} /> <span>${n}</span></label>`
       )
       .join("");
-    return `<div class="field full sheet-field"><span>${esc(f.label)}</span><div class="sheet-scale-row" role="radiogroup">${radios}</div></div>`;
+    return `<div class="field full sheet-field"><span>${esc(f.label)}</span><div class="sheet-scale-row" role="radiogroup">${radios}</div>${hint}</div>`;
   }
   return "";
 }
 
-function renderSheetProfileFromSchema(schema) {
+function renderSheetProfileFromSchema() {
   const root = document.getElementById("sheet-profile-root");
-  if (!root || !schema || !schema.length) return;
-  root.innerHTML = schema
+  const sections = schemaSections();
+  if (!root || !sections.length) return;
+  root.innerHTML = sections
     .map((sec) => {
-      const fields = (sec.fields || []).map(renderSheetField).join("");
-      return `<section class="sheet-section"><h3 class="sheet-section-title">${esc(sec.title)}</h3><div class="sheet-section-body">${fields}</div></section>`;
+      const fields = (sec.fields || []).map(renderSheetField).filter(Boolean).join("");
+      if (!fields) return "";
+      const opt = sec.optional
+        ? '<span class="sheet-section-badge muted small">по желанию</span>'
+        : "";
+      const sub = sec.subtitle
+        ? `<p class="sheet-section-sub muted small">${esc(sec.subtitle)}</p>`
+        : "";
+      return `<section class="sheet-section" data-section="${esc(sec.id || "")}"><div class="sheet-section-head"><h3 class="sheet-section-title">${esc(sec.title)}</h3>${opt}</div>${sub}<div class="sheet-section-body">${fields}</div></section>`;
     })
     .join("");
 
@@ -512,6 +550,8 @@ function renderSheetProfileFromSchema(schema) {
     wrap.querySelectorAll(".sheet-multi").forEach((cb) => {
       cb.addEventListener("change", () => {
         enforceMultiMax(fid, maxN);
+        if (fid === "interest_spheres") debouncedQuizReload();
+        updateAvatarBubble();
         scheduleSaveProfileDraft();
       });
     });
@@ -523,7 +563,82 @@ function renderSheetProfileFromSchema(schema) {
       scheduleSaveProfileDraft();
     });
   });
+
+  root.querySelectorAll("input[data-sheet-field], select[data-sheet-field], textarea[data-sheet-field]").forEach((el) => {
+    if (el.classList.contains("sheet-multi")) return;
+    const ev = el.tagName === "SELECT" || el.type === "radio" ? "change" : "input";
+    el.addEventListener(ev, scheduleSaveProfileDraft);
+  });
+
   syncEducationFromDetail();
+}
+
+function buildProfileForCompletion() {
+  const sheet = collectSheetExtra();
+  const p = { ...sheet };
+  if (Array.isArray(p.interest_spheres)) {
+    p.interest_spheres = JSON.stringify(p.interest_spheres);
+  }
+  if (p.age != null && p.age !== "") {
+    const a = parseInt(String(p.age), 10);
+    if (Number.isFinite(a)) p.age = a;
+  }
+  if (p.target_salary != null && p.target_salary !== "") {
+    const s = parseInt(String(p.target_salary), 10);
+    if (Number.isFinite(s)) p.target_salary = s;
+  }
+  if (p.hours_per_week != null && p.hours_per_week !== "") {
+    const h = parseInt(String(p.hours_per_week), 10);
+    if (Number.isFinite(h)) p.hours_per_week = h;
+  }
+  return p;
+}
+
+function fieldFilledClient(p, fieldId) {
+  const v = p[fieldId];
+  if (fieldId === "interest_spheres") {
+    if (Array.isArray(v) && v.length) return true;
+    if (typeof v === "string" && v.trim()) {
+      try {
+        const arr = JSON.parse(v);
+        return Array.isArray(arr) && arr.length > 0;
+      } catch (_) {
+        return true;
+      }
+    }
+    return Boolean((p.main_sphere || "").trim());
+  }
+  if (v == null || v === "") return false;
+  if (typeof v === "number") return Number.isFinite(v);
+  if (typeof v === "string") return Boolean(v.trim());
+  return true;
+}
+
+function getSphereToWebMap() {
+  return PROFILE_SCHEMA?.sphere_to_web_interest || {};
+}
+
+function getPrimarySphereId() {
+  const sheet = collectSheetExtra();
+  const spheres = sheet.interest_spheres;
+  if (Array.isArray(spheres) && spheres[0]) return String(spheres[0]);
+  return "";
+}
+
+function getPrimaryQuizInterest() {
+  const sid = getPrimarySphereId();
+  const map = getSphereToWebMap();
+  if (sid && map[sid]) return map[sid];
+  return "IT";
+}
+
+function mapPreparationForApi(levelId) {
+  const m = { weak: "слабый", medium: "средний", strong: "сильный" };
+  if (m[levelId]) return m[levelId];
+  const el = document.querySelector('input[name="preparation_level"]:checked');
+  const v = el?.value;
+  if (v === "слабый" || v === "сильный" || v === "средний") return v;
+  return "средний";
 }
 
 function enforceMultiMax(fieldId, maxN) {
@@ -558,7 +673,7 @@ async function ensureProfileSchemaRendered() {
   if (sheetProfileRendered) return;
   const root = document.getElementById("sheet-profile-root");
   if (root) {
-    renderSheetProfileFromSchema(PROFILE_SCHEMA || []);
+    renderSheetProfileFromSchema();
     sheetProfileRendered = true;
   }
 }
@@ -599,7 +714,17 @@ function collectSheetExtra() {
 function applySheetFieldValue(key, val) {
   const multiEls = document.querySelectorAll('.sheet-multi[data-sheet-field="' + key + '"]');
   if (multiEls.length) {
-    const set = new Set(Array.isArray(val) ? val.map(String) : [String(val)]);
+    let items = [];
+    if (Array.isArray(val)) items = val.map(String);
+    else if (typeof val === "string" && val.trim()) {
+      try {
+        const parsed = JSON.parse(val);
+        items = Array.isArray(parsed) ? parsed.map(String) : [val];
+      } catch (_) {
+        items = [val];
+      }
+    }
+    const set = new Set(items);
     multiEls.forEach((cb) => {
       cb.checked = set.has(cb.value);
     });
@@ -633,14 +758,17 @@ function applySheetFieldValue(key, val) {
 }
 
 function profileBasicsOk() {
-  const form = document.getElementById("diag-form");
-  if (!form) return false;
-  const fd = new FormData(form);
-  const age = parseInt(String(fd.get("age")), 10);
-  if (!Number.isFinite(age) || age < 14 || age > 30) return false;
-  if (!fd.get("interest") || !fd.get("education")) return false;
-  const det = document.querySelector('[data-sheet-field="education_detail"]');
-  if (det && det.tagName === "SELECT" && !String(det.value || "").trim()) return false;
+  const comp = PROFILE_SCHEMA?.completion;
+  if (!comp) return false;
+  const p = buildProfileForCompletion();
+  for (const fid of comp.required || []) {
+    if (!fieldFilledClient(p, fid)) return false;
+  }
+  for (const group of comp.any_of || []) {
+    if (!group.some((fid) => fieldFilledClient(p, fid))) return false;
+  }
+  const edu = document.getElementById("field-education-sync");
+  if (edu && !String(edu.value || "").trim()) return false;
   return true;
 }
 
@@ -783,7 +911,7 @@ function updateFlowUI() {
 
     const tag = document.getElementById("profile-tagline");
     if (tag && !window.lastAnalysis) {
-      if (!pOk) tag.textContent = "Сначала профиль: укажите возраст, сферу и уровень образования.";
+      if (!pOk) tag.textContent = "Заполните обязательные блоки анкеты: база, интересы и цели.";
       else if (!qOk) tag.textContent = "Профиль готов — откройте «Тест»: два блока (сфера + тип личности).";
       else tag.textContent = "Дозаполните оба теста — затем появится разбор и метрики.";
     } else if (tag && window.lastAnalysis) {
@@ -795,14 +923,14 @@ function updateFlowUI() {
       btn.textContent = "Сначала заполните профиль";
       btn.classList.remove("glow");
       hint.textContent =
-        "Шаг 1: укажите возраст, главную сферу и блок профиля (уровень образования).";
+        "Шаг 1: заполните анкету — возраст, город, образование, сферы (до 5), цели.";
       if (tf) tf.hidden = true;
       updateQuizMetricsVisibility();
       updateHeaderStepper(document.querySelector(".nav-pill.active, .tab-btn.active")?.dataset.tab || "profile");
       return;
     }
 
-    hint.textContent = "Профиль готов. Переходите к тесту — подставятся вопросы по выбранной сфере.";
+    hint.textContent = "Профиль готов. Переходите к тесту — вопросы по первой выбранной сфере.";
 
     if (!qOk) {
       btn.disabled = false;
@@ -838,14 +966,11 @@ function updateFlowUI() {
 function updateProfileProgress() {
   refreshProfileMetricsVisibility();
   if (!window.lastAnalysis) return;
-  const form = document.getElementById("diag-form");
-  const fd = new FormData(form);
   let pts = 0;
-  if (fd.get("age")) pts += 28;
-  if (fd.get("interest")) pts += 28;
-  if (fd.get("education")) pts += 28;
-  if (String(fd.get("motivation") || "").trim().length > 10) pts += 10;
-  if (document.querySelector('input[name="preparation_level"]:checked')) pts += 6;
+  if (profileBasicsOk()) pts += 84;
+  const sheet = collectSheetExtra();
+  if (String(sheet.motivation_ai || sheet.motivation || "").trim().length > 10) pts += 10;
+  if (sheet.preparation_level) pts += 6;
   const g = window.lastAnalysis.gap_analysis?.overall_hp;
   if (Number.isFinite(g)) pts = Math.min(100, Math.round((pts + g) / 2));
   else pts = Math.min(100, pts);
@@ -921,14 +1046,14 @@ function renderPersonalityQuiz() {
 
 function collectPayload() {
   const form = document.getElementById("diag-form");
-  const fd = new FormData(form);
   syncEducationFromDetail();
-  const age = parseInt(String(fd.get("age")), 10);
+  const extra = collectSheetExtra();
+  const age = parseInt(String(extra.age ?? ""), 10);
   if (!Number.isFinite(age) || age < 14 || age > 30) {
-    throw new Error("Укажите возраст от 14 до 30.");
+    throw new Error("Укажите возраст от 14 до 30 в профиле.");
   }
-  const interest = String(fd.get("interest"));
-  const education = String(fd.get("education") || "").trim();
+  const interest = getPrimaryQuizInterest();
+  const education = String(document.getElementById("field-education-sync")?.value || "").trim();
   if (!education) {
     throw new Error("Выберите уровень образования в блоке профиля.");
   }
@@ -955,10 +1080,9 @@ function collectPayload() {
   const skills = [];
   const question_timings = collectTimings();
   const personality_question_timings = collectPersonalityTimings();
-  const motivationRaw = String(fd.get("motivation") || "").trim();
+  const motivationRaw = String(extra.motivation_ai || extra.motivation || "").trim();
   const motivation = motivationRaw || null;
-  const preparation_level = getPreparationLevel();
-  const extra = collectSheetExtra();
+  const preparation_level = mapPreparationForApi(extra.preparation_level);
   const profile_extra = Object.keys(extra).length ? extra : null;
 
   return {
@@ -994,7 +1118,7 @@ function buildJobContextBlob() {
 function collectMatchBody() {
   const form = document.getElementById("diag-form");
   const fd = new FormData(form);
-  const interest = String(fd.get("interest"));
+  const interest = getPrimaryQuizInterest();
   const skills = skillsFromAnalysis(window.lastAnalysis);
   const profession = document.getElementById("job-profession").value.trim() || null;
   const level = document.getElementById("job-level").value || null;
@@ -1024,16 +1148,16 @@ function collectProfileFields() {
   const form = document.getElementById("diag-form");
   if (!form) return null;
   syncEducationFromDetail();
-  const fd = new FormData(form);
-  const age = parseInt(String(fd.get("age")), 10);
-  const prep = document.querySelector('input[name="preparation_level"]:checked')?.value || "средний";
+  const sheet = collectSheetExtra();
+  const age = parseInt(String(sheet.age ?? ""), 10);
+  const prep = mapPreparationForApi(sheet.preparation_level);
   return {
     age: Number.isFinite(age) && age >= 14 && age <= 30 ? age : 18,
-    interest: String(fd.get("interest") || "IT"),
-    education: String(fd.get("education") || "школа"),
-    motivation: String(fd.get("motivation") || ""),
-    preparation_level: prep === "слабый" || prep === "сильный" || prep === "средний" ? prep : "средний",
-    sheet: collectSheetExtra(),
+    interest: getPrimaryQuizInterest(),
+    education: String(document.getElementById("field-education-sync")?.value || "школа"),
+    motivation: String(sheet.motivation_ai || sheet.motivation || ""),
+    preparation_level: prep,
+    sheet,
   };
 }
 
@@ -1041,31 +1165,19 @@ function applyProfileToForm(p) {
   if (!p || typeof p !== "object") return;
   const form = document.getElementById("diag-form");
   if (!form) return;
-  const ageEl = form.querySelector('[name="age"]');
-  if (ageEl && p.age != null) {
-    const a = parseInt(String(p.age), 10);
-    if (Number.isFinite(a) && a >= 14 && a <= 30) ageEl.value = String(a);
-  }
-  const intSel = form.querySelector('[name="interest"]');
-  if (intSel && p.interest && [...intSel.options].some((o) => o.value === p.interest)) {
-    intSel.value = p.interest;
-  }
   const eduHid = document.getElementById("field-education-sync");
   if (eduHid && p.education && ["школа", "колледж", "вуз"].includes(String(p.education))) {
     eduHid.value = String(p.education);
   }
-  const mot = form.querySelector('[name="motivation"]');
-  if (mot && p.motivation != null) mot.value = String(p.motivation);
-  const pl = p.preparation_level;
-  if (pl === "слабый" || pl === "средний" || pl === "сильный") {
-    form.querySelectorAll('input[name="preparation_level"]').forEach((radio) => {
-      radio.checked = radio.value === pl;
-    });
+  const sheet = { ...(p.sheet && typeof p.sheet === "object" ? p.sheet : {}) };
+  if (p.age != null && sheet.age == null) sheet.age = p.age;
+  if (p.motivation && !sheet.motivation_ai) sheet.motivation_ai = p.motivation;
+  if (p.preparation_level) {
+    const rev = { слабый: "weak", средний: "medium", сильный: "strong" };
+    if (rev[p.preparation_level]) sheet.preparation_level = rev[p.preparation_level];
   }
-  if (p.sheet && typeof p.sheet === "object") {
-    for (const [k, v] of Object.entries(p.sheet)) {
-      applySheetFieldValue(k, v);
-    }
+  for (const [k, v] of Object.entries(sheet)) {
+    applySheetFieldValue(k, v);
   }
   syncEducationFromDetail();
 }
@@ -1134,8 +1246,6 @@ function schedulePushServerSnapshot() {
 
 async function pushServerSnapshot() {
   if (!window.serverLoggedIn) return;
-  const pill = document.getElementById("sync-pill");
-  const textEl = document.getElementById("sync-pill-text");
   try {
     const body = buildServerSnapshot();
     const r = await fetch("/api/auth/snapshot", {
@@ -1144,23 +1254,11 @@ async function pushServerSnapshot() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (r.ok && textEl) {
-      const prev = textEl.textContent;
-      textEl.textContent = "Сохранено";
-      pill.title = "Черновик отправлен на сервер.";
-      clearTimeout(pushServerSnapshot._toastT);
-      pushServerSnapshot._toastT = setTimeout(() => {
-        textEl.textContent = prev;
-        updateSyncPill();
-      }, 2000);
+    if (r.ok) {
+      showToast("Сохранено на сервере.", 2000);
     }
   } catch (_) {
-    if (textEl) {
-      textEl.textContent = "Нет связи";
-      pill.title = "Не удалось сохранить на сервер — проверьте сеть и что бэкенд запущен.";
-      clearTimeout(pushServerSnapshot._toastT);
-      pushServerSnapshot._toastT = setTimeout(() => updateSyncPill(), 3500);
-    }
+    showToast("Не удалось сохранить на сервер — проверьте сеть.");
   }
 }
 
@@ -1221,50 +1319,274 @@ function resetClientStateForNewAccount() {
   updateAvatarBubble();
 }
 
-/** Индикатор: без аккаунта — только браузер; после входа — сессия и синхронизация с сервером. */
-function updateSyncPill() {
-  const pill = document.getElementById("sync-pill");
-  const textEl = document.getElementById("sync-pill-text");
-  if (!pill || !textEl) return;
-  pill.classList.toggle("live-pill--server", !!window.serverLoggedIn);
-  pill.classList.toggle("live-pill--local", !window.serverLoggedIn);
-  if (window.serverLoggedIn) {
-    textEl.textContent = "Аккаунт";
-    pill.title = "Вы вошли — профиль и разбор можно сохранять на сервере.";
-  } else {
-    textEl.textContent = "Локально";
-    pill.title = "Без входа данные хранятся только в этом браузере.";
+function updateAccountHubLabel() {
+  const btn = document.getElementById("btn-account-hub");
+  const label = document.getElementById("account-hub-label");
+  if (!btn || !label) return;
+  if (!window.serverLoggedIn) {
+    btn.hidden = true;
+    return;
   }
+  btn.hidden = false;
+  const nick = (window.serverNickname || "").trim();
+  label.textContent = nick || "Аккаунт";
+  btn.title = nick
+    ? `Аккаунт: ${nick}`
+    : window.serverEmail
+      ? `Аккаунт: ${window.serverEmail}`
+      : "Страница аккаунта";
+}
+
+function sphereLabelsFromSheet(sheet) {
+  const raw = sheet?.interest_spheres;
+  const ids = Array.isArray(raw)
+    ? raw
+    : typeof raw === "string" && raw.trim()
+      ? (() => {
+          try {
+            const p = JSON.parse(raw);
+            return Array.isArray(p) ? p : [];
+          } catch (_) {
+            return [];
+          }
+        })()
+      : [];
+  const labels = [];
+  for (const id of ids) {
+    const cb = document.querySelector(
+      '.sheet-multi[data-sheet-field="interest_spheres"][value="' + id + '"]'
+    );
+    const lbl = cb?.closest(".sheet-multi-opt")?.querySelector("span")?.textContent;
+    labels.push(lbl || id);
+  }
+  return labels;
+}
+
+function buildProfileSummaryLines(profile, analysis) {
+  const lines = [];
+  if (!profile || typeof profile !== "object") {
+    return ["<li>Анкета ещё не заполнена — начните с раздела «Профиль».</li>"];
+  }
+  const sheet = profile.sheet && typeof profile.sheet === "object" ? profile.sheet : {};
+  const age = profile.age ?? sheet.age;
+  if (age) lines.push(`<li><strong>Возраст:</strong> ${esc(String(age))} лет</li>`);
+  const spheres = sphereLabelsFromSheet(sheet);
+  if (spheres.length) {
+    lines.push(`<li><strong>Сферы:</strong> ${esc(spheres.join(", "))}</li>`);
+  } else if (profile.interest) {
+    lines.push(`<li><strong>Сфера:</strong> ${esc(String(profile.interest))}</li>`);
+  }
+  if (profile.education) lines.push(`<li><strong>Образование:</strong> ${esc(String(profile.education))}</li>`);
+  if (sheet.course_grade) lines.push(`<li><strong>Курс/класс:</strong> ${esc(String(sheet.course_grade))}</li>`);
+  if (sheet.like_to_do) {
+    const t = String(sheet.like_to_do).trim();
+    if (t) lines.push(`<li><strong>Нравится:</strong> ${esc(t.length > 100 ? t.slice(0, 97) + "…" : t)}</li>`);
+  }
+  if (sheet.target_salary) {
+    lines.push(`<li><strong>Цель по доходу:</strong> ${esc(String(sheet.target_salary))} ₽/мес</li>`);
+  }
+  if (profile.preparation_level) {
+    lines.push(`<li><strong>Готовность:</strong> ${esc(String(profile.preparation_level))}</li>`);
+  }
+  const mot = profile.motivation || sheet.motivation_ai;
+  if (mot) {
+    const m = String(mot).trim();
+    if (m) lines.push(`<li><strong>Мотивация:</strong> ${esc(m.length > 120 ? `${m.slice(0, 117)}…` : m)}</li>`);
+  }
+  const city = sheet.city || sheet.location;
+  if (city) lines.push(`<li><strong>Город:</strong> ${esc(String(city))}</li>`);
+  if (analysis?.profile_summary) {
+    const s = String(analysis.profile_summary).trim();
+    if (s) {
+      lines.push(
+        `<li><strong>Разбор:</strong> ${esc(s.length > 200 ? `${s.slice(0, 197)}…` : s)}</li>`
+      );
+    }
+  } else if (analysis?.scenarios?.inferred_profession?.label) {
+    lines.push(
+      `<li><strong>Направление:</strong> ${esc(String(analysis.scenarios.inferred_profession.label))}</li>`
+    );
+  }
+  if (!lines.length) {
+    return ["<li>Заполните анкету в разделе «Профиль», чтобы здесь появилась сводка.</li>"];
+  }
+  return lines;
+}
+
+function renderAccountPage() {
+  const root = document.getElementById("account-page-root");
+  const emailEl = document.getElementById("account-page-email");
+  if (!root || !window.serverLoggedIn) return;
+  const profile = collectProfileFields();
+  const snap = buildServerSnapshot();
+  const summary = buildProfileSummaryLines(profile, window.lastAnalysis || snap.analysis);
+  const nickVal = esc((window.serverNickname || "").trim());
+  if (emailEl) {
+    emailEl.textContent = window.serverEmail ? `Вход: ${window.serverEmail}` : "";
+  }
+  root.innerHTML = `
+    <section class="account-section">
+      <h2>Никнейм</h2>
+      <p class="muted small">Отображается на кнопке аккаунта в шапке вместо почты.</p>
+      <label class="account-field">
+        <span>Имя в интерфейсе</span>
+        <input type="text" id="acc-nickname" maxlength="80" autocomplete="nickname" value="${nickVal}" placeholder="Например, Сёма" />
+      </label>
+      <p id="acc-nick-msg" class="account-msg" hidden role="status"></p>
+      <div class="account-actions">
+        <button type="button" class="btn primary" id="acc-save-nick">Сохранить никнейм</button>
+      </div>
+    </section>
+    <section class="account-section">
+      <h2>О вас по анкете</h2>
+      <ul class="account-summary-list">${summary.join("")}</ul>
+    </section>
+    <section class="account-section">
+      <h2>Смена пароля</h2>
+      <label class="account-field"><span>Текущий пароль</span>
+        <input type="password" id="acc-old-pwd" autocomplete="current-password" /></label>
+      <label class="account-field"><span>Новый пароль</span>
+        <input type="password" id="acc-new-pwd" autocomplete="new-password" placeholder="Не короче 8 символов" /></label>
+      <label class="account-field"><span>Повтор нового пароля</span>
+        <input type="password" id="acc-new-pwd2" autocomplete="new-password" /></label>
+      <p id="acc-pwd-msg" class="account-msg" hidden role="alert"></p>
+      <div class="account-actions">
+        <button type="button" class="btn primary" id="acc-change-pwd">Сохранить новый пароль</button>
+        <a class="btn secondary" href="/reset-password">Забыли пароль?</a>
+      </div>
+    </section>`;
+
+  document.getElementById("acc-save-nick")?.addEventListener("click", async () => {
+    const msg = document.getElementById("acc-nick-msg");
+    const btn = document.getElementById("acc-save-nick");
+    const raw = (document.getElementById("acc-nickname")?.value || "").trim();
+    if (msg) {
+      msg.hidden = true;
+      msg.textContent = "";
+    }
+    if (btn) btn.disabled = true;
+    try {
+      const r = await fetch("/api/auth/account/nickname", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname: raw }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        if (msg) {
+          msg.textContent = formatAuthError(j.detail) || "Не удалось сохранить";
+          msg.className = "account-msg account-msg--err";
+          msg.hidden = false;
+        }
+        return;
+      }
+      window.serverNickname = j.nickname || raw || null;
+      updateAccountHubLabel();
+      if (msg) {
+        msg.textContent = "Никнейм сохранён.";
+        msg.className = "account-msg account-msg--ok";
+        msg.hidden = false;
+      }
+    } catch (e) {
+      if (msg) {
+        msg.textContent = e.message || "Ошибка сети";
+        msg.className = "account-msg account-msg--err";
+        msg.hidden = false;
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
+
+  document.getElementById("acc-change-pwd")?.addEventListener("click", async () => {
+    const msg = document.getElementById("acc-pwd-msg");
+    const oldPw = document.getElementById("acc-old-pwd")?.value || "";
+    const p1 = document.getElementById("acc-new-pwd")?.value || "";
+    const p2 = document.getElementById("acc-new-pwd2")?.value || "";
+    if (msg) {
+      msg.hidden = true;
+      msg.textContent = "";
+    }
+    if (p1.length < 8) {
+      if (msg) {
+        msg.textContent = "Новый пароль — не короче 8 символов.";
+        msg.className = "account-msg account-msg--err";
+        msg.hidden = false;
+      }
+      return;
+    }
+    if (p1 !== p2) {
+      if (msg) {
+        msg.textContent = "Пароли не совпадают.";
+        msg.className = "account-msg account-msg--err";
+        msg.hidden = false;
+      }
+      return;
+    }
+    const btn = document.getElementById("acc-change-pwd");
+    if (btn) btn.disabled = true;
+    try {
+      const r = await fetch("/api/auth/account/change-password", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ current_password: oldPw, new_password: p1 }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        if (msg) {
+          msg.textContent = formatAuthError(j.detail) || "Не удалось сменить пароль";
+          msg.className = "account-msg account-msg--err";
+          msg.hidden = false;
+        }
+        return;
+      }
+      document.getElementById("acc-old-pwd").value = "";
+      document.getElementById("acc-new-pwd").value = "";
+      document.getElementById("acc-new-pwd2").value = "";
+      if (msg) {
+        msg.textContent = "Пароль обновлён.";
+        msg.className = "account-msg account-msg--ok";
+        msg.hidden = false;
+      }
+    } catch (e) {
+      if (msg) {
+        msg.textContent = e.message || "Ошибка сети";
+        msg.className = "account-msg account-msg--err";
+        msg.hidden = false;
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
 }
 
 function updateAuthPanel() {
-  const lab = document.getElementById("auth-email-label");
   const em = document.getElementById("auth-email");
   const pw = document.getElementById("auth-password");
   const loginB = document.getElementById("btn-auth-login");
   const outB = document.getElementById("btn-auth-logout");
   const forgot = document.getElementById("auth-forgot-wrap");
+  const navAcc = document.getElementById("nav-account");
   if (window.serverLoggedIn) {
-    if (lab) {
-      lab.hidden = false;
-      lab.textContent = window.serverEmail || "";
-    }
     if (em) em.hidden = true;
     if (pw) pw.hidden = true;
     if (loginB) loginB.hidden = true;
     if (outB) outB.hidden = false;
     if (forgot) forgot.hidden = true;
+    if (navAcc) navAcc.hidden = false;
     document.body.classList.add("app-ready");
   } else {
-    if (lab) lab.hidden = true;
     if (em) em.hidden = false;
     if (pw) pw.hidden = false;
     if (loginB) loginB.hidden = false;
     if (outB) outB.hidden = true;
     if (forgot) forgot.hidden = false;
+    if (navAcc) navAcc.hidden = true;
     document.body.classList.remove("app-ready");
   }
-  updateSyncPill();
+  updateAccountHubLabel();
 }
 
 async function refreshAuthState() {
@@ -1275,6 +1597,8 @@ async function refreshAuthState() {
     if (j.authenticated) {
       window.serverLoggedIn = true;
       window.serverEmail = j.email || "";
+      window.serverNickname = j.nickname || null;
+      window.serverUserId = j.user_id || null;
       updateAuthPanel();
       applyServerSnapshot(j.snapshot || {});
       return j;
@@ -1282,6 +1606,8 @@ async function refreshAuthState() {
   } catch (_) {}
   window.serverLoggedIn = false;
   window.serverEmail = null;
+  window.serverNickname = null;
+  window.serverUserId = null;
   updateAuthPanel();
   return { authenticated: false };
 }
@@ -1499,7 +1825,11 @@ function computeFallbackInsightTiles(res) {
   const sphereFit = Math.round((fa + combined) / 2);
   const peopleReady = fp;
   const trackShort = planA.name.length <= 44 ? planA.name : `${planA.name.slice(0, 41)}…`;
-  const sph = (document.getElementById("field-interest")?.selectedOptions?.[0]?.text || "сфера").trim();
+  const sid = getPrimarySphereId();
+  const cb = sid
+    ? document.querySelector('.sheet-multi[data-sheet-field="interest_spheres"][value="' + sid + '"]')
+    : null;
+  const sph = (cb?.closest(".sheet-multi-opt")?.querySelector("span")?.textContent || "сфера").trim();
   return [
     {
       title: "Психологическая готовность к роли",
@@ -2183,22 +2513,15 @@ const debouncedReanalyze = debounce(() => {
   runConsultation({ switchToTestTab: false, quietErrors: true }).catch(() => {});
 }, 1000);
 
-document.getElementById("diag-form").addEventListener("change", (e) => {
+document.getElementById("diag-form")?.addEventListener("change", () => {
   scheduleSaveProfileDraft();
   updateAvatarBubble();
   updateFlowUI();
-  if (e.target && e.target.id === "field-interest") debouncedQuizReload();
-});
-document.querySelectorAll('input[name="preparation_level"]').forEach((r) => {
-  r.addEventListener("change", () => {
-    scheduleSaveProfileDraft();
-    updateFlowUI();
-  });
 });
 
-document.getElementById("btn-spark-tip")?.addEventListener("click", () => {
-  const t = MICRO_TIPS[Math.floor(Math.random() * MICRO_TIPS.length)];
-  showToast(t);
+document.getElementById("btn-account-hub")?.addEventListener("click", () => {
+  if (!window.serverLoggedIn) return;
+  setTab("account");
 });
 
 document.getElementById("swipe-rewind")?.addEventListener("click", () => {
@@ -2372,6 +2695,8 @@ document.getElementById("btn-auth-logout").addEventListener("click", async () =>
   } catch (_) {}
   window.serverLoggedIn = false;
   window.serverEmail = null;
+  window.serverNickname = null;
+  window.serverUserId = null;
   const pw = document.getElementById("auth-password");
   if (pw) pw.value = "";
   updateAuthPanel();
@@ -2379,6 +2704,7 @@ document.getElementById("btn-auth-logout").addEventListener("click", async () =>
 });
 
 (async () => {
+  await ensureProfileSchemaRendered();
   const me = await refreshAuthState();
   if (!me.authenticated) {
     const storedOnLoad = loadResult();
@@ -2387,6 +2713,8 @@ document.getElementById("btn-auth-logout").addEventListener("click", async () =>
     } else {
       loadProfileDraft();
     }
+  } else if (me.snapshot?.profile) {
+    applyProfileToForm(me.snapshot.profile);
   }
 
   renderQuiz();
@@ -2461,12 +2789,12 @@ document.getElementById("btn-auth-logout").addEventListener("click", async () =>
 const THEME_STORAGE_KEY = "vibework_theme";
 
 function syncThemeToggleButton(isDark) {
-  const btn = document.getElementById("btn-theme-toggle");
-  if (!btn) return;
-  btn.setAttribute("aria-pressed", isDark ? "true" : "false");
-  btn.title = isDark ? "Светлая тема" : "Тёмная тема";
-  btn.setAttribute("aria-label", isDark ? "Включить светлую тему" : "Включить тёмную тему");
-  btn.textContent = isDark ? "☀️" : "🌙";
+  document.querySelectorAll(".theme-toggle-btn").forEach((btn) => {
+    btn.setAttribute("aria-pressed", isDark ? "true" : "false");
+    btn.title = isDark ? "Светлая тема" : "Тёмная тема";
+    btn.setAttribute("aria-label", isDark ? "Включить светлую тему" : "Включить тёмную тему");
+    btn.textContent = isDark ? "☀️" : "🌙";
+  });
 }
 
 function applyTheme(mode) {
@@ -2486,14 +2814,14 @@ function initThemeToggle() {
     else if (stored === "light") document.documentElement.removeAttribute("data-theme");
   } catch (_) {}
   syncThemeToggleButton(document.documentElement.getAttribute("data-theme") === "dark");
-  const btn = document.getElementById("btn-theme-toggle");
-  if (btn && !btn.dataset.themeBound) {
+  document.querySelectorAll(".theme-toggle-btn").forEach((btn) => {
+    if (btn.dataset.themeBound) return;
     btn.dataset.themeBound = "1";
     btn.addEventListener("click", () => {
       const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
       applyTheme(next);
     });
-  }
+  });
 }
 
 initThemeToggle();

@@ -813,6 +813,13 @@ TAG_TO_QUIZ_KEY: dict[str, str] = {
 
 def resolve_quiz_key(form_interest: str, target_mts_role_id: str | None) -> str:
     """Приоритет: целевая роль из матрицы → тег роли; иначе интерес из профиля."""
+    try:
+        from wibe_work.questionnaire_fields import SPHERE_TO_WEB_INTEREST, sphere_to_web_interest
+
+        if form_interest in SPHERE_TO_WEB_INTEREST:
+            form_interest = sphere_to_web_interest(form_interest)
+    except ImportError:
+        pass
     if target_mts_role_id:
         for tr in load_mts_tracks():
             if tr.id == target_mts_role_id:

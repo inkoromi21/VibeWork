@@ -9,7 +9,11 @@ _REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO / "miniapp" / "backend"))
 
 from wibe_work.api_schemas import ProfileData
-from wibe_work.questionnaire_fields import get_profile_schema
+from wibe_work.questionnaire_fields import (
+    SPHERE_TO_WEB_INTEREST,
+    get_profile_schema,
+    sphere_to_web_interest,
+)
 
 
 def _collect_field_ids(schema: dict) -> set[str]:
@@ -34,6 +38,21 @@ def test_schema_field_ids_in_profile_data() -> None:
     allowed = set(ProfileData.model_fields.keys())
     for fid in _collect_field_ids(get_profile_schema()):
         assert fid in allowed, f"unknown field {fid!r} for ProfileData"
+
+
+def test_schema_exports_sphere_map() -> None:
+    schema = get_profile_schema()
+    assert schema.get("sphere_to_web_interest") == SPHERE_TO_WEB_INTEREST
+    assert sphere_to_web_interest("it_dev") == "IT"
+    assert sphere_to_web_interest("design") == "дизайн"
+    assert sphere_to_web_interest("unknown") == "IT"
+
+
+def test_schema_has_product_blocks() -> None:
+    schema = get_profile_schema()
+    section_ids = {s["id"] for s in schema.get("sections") or []}
+    for sid in ("pain", "base", "interests", "skills_hard", "skills_soft", "experience", "goals", "extra"):
+        assert sid in section_ids, sid
 
 
 def test_interest_spheres_multiselect() -> None:

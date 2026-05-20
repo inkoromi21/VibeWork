@@ -20,7 +20,6 @@
   </script>
 </head>
 <body>
-  <button type="button" class="theme-toggle-btn theme-toggle-btn--floating" id="btn-theme-toggle" title="Тёмная тема" aria-pressed="false" aria-label="Переключить тему">🌙</button>
   <div class="app-bg" aria-hidden="true">
     <div class="app-bg-waves">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 720" preserveAspectRatio="xMidYMid slice" fill="none">
@@ -41,6 +40,7 @@
   </div>
 
   <div id="auth-gate" class="auth-gate" role="dialog" aria-modal="true" aria-labelledby="auth-gate-title">
+    <button type="button" class="theme-toggle-btn theme-toggle-btn--auth-gate" id="btn-theme-toggle-auth" title="Тёмная тема" aria-pressed="false" aria-label="Переключить тему">🌙</button>
     <div class="auth-gate-waves" aria-hidden="true">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 720" preserveAspectRatio="xMidYMid slice" fill="none">
         <g stroke="#22a954" stroke-width="1.15" stroke-linecap="round" opacity="0.38">
@@ -105,6 +105,9 @@
         <button type="button" class="nav-pill side-nav-item" data-tab="sim">
           <span class="sn-ico" aria-hidden="true">▶</span> Симулятор
         </button>
+        <button type="button" class="nav-pill side-nav-item" data-tab="account" id="nav-account" hidden>
+          <span class="sn-ico" aria-hidden="true">◎</span> Аккаунт
+        </button>
       </nav>
     </aside>
 
@@ -129,13 +132,12 @@
         </div>
         <div class="topbar-tools">
           <span class="streak-chip" id="streak-chip" hidden>фокус</span>
-          <button type="button" class="spark-btn" id="btn-spark-tip" title="Случайный совет">✦</button>
-          <span class="live-pill compact live-pill--local" id="sync-pill" title="">
-            <span class="dot" aria-hidden="true"></span>
-            <span id="sync-pill-text">Локально</span>
-          </span>
+          <button type="button" class="theme-toggle-btn theme-toggle-btn--topbar" id="btn-theme-toggle" title="Тёмная тема" aria-pressed="false" aria-label="Переключить тему">🌙</button>
+          <button type="button" class="account-hub-btn" id="btn-account-hub" hidden title="Страница аккаунта">
+            <span class="account-hub-star" aria-hidden="true">✦</span>
+            <span id="account-hub-label">Аккаунт</span>
+          </button>
           <div class="auth-cluster auth-cluster-inline" id="auth-cluster">
-            <span id="auth-email-label" class="auth-email-label muted small" hidden></span>
             <button type="button" class="btn-inline" id="btn-auth-logout" hidden>Выйти</button>
           </div>
         </div>
@@ -148,7 +150,7 @@
         <div class="card float-in cdek-profile-card">
         <div class="card-head cdek-card-head">
           <h1>Шаг 1 — профиль</h1>
-          <p class="muted">Сверху — возраст и главная сфера (от неё зависят вопросы теста). Ниже по странице — полный профиль: базовые данные, интересы, навыки, опыт и дополнительные поля.</p>
+          <p class="muted">Анкета по блокам: базовые данные, интересы, навыки, опыт и цели. От первой выбранной сферы зависят вопросы теста. Поля со звёздочкой обязательны для перехода к тесту.</p>
         </div>
         <ol class="flow-steps cdek-flow-steps" aria-label="Порядок шагов">
           <li><strong>Профиль</strong></li>
@@ -178,26 +180,6 @@
           </div>
           <p class="profi-method-foot muted small"><strong>Карьерные ценности</strong> (в духе якорей Шейна): что в работе мотивирует — служение людям, рост до эксперта, управление и статус, баланс жизни. Если важен баланс, роль «24/7» будет давить; если служение, одни деньги редко хватят.</p>
         </div>
-        <div class="field full prep-block">
-          <span>Уровень подготовки <span class="muted small">(ветка на схеме)</span></span>
-          <div class="prep-cards" role="radiogroup" aria-label="Уровень подготовки">
-            <label class="prep-card">
-              <input type="radio" name="preparation_level" value="слабый" />
-              <strong>Слабый</strong>
-              <span class="muted small">Нужна база: курсы, микро-проекты</span>
-            </label>
-            <label class="prep-card">
-              <input type="radio" name="preparation_level" value="средний" checked />
-              <strong>Средний</strong>
-              <span class="muted small">Курс + проект параллельно</span>
-            </label>
-            <label class="prep-card">
-              <input type="radio" name="preparation_level" value="сильный" />
-              <strong>Сильный</strong>
-              <span class="muted small">Кейсы, хакатоны, нетворк</span>
-            </label>
-          </div>
-        </div>
         <div class="progress-wrap profile-metrics-wrap" id="profile-metrics-wrap" hidden>
           <div class="progress-label"><span>Сводка профиля</span><span id="profile-pct">0%</span></div>
           <div class="progress-bar"><div class="progress-fill" id="profile-bar"></div></div>
@@ -205,40 +187,7 @@
         <p id="profile-metrics-hint" class="muted small metrics-hint">Эта шкала и итоговые метрики появятся после теста и разбора — до этого заполните поля и пройдите вопросы.</p>
         <form id="diag-form" class="cdek-profile-form" novalidate>
           <input type="hidden" name="education" id="field-education-sync" value="школа" />
-          <div class="cdek-core-row form-grid">
-            <label class="field">
-              <span>Возраст</span>
-              <input type="number" name="age" id="field-age" min="14" max="30" step="1" inputmode="numeric" value="18" required />
-            </label>
-            <label class="field">
-              <span>Главная сфера <span class="muted small">(тест)</span></span>
-              <select name="interest" id="field-interest" required>
-                <option value="IT">IT и разработка</option>
-                <option value="данные_и_AI">Данные и AI</option>
-                <option value="DevOps_и_SRE">DevOps и SRE</option>
-                <option value="дизайн">Дизайн</option>
-                <option value="маркетинг">Маркетинг</option>
-                <option value="продажи">Продажи</option>
-                <option value="инженерия">Инженерия</option>
-                <option value="наука">Наука</option>
-                <option value="бизнес">Бизнес и управление</option>
-                <option value="финансы_и_контроль">Финансы и контроль</option>
-                <option value="HR_и_рекрутинг">HR и рекрутинг</option>
-                <option value="юриспруденция">Юриспруденция</option>
-                <option value="закупки">Закупки</option>
-                <option value="логистика">Логистика</option>
-                <option value="недвижимость_и_эксплуатация">Недвижимость и эксплуатация</option>
-                <option value="офис_и_администрирование">Офис и администрирование</option>
-                <option value="продукт_и_PMO">Продукт и PMO</option>
-                <option value="поддержка_и_сервис">Поддержка и сервис</option>
-              </select>
-            </label>
-          </div>
           <div id="sheet-profile-root" class="sheet-profile-root" aria-live="polite"></div>
-          <label class="field full">
-            <span>Почему выбрали это направление (по желанию)</span>
-            <textarea name="motivation" id="field-motivation" rows="2" placeholder="Например: интерес к задачам, опыт, что хотите от карьеры…"></textarea>
-          </label>
         </form>
         <p class="muted small skills-note">Заполненный профиль учитывается в разборе и подборе вакансий вместе с тестом.</p>
         <div class="actions flow-actions">
@@ -257,7 +206,7 @@
           <h1>Шаг 2 — тест</h1>
           <p class="muted"><strong>Два отдельных теста:</strong> (1) <strong>10 вопросов</strong> по выбранной сфере — (2) <strong>8 вопросов</strong> «тип личности». Оба блока нужны для разбора. Учитывается время ответа.</p>
         </div>
-        <p class="banner-warn" id="test-blocked-banner" hidden>Сначала заполните шаг 1 — профиль: возраст, главная сфера и уровень образования в форме ниже.</p>
+        <p class="banner-warn" id="test-blocked-banner" hidden>Сначала заполните шаг 1 — обязательные поля анкеты (база, интересы, цели).</p>
         <div class="quiz-metrics-wrap" id="quiz-metrics-wrap" hidden>
           <div class="progress-wrap">
             <div class="progress-label"><span>Тест 1 — сфера и задачи</span><span id="quiz-progress-label">0/10</span></div>
@@ -271,7 +220,7 @@
         <p id="quiz-metrics-hint" class="muted small metrics-hint">Шкалы — после готового профиля. Разбор откроется, когда заполнены <strong>оба</strong> теста.</p>
         <div class="quiz-test-section">
           <h2 class="quiz-test-heading">Тест 1 — стиль задач в вашей сфере</h2>
-          <p class="muted small">Первые пять вопросов зависят от главной сферы в профиле; далее — общий блок.</p>
+          <p class="muted small">Первые пять вопросов зависят от первой выбранной сферы в анкете; далее — общий блок.</p>
           <div id="quiz" class="quiz"></div>
         </div>
         <div class="quiz-test-section quiz-test-section--personality">
@@ -436,6 +385,16 @@
           </div>
           <p class="muted small swipe-hint">Свайп вправо — в локальное избранное (демо)</p>
         </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-account" data-panel="account">
+      <div class="card float-in account-page-card">
+        <div class="card-head">
+          <h1>Аккаунт</h1>
+          <p class="muted" id="account-page-email"></p>
+        </div>
+        <div id="account-page-root" class="account-page-root"></div>
       </div>
     </section>
 
