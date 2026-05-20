@@ -318,6 +318,27 @@ html[data-theme="dark"] #app .vw-wave-strip g {
   overflow-wrap: break-word;
 }
 
+@media (max-width: 860px), (pointer: coarse) {
+  #app .quiz-q {
+    outline: none !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-card) !important;
+  }
+
+  #app .quiz-opt {
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    font-size: 0.9rem !important;
+    font-weight: 500 !important;
+  }
+
+  #app .quiz-opt.selected {
+    border-width: 2px !important;
+    box-shadow: 0 0 0 2px var(--green-soft) !important;
+  }
+}
+
 #app #tabContent a {
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -565,6 +586,25 @@ html[data-theme="dark"] #app .vw-wave-strip g {
   backdrop-filter: blur(18px);
   border: 1px solid var(--auth-card-border, var(--border));
   box-shadow: var(--shadow);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+#app .layout--auth .auth-field,
+#app .layout--auth .auth-gate-field {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+#app .layout--auth .auth-pwd-field {
+  width: 100%;
+  max-width: 100%;
+}
+
+#app .layout--auth .auth-hh-agree-text {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 #app .layout--auth .auth-card h2 {

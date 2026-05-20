@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <meta name="vibework-build" content="20260521-responsive-touch">
+    <meta name="vibework-build" content="20260521-mobile-ui-fix">
     <script>
     (function () {
-        var BUILD = '20260521-responsive-touch';
+        var BUILD = '20260521-mobile-ui-fix';
         var key = 'vw_miniapp_build';
         try {
             var prev = localStorage.getItem(key);
@@ -41,7 +41,7 @@
     })();
     </script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/static/vw_shared_ui.js?v=20260521-responsive-touch"></script>
+    <script src="/static/vw_shared_ui.js?v=20260521-mobile-ui-fix"></script>
     <script>
     (function () {
         try {
@@ -97,8 +97,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=20260521-responsive-touch">
-    <link rel="stylesheet" href="/static/miniapp-shell.css?v=20260521-responsive-touch">
+    <link rel="stylesheet" href="/static/style.css?v=20260521-mobile-ui-fix">
     <style>
         /* Токены страницы — из /static/style.css; здесь только алиасы legacy-миниаппа */
         html[data-miniapp] {
@@ -2323,7 +2322,62 @@
             z-index: 100;
             margin-top: 0;
         }
+
+        /* Мобильный мини-апп: как на сайте — без «старого» outline и съезда текста */
+        html[data-miniapp] #app .layout--auth {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+            box-sizing: border-box;
+            padding-left: max(16px, env(safe-area-inset-left));
+            padding-right: max(16px, env(safe-area-inset-right));
+        }
+        html[data-miniapp] #app .layout--auth .auth-card {
+            max-width: min(420px, 100%);
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        html[data-miniapp] #app .auth-hh-agree label {
+            max-width: 100%;
+        }
+        html[data-miniapp] #app .auth-hh-agree-text {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        html[data-miniapp] #app .profile-card label,
+        html[data-miniapp] #app .profile-card input,
+        html[data-miniapp] #app .profile-card p {
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        @media (max-width: 860px), (pointer: coarse) {
+            html[data-miniapp] #app .quiz-q {
+                outline: none;
+                border: 1px solid var(--border);
+                border-radius: var(--radius-lg);
+                padding: 14px 12px 12px;
+                box-shadow: var(--shadow-card);
+            }
+            html[data-miniapp] #app .quiz-opt {
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                padding: 10px 36px 10px 12px;
+                font-size: 0.9rem;
+                font-weight: 500;
+                margin-bottom: 6px;
+            }
+            html[data-miniapp] #app .quiz-opt.selected {
+                border-width: 2px;
+                border-color: var(--green);
+                box-shadow: 0 0 0 2px var(--green-soft);
+            }
+            html[data-miniapp] #app .pwd-reveal {
+                display: none;
+            }
+        }
     </style>
+    <link rel="stylesheet" href="/static/miniapp-shell.css?v=20260521-mobile-ui-fix">
+    <script src="/static/auth-password-toggle.js?v=20260521-mobile-ui-fix"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -2416,7 +2470,7 @@
 
     const HOME_TAB = { id: 'home', label: 'Разделы', ico: '☰' };
     const ACCOUNT_TAB = { id: 'account', label: 'Аккаунт', ico: '✦' };
-    const VW_BUILD = '20260521-responsive-touch';
+    const VW_BUILD = '20260521-mobile-ui-fix';
     const SECTION_TABS = [
         { id: 'profile', label: 'Профиль', short: 'Анкета', snIco: '◇', ico: '📋' },
         { id: 'test', label: 'Тестирование', short: 'Тест', snIco: '☑', ico: '🎯' },
@@ -3134,18 +3188,46 @@
         showAuthScreen();
     }
 
-    function wirePasswordToggle(buttonId, inputId) {
-        const btn = document.getElementById(buttonId);
-        const inp = document.getElementById(inputId);
-        if (!btn || !inp) return;
-        btn.onclick = function () {
-            const show = inp.type === 'password';
-            inp.type = show ? 'text' : 'password';
-            btn.textContent = show ? '◉' : '○';
-            btn.setAttribute('aria-pressed', show ? 'true' : 'false');
-            btn.setAttribute('aria-label', show ? 'Скрыть пароль' : 'Показать пароль');
-        };
-        btn.textContent = inp.type === 'password' ? '○' : '◉';
+    const AUTH_PWD_TOGGLE_SVG =
+        '<svg class="auth-pwd-toggle-icon auth-pwd-toggle-icon--show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>' +
+        '<svg class="auth-pwd-toggle-icon auth-pwd-toggle-icon--hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>' +
+        '<path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>' +
+        '<path d="M1 1l22 22"></path><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"></path></svg>';
+
+    function authPwdFieldHtml(inputId, placeholder, autocomplete) {
+        return (
+            '<div class="auth-pwd-field">' +
+            '<input type="password" id="' +
+            inputId +
+            '" class="auth-field auth-gate-field pwd-input" autocomplete="' +
+            (autocomplete || 'current-password') +
+            '" placeholder="' +
+            esc(placeholder || '') +
+            '">' +
+            '<button type="button" class="auth-pwd-toggle" data-pwd-toggle-for="' +
+            inputId +
+            '" aria-label="Показать пароль" aria-pressed="false">' +
+            AUTH_PWD_TOGGLE_SVG +
+            '</button></div>'
+        );
+    }
+
+    function wirePasswordFields() {
+        document.querySelectorAll('.auth-pwd-toggle[data-pwd-toggle-for]').forEach(function (btn) {
+            var id = btn.getAttribute('data-pwd-toggle-for');
+            var inp = document.getElementById(id);
+            if (!inp || btn.dataset.pwdToggleWired === '1') return;
+            btn.dataset.pwdToggleWired = '1';
+            btn.addEventListener('click', function () {
+                var show = inp.type === 'password';
+                inp.type = show ? 'text' : 'password';
+                btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+                btn.setAttribute('aria-label', show ? 'Скрыть пароль' : 'Показать пароль');
+                btn.classList.toggle('auth-pwd-toggle--visible', show);
+            });
+        });
     }
 
     /** Проверка формата почты перед запросом; на сервере — Pydantic EmailStr. */
@@ -3185,19 +3267,14 @@
                 : 'Войдите по почте и паролю, которые указывали при регистрации.') + '</p>' +
             '<div id="authErr" class="auth-error" style="display:none"></div>' +
             '<label for="authEmail">Email</label>' +
-            '<input type="text" id="authEmail" autocomplete="username" placeholder="you@example.com">' +
+            '<input type="text" id="authEmail" class="auth-field auth-gate-field" autocomplete="username" placeholder="you@example.com">' +
             '<label for="authPass">Пароль</label>' +
-            '<input class="pwd-input" type="password" id="authPass" autocomplete="' + (isReg ? 'new-password' : 'current-password') + '" placeholder="' + (isReg ? 'Не меньше 8 символов' : '••••••••') + '">' +
-            '<div class="pwd-reveal">' +
-            '<button type="button" class="pwd-square" id="toggleAuthPass" aria-pressed="false" aria-label="Показать пароль">○</button>' +
-            '<span class="pwd-reveal-caption">Показать пароль</span></div>' +
-            (isReg
-                ? '<label for="authPass2">Пароль ещё раз</label>' +
-                  '<input class="pwd-input" type="password" id="authPass2" autocomplete="new-password">' +
-                  '<div class="pwd-reveal">' +
-                  '<button type="button" class="pwd-square" id="toggleAuthPass2" aria-pressed="false" aria-label="Показать пароль">○</button>' +
-                  '<span class="pwd-reveal-caption">Показать пароль</span></div>'
-                : '') +
+            authPwdFieldHtml(
+                'authPass',
+                isReg ? 'Не меньше 8 символов' : '••••••••',
+                isReg ? 'new-password' : 'current-password'
+            ) +
+            (isReg ? '<label for="authPass2">Пароль ещё раз</label>' + authPwdFieldHtml('authPass2', '', 'new-password') : '') +
             (isReg
                 ? '<div class="auth-hh-agree">' +
                   '<label for="hhAgree">' +
@@ -3220,8 +3297,7 @@
         if (swLogin) swLogin.onclick = function (e) { e.preventDefault(); authMode = 'login'; renderAuthForm(); };
         const swReg = document.getElementById('swReg');
         if (swReg) swReg.onclick = function (e) { e.preventDefault(); authMode = 'register'; renderAuthForm(); };
-        wirePasswordToggle('toggleAuthPass', 'authPass');
-        wirePasswordToggle('toggleAuthPass2', 'authPass2');
+        wirePasswordFields();
         wireThemeToggleClicks();
     }
 
@@ -6416,19 +6492,19 @@
                         '<div class="section-title">Сайт и Telegram — один аккаунт</div>' +
                         '<p class="muted" style="margin:0 0 12px">Укажите почту и пароль — по ним можно войти с браузера; анкета и разбор останутся теми же.</p>' +
                         '<label for="vwSyncEmail">Email</label>' +
-                        '<input type="email" id="vwSyncEmail" autocomplete="email" placeholder="you@example.com" style="width:100%;max-width:420px">' +
+                        '<input type="email" id="vwSyncEmail" class="auth-field auth-gate-field" autocomplete="email" placeholder="you@example.com">' +
                         '<label for="vwSyncPass" style="margin-top:10px">Пароль (не короче 8 символов)</label>' +
-                        '<input type="password" id="vwSyncPass" autocomplete="new-password" class="pwd-input" style="width:100%;max-width:420px">' +
+                        authPwdFieldHtml('vwSyncPass', 'Не меньше 8 символов', 'new-password') +
                         '<label for="vwSyncPass2" style="margin-top:10px">Пароль ещё раз</label>' +
-                        '<input type="password" id="vwSyncPass2" autocomplete="new-password" class="pwd-input" style="width:100%;max-width:420px">' +
+                        authPwdFieldHtml('vwSyncPass2', '', 'new-password') +
                         '<p id="vwSyncRegErr" style="display:none;margin-top:8px;color:#c62828;font-size:0.875rem"></p>' +
                         '<button type="button" class="btn-primary" style="margin-top:12px" id="vwSyncRegBtn">Сохранить почту для входа на сайте</button>' +
                         '<div class="nav-sep" style="margin:18px 0"></div>' +
                         '<p class="muted" style="margin:0 0 8px;font-size:0.85rem">Уже есть аккаунт на сайте?</p>' +
                         '<label for="vwBindEmail">Email</label>' +
-                        '<input type="email" id="vwBindEmail" autocomplete="email" style="width:100%;max-width:420px">' +
+                        '<input type="email" id="vwBindEmail" class="auth-field auth-gate-field" autocomplete="email">' +
                         '<label for="vwBindPass" style="margin-top:10px">Пароль</label>' +
-                        '<input type="password" id="vwBindPass" autocomplete="current-password" class="pwd-input" style="width:100%;max-width:420px">' +
+                        authPwdFieldHtml('vwBindPass', '', 'current-password') +
                         '<p id="vwSyncBindErr" style="display:none;margin-top:8px;color:#c62828;font-size:0.875rem"></p>' +
                         '<button type="button" class="btn-secondary" style="margin-top:12px" id="vwSyncBindBtn">Войти в существующий аккаунт и объединить</button>' +
                         '</div>';
@@ -6481,6 +6557,7 @@
                     '</div>' +
                     '</div></div>';
                 el.innerHTML = html;
+                wirePasswordFields();
                 if (
                     accountStatus &&
                     !isTgApp &&

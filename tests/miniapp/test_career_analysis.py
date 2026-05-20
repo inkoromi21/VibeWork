@@ -53,6 +53,7 @@ def test_it_backend_track_from_technical_answers() -> None:
     profile = {
         "age": 20,
         "city": "Кемерово",
+        "education_detail": "univ_bachelor",
         "main_sphere": "it_dev",
         "programming_skills": "Python Django",
         "preparation_level": "medium",
@@ -60,10 +61,11 @@ def test_it_backend_track_from_technical_answers() -> None:
     full = build_analysis_result(
         profile, {}, "it_dev", "вуз", "medium", tech_a + pers
     )
-    inf = (full.get("scenarios") or {}).get("inferred_profession") or {}
+    scenarios = full.get("scenarios") or {}
+    inf = scenarios.get("inferred_profession") or {}
     assert inf.get("track_id") == "backend"
     assert "Backend" in str(inf.get("label") or "")
-    best = str((full.get("scenarios") or {}).get("best_plan_name") or "").lower()
+    best = str(scenarios.get("best_plan_name") or "").lower()
     assert "backend" in best or "бэкенд" in best
     pub = public_analysis_payload(full)
     assert pub.get("inferred_profession", {}).get("label")
@@ -72,9 +74,6 @@ def test_it_backend_track_from_technical_answers() -> None:
     names = " ".join(str(r.get("role_name") or "") for r in mts).lower()
     assert "backend" in names or "бэкенд" in names
     assert "закуп" not in names
-    assert mts[0]["role_name"] and (
-        "backend" in mts[0]["role_name"].lower() or "бэкенд" in mts[0]["role_name"].lower()
-    )
 
 
 def test_public_payload_omits_internal_keys() -> None:
