@@ -411,6 +411,14 @@ class AnalysisResult(BaseModel):
         None,
         description="school — маршруты обучения; career — роли и развитие в сфере",
     )
+    readiness: dict | None = Field(
+        None,
+        description="Индекс готовности и пояснение (как в миниаппе)",
+    )
+    learning_cards: list[dict] | None = Field(
+        None,
+        description="Карточки обучения (каталог + школьные ссылки)",
+    )
 
 
 class SimulatorChoice(BaseModel):

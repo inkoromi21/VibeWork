@@ -298,7 +298,26 @@ function setTab(name) {
       .then(() => fetchAndRenderQuiz())
       .catch(() => {});
   }
+  if (name === "analysis") {
+    syncAnalysisTabView();
+  }
   schedulePushServerSnapshot();
+}
+
+function showAnalysisPanel(hasReport) {
+  const gate = document.getElementById("analysis-gate");
+  const results = document.getElementById("analysis-results");
+  if (gate) gate.hidden = !!hasReport;
+  if (results) results.hidden = !hasReport;
+}
+
+function syncAnalysisTabView() {
+  if (window.lastAnalysis && quizComplete()) {
+    showAnalysisPanel(true);
+    renderResults(window.lastAnalysis);
+  } else {
+    showAnalysisPanel(false);
+  }
 }
 
 document.querySelectorAll(".nav-pill, .tab-btn").forEach((btn) => {
@@ -307,6 +326,11 @@ document.querySelectorAll(".nav-pill, .tab-btn").forEach((btn) => {
 
 document.getElementById("btn-go-profile").addEventListener("click", () => setTab("profile"));
 document.getElementById("btn-go-test").addEventListener("click", () => setTab("test"));
+document.getElementById("btn-go-analysis")?.addEventListener("click", () => setTab("analysis"));
+document.getElementById("btn-analysis-go-profile")?.addEventListener("click", () => setTab("profile"));
+document.getElementById("btn-analysis-go-test")?.addEventListener("click", () => setTab("test"));
+document.getElementById("btn-test-to-analysis")?.addEventListener("click", () => setTab("analysis"));
+document.getElementById("btn-test-open-analysis")?.addEventListener("click", () => setTab("analysis"));
 
 function ensureQuestionTimer(qid) {
   if (!questionStartedAt[qid]) questionStartedAt[qid] = Date.now();
@@ -1594,8 +1618,11 @@ function answersMatchPayloadTest(testAnswers, personalityTestAnswers) {
 function clearReportUi() {
   window.lastAnalysis = null;
   lastReportAnswerFingerprint = null;
-  const ptw = document.getElementById("post-test-wrap");
-  if (ptw) ptw.hidden = true;
+  showAnalysisPanel(false);
+  const banner = document.getElementById("test-done-banner");
+  if (banner) banner.hidden = true;
+  const openBtn = document.getElementById("btn-test-open-analysis");
+  if (openBtn) openBtn.hidden = true;
   const loadingEl = document.getElementById("post-test-loading");
   if (loadingEl) loadingEl.hidden = true;
   const gate = document.getElementById("ai-gate");
@@ -1732,12 +1759,20 @@ function updateFlowUI() {
     btn.disabled = false;
     btn.textContent = "К тесту и разбору";
     btn.classList.add("glow");
-    hint.textContent = "После отправки ответов откроются метрики. Чат — на вкладке «ИИ».";
+    hint.textContent = "После отправки ответов откройте вкладку «Разбор» — метрики и графики. Чат — на «ИИ».";
     if (tf) {
       tf.hidden = false;
-      if (tff) tff.textContent = "Тест заполнен — нажмите «К тесту и разбору» или дождитесь авто-разбора.";
+      if (tff) {
+        tff.textContent = window.lastAnalysis
+          ? "Разбор готов — вкладка «Разбор». Здесь можно снова изменить ответы и пересчитать."
+          : "Тест заполнен — отправьте ответы или дождитесь авто-разбора.";
+      }
+      const openAnalysis = document.getElementById("btn-test-open-analysis");
+      if (openAnalysis) openAnalysis.hidden = !window.lastAnalysis;
       if (aiBtn) aiBtn.hidden = !window.lastAnalysis;
     }
+    const doneBanner = document.getElementById("test-done-banner");
+    if (doneBanner) doneBanner.hidden = !window.lastAnalysis;
   updateQuizMetricsVisibility();
 }
 
@@ -2944,7 +2979,7 @@ function applyAnalysisPanelLabels(res) {
   if (mtsTitleEl) mtsTitleEl.textContent = L.mtsTitle;
   if (mtsLeadEl) mtsLeadEl.textContent = L.mtsLead;
   const insCard = document.getElementById("res-quad-insights");
-  const insLead = insCard?.querySelector(".muted.small");
+  const insLead = document.getElementById("insights-panel-lead") || insCard?.querySelector(".muted.small");
   if (insLead) insLead.textContent = L.insightsLead;
   const stCard = document.getElementById("res-stages");
   const stTitle = stCard?.querySelector("h2");
@@ -3021,6 +3056,154 @@ function renderChatMessages() {
   root.scrollTop = root.scrollHeight;
 }
 
+function renderReadinessPanel(res) {
+  const card = document.getElementById("res-readiness");
+  const host = document.getElementById("readiness-segmented-host");
+  const whyEl = document.getElementById("readiness-why");
+  const titleEl = document.getElementById("readiness-panel-title");
+  const r = res.readiness;
+  if (!card || !host) return;
+  if (!r || r.value_percent == null) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  const school = isSchoolAnalysis(res);
+  if (titleEl) {
+    titleEl.textContent = school ? "Ясность маршрута" : "Индекс готовности";
+  }
+  renderSegmentedGauge(host, r.value_percent);
+  if (whyEl) {
+    const why = r.why || r.summary || "";
+    whyEl.textContent = why ? String(why) : "";
+    whyEl.hidden = !why;
+  }
+}
+
+function renderScenariosPanel(res) {
+  const card = document.getElementById("res-scenarios");
+  const hero = document.getElementById("scenarios-hero");
+  const lanes = document.getElementById("scenarios-lanes");
+  const capEl = document.getElementById("scenarios-caption");
+  const titleEl = document.getElementById("scenarios-panel-title");
+  if (!card || !hero || !lanes) return;
+  const dirs = res.directions || [];
+  if (!dirs.length) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  const school = isSchoolAnalysis(res);
+  if (titleEl) {
+    titleEl.textContent = school ? "Куда идти учиться (A / B / C)" : "Сценарии развития (A / B / C)";
+  }
+  const best = dirs.reduce((a, b) => ((a.match_score || 0) >= (b.match_score || 0) ? a : b)), dirs[0]);
+  if (capEl) {
+    capEl.textContent = school
+      ? "Три маршрута обучения по ответам теста — сравните и обсудите с родителями или школой."
+      : "Три направления в сфере — ближе всего вариант с наибольшим %.";
+  }
+  hero.innerHTML = `
+    <div class="scenario-hero-pct mono">${esc(String(best.match_score || 0))}%</div>
+    <p class="scenario-hero-name"><strong>${esc(best.plan_code)}</strong> · ${esc(best.name)}</p>`;
+  lanes.innerHTML = dirs
+    .map((d) => {
+      const pct = Math.max(0, Math.min(100, Number(d.match_score) || 0));
+      return `
+      <div class="scenario-lane-row">
+        <div class="scenario-lane-head"><span>${esc(d.plan_code)} · ${esc(d.name)}</span><span class="mono">${pct}%</span></div>
+        <div class="scenario-lane-track"><div class="scenario-lane-fill" style="width:${pct}%"></div></div>
+      </div>`;
+    })
+    .join("");
+}
+
+function renderNarrativePanel(res) {
+  const card = document.getElementById("res-narrative");
+  const el = document.getElementById("analysis-narrative");
+  const text = (res.ai_narrative || "").trim();
+  if (!card || !el) return;
+  if (!text) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  el.textContent = text;
+}
+
+function renderWeeklyRoadmap(res) {
+  const wrap = document.getElementById("res-weekly");
+  const root = document.getElementById("weekly-roadmap-block");
+  if (!wrap || !root) return;
+  const items = res.weekly_roadmap || [];
+  if (!items.length) {
+    wrap.hidden = true;
+    root.innerHTML = "";
+    return;
+  }
+  wrap.hidden = false;
+  root.innerHTML = items
+    .map((w) => {
+      const title = w.week_range || w.period || "Недели";
+      const topics = w.topics || [];
+      const learn = w.learn;
+      const practice = w.practice;
+      const outcome = w.outcome;
+      let body = "";
+      if (learn || practice || outcome) {
+        if (learn) body += `<p class="muted small"><strong>Изучите:</strong> ${esc(learn)}</p>`;
+        if (practice) body += `<p class="muted small"><strong>Практика:</strong> ${esc(practice)}</p>`;
+        if (outcome) body += `<p class="muted small"><strong>Итог:</strong> ${esc(outcome)}</p>`;
+      } else if (topics.length) {
+        body = `<ul class="weekly-topics">${topics.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>`;
+      }
+      return `<article class="weekly-plan-card"><h3 class="weekly-plan-title">${esc(title)}</h3>${body}</article>`;
+    })
+    .join("");
+}
+
+function renderLearningBlock(res) {
+  const learnHost = document.getElementById("learning-block");
+  if (!learnHost) return;
+  const chunks = [];
+  const catalog = res.learning_cards || res.learning || [];
+  if (Array.isArray(catalog) && catalog.length) {
+    chunks.push(
+      catalog
+        .map((r) => {
+          const kind = r.kind || r.type || "ресурс";
+          const url = (r.url || "").trim();
+          return `
+      <div class="learn-card">
+        <span class="badge">${esc(kind)}</span>
+        <h4 style="margin:0.5rem 0 0.35rem">${esc(r.title || "Материал")}</h4>
+        <p class="muted small" style="margin:0">${esc(r.description || "")}</p>
+        ${url && url !== "#" ? `<a href="${esc(url)}" target="_blank" rel="noopener" class="btn secondary">Открыть →</a>` : ""}
+      </div>`;
+        })
+        .join("")
+    );
+  }
+  const pathList = res.learning_path || [];
+  if (Array.isArray(pathList) && pathList.length && !catalog.length) {
+    chunks.push(
+      pathList
+        .map(
+          (r) => `
+      <div class="learn-card">
+        <span class="badge">${esc(r.type)}</span>
+        <h4 style="margin:0.5rem 0 0.35rem">${esc(r.title)}</h4>
+        <p class="muted small" style="margin:0">${esc(r.description)}</p>
+        ${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" class="btn secondary">Открыть →</a>` : ""}
+      </div>`
+        )
+        .join("")
+    );
+  }
+  learnHost.innerHTML = chunks.join("") || '<p class="muted small">Материалы подберутся после обновления разбора.</p>';
+  if (res.learning_path_detail) renderLearningPathDetail(learnHost, res.learning_path_detail);
+}
+
 function renderResults(res) {
   if (!quizComplete()) {
     return;
@@ -3034,12 +3217,12 @@ function renderResults(res) {
     void av.offsetWidth;
     av.classList.add("pulse");
   }
-  const ptw = document.getElementById("post-test-wrap");
-  if (ptw) ptw.hidden = false;
+  showAnalysisPanel(true);
   const wrap = document.getElementById("results");
   if (wrap) wrap.hidden = false;
   unlockChatUi();
   updateAiChecklist();
+  updateFlowUI();
 
   const tsLine = document.getElementById("results-timestamp");
   if (tsLine) {
@@ -3048,6 +3231,8 @@ function renderResults(res) {
   }
 
   const panelLabels = applyAnalysisPanelLabels(res);
+  renderNarrativePanel(res);
+  renderReadinessPanel(res);
   if (res.gap_analysis) renderGap(res.gap_analysis, res);
 
   const radarHost = document.getElementById("style-radar-host");
@@ -3056,27 +3241,15 @@ function renderResults(res) {
     renderStyleFitRadar(radarHost, radarLeg, res.style_fit);
   }
 
+  renderScenariosPanel(res);
+
   const mtsMet = document.getElementById("mts-metrics-block");
   if (mtsMet) renderMtsMetrics(mtsMet, res.mts_matrix, res);
 
   renderInsightTilesFromResult(res);
 
-  const learnHost = document.getElementById("learning-block");
-  if (learnHost) {
-    const cards = (res.learning_path || [])
-      .map(
-        (r) => `
-      <div class="learn-card">
-        <span class="badge">${esc(r.type)}</span>
-        <h4 style="margin:0.5rem 0 0.35rem">${esc(r.title)}</h4>
-        <p class="muted small" style="margin:0">${esc(r.description)}</p>
-        ${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" class="btn secondary">Открыть →</a>` : ""}
-      </div>`
-      )
-      .join("");
-    learnHost.innerHTML = cards || "";
-    if (res.learning_path_detail) renderLearningPathDetail(learnHost, res.learning_path_detail);
-  }
+  renderWeeklyRoadmap(res);
+  renderLearningBlock(res);
 
   const adviceRoot = document.getElementById("advice-block");
   if (adviceRoot) renderAdviceBlock(adviceRoot, res);
@@ -3355,7 +3528,7 @@ async function loadJobsData() {
 }
 
 async function runConsultation(opts = {}) {
-  const { switchToTestTab = true, quietErrors = false } = opts;
+  const { switchToAnalysisTab = true, quietErrors = false } = opts;
   let payload;
   try {
     payload = collectPayload();
@@ -3368,7 +3541,7 @@ async function runConsultation(opts = {}) {
   const btnMain = document.getElementById("btn-analyze");
   const btnTest = document.getElementById("btn-request-ai");
   const loadingEl = document.getElementById("post-test-loading");
-  const ptw = document.getElementById("post-test-wrap");
+  const resultsWrap = document.getElementById("analysis-results");
 
   const setLoading = (v) => {
     if (btnMain) {
@@ -3377,7 +3550,11 @@ async function runConsultation(opts = {}) {
     }
     if (btnTest) btnTest.disabled = v;
     if (loadingEl) loadingEl.hidden = !v;
-    if (v && ptw) ptw.hidden = false;
+    if (v) {
+      setTab("analysis");
+      showAnalysisPanel(true);
+      if (resultsWrap) resultsWrap.hidden = false;
+    }
   };
 
   setLoading(true);
@@ -3400,7 +3577,7 @@ async function runConsultation(opts = {}) {
     saveResult(body, payload);
     renderResults(body);
     chatMessages = [];
-    if (switchToTestTab) setTab("test");
+    if (switchToAnalysisTab) setTab("analysis");
     await loadJobsData();
   } catch (err) {
     if (!quietErrors) showError(err.message || "Сеть или сервер недоступны");
@@ -3417,7 +3594,7 @@ document.getElementById("btn-analyze")?.addEventListener("click", async () => {
     setTab("test");
     return;
   }
-  await runConsultation({ switchToTestTab: true });
+  await runConsultation({ switchToAnalysisTab: true });
 });
 
 document.getElementById("btn-request-ai").addEventListener("click", () => {
@@ -3431,7 +3608,7 @@ document.getElementById("btn-request-ai").addEventListener("click", () => {
     return;
   }
   if (!window.lastAnalysis) {
-    runConsultation({ switchToTestTab: true }).catch(() => {});
+    runConsultation({ switchToAnalysisTab: true }).catch(() => {});
     return;
   }
   setTab("ai");
@@ -3471,7 +3648,7 @@ document.getElementById("btn-restore")?.addEventListener("click", async () => {
   }
   chatMessages = [];
   renderResults(stored.data);
-  setTab("test");
+  setTab("analysis");
   loadJobsData().catch(() => {});
 });
 
@@ -3507,7 +3684,7 @@ const debouncedQuizReload = debounce(() => {
 
 const debouncedReanalyze = debounce(() => {
   if (!profileBasicsOk() || !quizComplete()) return;
-  runConsultation({ switchToTestTab: false, quietErrors: true }).catch(() => {});
+  runConsultation({ switchToAnalysisTab: false, quietErrors: true }).catch(() => {});
 }, 1000);
 
 document.getElementById("diag-form")?.addEventListener("change", () => {

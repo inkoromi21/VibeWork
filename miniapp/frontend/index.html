@@ -4423,6 +4423,36 @@
                 }
                 html += '</div>';
             }
+            const learnCards = d.learning || [];
+            if (learnCards.length) {
+                html +=
+                    '<div class="dash-card" style="margin-bottom:16px"><h3>Материалы и ссылки</h3>' +
+                    '<p class="muted" style="margin:0 0 12px;font-size:.82rem">Официальные источники (ФИПИ) и тренажёры по предметам — откройте один ресурс на неделю.</p>';
+                for (let lc = 0; lc < learnCards.length; lc++) {
+                    const c = learnCards[lc];
+                    const curl = c.url && c.url !== '#' ? c.url : '';
+                    html +=
+                        '<div class="learn-path-resource" style="margin:0 0 10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:.85rem;line-height:1.4">' +
+                        (c.kind
+                            ? '<span class="muted" style="font-size:.72rem;display:block;margin-bottom:4px">' +
+                              esc(String(c.kind)) +
+                              '</span>'
+                            : '') +
+                        (curl
+                            ? '<a href="' +
+                              esc(curl) +
+                              '" target="_blank" rel="noopener" style="color:var(--accent-dark);font-weight:600">' +
+                              esc(c.title || 'Материал') +
+                              '</a>'
+                            : esc(c.title || 'Материал'));
+                    if (c.description) {
+                        html +=
+                            '<p class="muted" style="margin:6px 0 0;font-size:.78rem">' + esc(String(c.description)) + '</p>';
+                    }
+                    html += '</div>';
+                }
+                html += '</div>';
+            }
             const lp = d.learning_path || {};
             const lpMetrics = lp.metrics || {};
             const lpSteps = lp.steps || [];

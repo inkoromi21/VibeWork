@@ -95,6 +95,9 @@
         <button type="button" class="nav-pill side-nav-item" data-tab="test">
           <span class="sn-ico" aria-hidden="true">☑</span> Тестирование
         </button>
+        <button type="button" class="nav-pill side-nav-item" data-tab="analysis">
+          <span class="sn-ico" aria-hidden="true">📊</span> Разбор
+        </button>
         <button type="button" class="nav-pill side-nav-item" data-tab="ai">
           <span class="sn-ico" aria-hidden="true">💬</span> Чат с ИИ
         </button>
@@ -168,7 +171,7 @@
           </div>
         </div>
         <p id="quiz-track-hint" class="muted small metrics-hint" hidden></p>
-        <p id="quiz-metrics-hint" class="muted small metrics-hint">Шкалы — после готового профиля. Разбор откроется, когда заполнен опросник на вкладке «Тест».</p>
+        <p id="quiz-metrics-hint" class="muted small metrics-hint">После отправки ответов метрики и графики — на вкладке «Разбор».</p>
         <div class="quiz-test-section">
           <h2 class="quiz-test-heading">Тест 1 — стиль задач в вашей сфере</h2>
           <p class="muted small quiz-test-lead">
@@ -183,15 +186,40 @@
         </div>
         <div class="actions test-footer" id="test-footer" hidden>
           <p class="muted small" id="test-footer-hint"></p>
-          <button type="button" id="btn-request-ai" class="btn primary glow">Открыть чат с ИИ</button>
+          <button type="button" id="btn-test-open-analysis" class="btn primary glow" hidden>Открыть разбор</button>
+          <button type="button" id="btn-request-ai" class="btn secondary">Открыть чат с ИИ</button>
+        </div>
+        <div id="test-done-banner" class="card float-in test-done-banner" hidden>
+          <p class="muted small" style="margin:0 0 0.75rem">Тест отправлен. Метрики, графики и сценарии — на вкладке <strong>«Разбор»</strong>.</p>
+          <button type="button" class="btn primary" id="btn-test-to-analysis">Перейти к разбору →</button>
         </div>
       </div>
+    </section>
 
-      <div id="post-test-wrap" class="post-test-stack results-stack" hidden>
+    <section class="panel" id="panel-analysis" data-panel="analysis">
+      <div id="analysis-gate" class="card float-in hint-card">
+        <h1>Разбор после теста</h1>
+        <p class="muted">Здесь появятся <strong>метрики и графики</strong>: готовность, радар, сценарии A/B/C, разрыв по навыкам или предметам, обучение и план.</p>
+        <p class="muted small">Сначала заполните профиль и пройдите тест на вкладке «Тестирование», затем отправьте ответы — разбор соберётся автоматически.</p>
+        <div class="actions">
+          <button type="button" class="btn secondary" id="btn-analysis-go-profile">К профилю</button>
+          <button type="button" class="btn primary" id="btn-analysis-go-test">К тесту</button>
+        </div>
+      </div>
+      <div id="analysis-results" class="post-test-stack results-stack" hidden>
         <p id="post-test-loading" class="card float-in muted" hidden>Собираем разбор по ответам…</p>
         <div id="results" class="results-inner results-inner--compact">
           <p class="results-timestamp muted small" id="results-timestamp" hidden></p>
+          <div class="card float-in" id="res-narrative" hidden>
+            <h2>Краткий вывод</h2>
+            <p id="analysis-narrative" class="analysis-narrative muted" style="margin:0;line-height:1.6"></p>
+          </div>
           <div class="results-dashboard-top">
+            <div class="card float-in metric-panel metric-panel--readiness" id="res-readiness">
+              <h2 class="metric-panel-title" id="readiness-panel-title">Готовность к цели</h2>
+              <div id="readiness-segmented-host" class="cdek-segmented-wrap"></div>
+              <p class="muted small" id="readiness-why"></p>
+            </div>
             <div class="card float-in metric-panel metric-panel--segments" id="res-gap">
               <h2 class="metric-panel-title">Готовность к цели трека</h2>
               <p class="muted small" id="gap-headline"></p>
@@ -206,10 +234,16 @@
               <div id="style-fit-legend" class="style-radar-legend muted small"></div>
             </div>
           </div>
+          <div class="card float-in metric-panel metric-panel--scenarios" id="res-scenarios" hidden>
+            <h2 class="metric-panel-title" id="scenarios-panel-title">Сценарии A / B / C</h2>
+            <p class="muted small" id="scenarios-caption"></p>
+            <div id="scenarios-hero" class="scenario-hero-compact"></div>
+            <div id="scenarios-lanes" class="scenario-lanes"></div>
+          </div>
           <div class="results-metrics-grid results-metrics-grid--secondary">
-            <div class="card float-in metric-panel metric-panel--quad metric-panel--fullrow" id="res-quad-insights" hidden>
+            <div class="card float-in metric-panel metric-panel--quad metric-panel--fullrow" id="res-quad-insights">
               <h2 class="metric-panel-title">Четыре индикатора</h2>
-              <p class="muted small">
+              <p class="muted small" id="insights-panel-lead">
                 Психологическая готовность к роли, усиленный вклад <strong>теста личности</strong>, совпадение теста сферы с рекомендуемым треком и ориентир по работе с людьми и чужими запросами.
                 Проценты — модельные оценки для рефлексии, не медицинское заключение.
               </p>
@@ -220,6 +254,10 @@
               <p class="muted small">Топ направлений из матрицы.</p>
               <div id="mts-metrics-block" class="mts-thermo-list"></div>
             </div>
+          </div>
+          <div class="card float-in" id="res-weekly" hidden>
+            <h2>План на 4 недели</h2>
+            <div id="weekly-roadmap-block" class="weekly-roadmap-stack"></div>
           </div>
           <div class="card float-in" id="res-learn">
             <h2>Обучение</h2>
@@ -246,15 +284,16 @@
     <section class="panel" id="panel-ai" data-panel="ai">
       <div id="ai-gate" class="card float-in hint-card">
         <h2>Чат с ИИ</h2>
-        <p class="muted">Чат открывается после профиля и теста: сначала появится <strong>разбор под тестом</strong>, затем можно задавать вопросы здесь. Подбор вакансий на вкладке «Работа» учитывает разбор и последние сообщения чата.</p>
+        <p class="muted">Чат открывается после профиля, теста и вкладки <strong>«Разбор»</strong>. Подбор вакансий учитывает разбор и последние сообщения чата.</p>
         <ul class="checklist" id="ai-readiness">
           <li id="chk-profile">Профиль: возраст, сфера, уровень образования</li>
           <li id="chk-test">Тесты: оба блока заполнены</li>
-          <li id="chk-report">Разбор получен (под тестом)</li>
+          <li id="chk-report">Разбор получен (вкладка «Разбор»)</li>
         </ul>
         <div class="actions">
           <button type="button" class="btn secondary" id="btn-go-profile">К профилю</button>
-          <button type="button" class="btn secondary" id="btn-go-test">К тесту и разбору</button>
+          <button type="button" class="btn secondary" id="btn-go-test">К тесту</button>
+          <button type="button" class="btn secondary" id="btn-go-analysis">К разбору</button>
         </div>
       </div>
       <div id="ai-chat-shell" class="card float-in chat-shell chat-shell--framed" hidden>

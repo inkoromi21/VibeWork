@@ -361,9 +361,17 @@ async def build_analysis_unified(payload: DiagnosisPayload) -> AnalysisResult:
     learning = _learning_resources(full)
     advice = _normalize_advice(full.get("individual_advice"), directions, school=school)
 
+    learn_cards = full.get("learning") or []
+    if isinstance(learn_cards, list):
+        learn_cards = [c for c in learn_cards if isinstance(c, dict)]
+    else:
+        learn_cards = []
+
     return AnalysisResult(
         profile_summary=str(full.get("profile_summary") or ""),
         behavioral_hint=full.get("behavioral_hint"),
+        readiness=full.get("readiness") if isinstance(full.get("readiness"), dict) else None,
+        learning_cards=learn_cards or None,
         directions=directions,
         gap_analysis=gap,
         learning_path=learning,
