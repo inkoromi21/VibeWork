@@ -1099,11 +1099,25 @@
             line-height: 1.45;
         }
         .analysis-spoiler,
+        .analysis-block,
         .advice-sec-spoiler {
             margin: 0 0 10px;
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             overflow: hidden;
+        }
+        .analysis-block--plain .analysis-block__head {
+            cursor: default;
+        }
+        .analysis-block--plain .analysis-block__head::before {
+            display: none;
+        }
+        .analysis-block--root {
+            margin: 0 0 14px;
+        }
+        .analysis-block--nested {
+            margin: 8px 0 0;
+            border-color: color-mix(in srgb, var(--border) 72%, transparent);
         }
         .analysis-spoiler--root {
             margin: 0 0 14px;
@@ -1553,25 +1567,27 @@
         .radar-chart-svg .radar-ring { fill: none; stroke: var(--border); stroke-width: 1; }
         .radar-chart-svg .radar-spoke { stroke: color-mix(in srgb, var(--border) 85%, transparent); stroke-width: 1; }
         .radar-chart-svg .radar-fill { fill: rgba(61, 177, 61, 0.22); stroke: var(--accent-dark); stroke-width: 2; }
-        .radar-chart-svg .radar-node { fill: var(--card); stroke: var(--accent-dark); stroke-width: 2; }
-        .radar-chart-svg .radar-axis-label { fill: var(--text); font-size: 9px; font-weight: 600; font-family: var(--font); }
-        .radar-chart-svg .radar-axis-pct { fill: var(--accent-dark); font-size: 10px; font-weight: 700; font-family: var(--font-mono); }
-        .radar-chip-pos {
-            display: inline-block;
-            min-width: 1.1em;
-            margin-right: 2px;
-            font-weight: 700;
-            color: var(--accent-dark);
-        }
+        .radar-chart-svg .radar-node { stroke-width: 2; }
         .radar-legend { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
         .radar-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
             font-family: var(--font-mono);
             font-size: .7rem;
             padding: 4px 10px;
             border-radius: 999px;
-            background: var(--accent-soft);
-            border: 1px solid var(--accent-border);
-            color: var(--accent-dark);
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        .radar-chip-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+            box-shadow: 0 0 0 1px color-mix(in srgb, var(--card) 40%, transparent);
         }
         .scenario-hero { text-align: center; margin-bottom: 16px; }
         .scenario-hero .big-pct { font-size: 2.25rem; font-weight: 800; font-family: var(--font-mono); color: var(--accent-dark); line-height: 1.1; }
@@ -2926,6 +2942,50 @@
         return h;
     }
 
+    function stripHtmlTextLen(html) {
+        return String(html || '')
+            .replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim().length;
+    }
+
+    function countAnalysisSpoilersInHtml(html) {
+        return (String(html || '').match(/class="[^"]*analysis-spoiler/g) || []).length;
+    }
+
+    function shouldWrapAnalysisSpoiler(bodyHtml, opts) {
+        opts = opts || {};
+        if (opts.alwaysSpoiler) return true;
+        if (opts.neverSpoiler) return false;
+        const html = String(bodyHtml || '');
+        if (!html.trim()) return false;
+        const textLen = stripHtmlTextLen(html);
+        const nested = countAnalysisSpoilersInHtml(html);
+        const listItems = (html.match(/<li[\s>]/gi) || []).length;
+        const bars = (html.match(/plan-bar-outer/g) || []).length;
+        const learnRes = (html.match(/learn-path-resource/g) || []).length;
+        const mtsRows = (html.match(/mts-row/g) || []).length;
+
+        if (nested >= 2) return true;
+        if (nested === 1 && textLen > 420) return true;
+        if (listItems > 4 || learnRes >= 2) return true;
+
+        if (nested === 1 && textLen <= 400) return false;
+
+        if (nested === 0) {
+            if (html.includes('radar-svg-wrap') && bars === 0 && textLen <= 520) return false;
+            if (html.includes('readiness-metric__bar-wrap') && listItems <= 4 && textLen <= 950) return false;
+            if (textLen <= 220 && bars <= 1 && listItems <= 2 && learnRes === 0) return false;
+            if (textLen <= 300 && !/<ul[\s>]/i.test(html) && learnRes === 0 && bars === 0) return false;
+            if (bars === 1 && textLen <= 160) return false;
+            if (mtsRows === 1 && textLen <= 100) return false;
+            if (html.includes('scenario-hero') && bars <= 3 && textLen <= 650) return false;
+        }
+        return textLen > 400 || bars > 2 || listItems > 3 || mtsRows > 5;
+    }
+
     function analysisSpoiler(summaryHtml, bodyHtml, opts) {
         opts = opts || {};
         let cls = 'analysis-spoiler';
@@ -2944,6 +3004,27 @@
             '<div class="analysis-spoiler__body">' +
             (bodyHtml || '') +
             '</div></details>'
+        );
+    }
+
+    function analysisBlock(summaryHtml, bodyHtml, opts) {
+        opts = opts || {};
+        if (shouldWrapAnalysisSpoiler(bodyHtml, opts)) {
+            return analysisSpoiler(summaryHtml, bodyHtml, opts);
+        }
+        let cls = 'analysis-block analysis-block--plain';
+        if (opts.nested) cls += ' analysis-block--nested';
+        if (opts.root) cls += ' analysis-block--root';
+        return (
+            '<section class="' +
+            cls +
+            '">' +
+            '<div class="analysis-block__head analysis-spoiler__sum">' +
+            summaryHtml +
+            '</div>' +
+            '<div class="analysis-block__body analysis-spoiler__body">' +
+            (bodyHtml || '') +
+            '</div></section>'
         );
     }
 
@@ -2984,7 +3065,7 @@
         body += learnDescSpoiler(mdesc);
         body += '</div>';
         const hint = M.provider ? String(M.provider) : mdesc ? 'есть описание' : '';
-        return analysisSpoiler(analysisSummaryTitle(M.title || 'Материал', hint), body, { nested: true });
+        return analysisBlock(analysisSummaryTitle(M.title || 'Материал', hint), body, { nested: true });
     }
 
     function renderAdvicePlanStepsHtml(secSteps) {
@@ -3006,7 +3087,7 @@
                 inner += renderLearnResourceSpoiler(mats[mi], 'inline');
             }
             const stepHint = truncHint(stepText, 56) || 'Шаг ' + (s + 1);
-            html += analysisSpoiler(analysisSummaryTitle(stepHint, mats.length ? mats.length + ' материала' : ''), inner, {
+            html += analysisBlock(analysisSummaryTitle(stepHint, mats.length ? mats.length + ' материала' : ''), inner, {
                 nested: true
             });
         }
@@ -3016,7 +3097,7 @@
     function renderAdvicePlanSectionHtml(sec) {
         const secTitle = sec.title ? String(sec.title) : 'Раздел';
         const secSteps = sec.steps || [];
-        return analysisSpoiler(analysisSummaryTitle(secTitle, secSteps.length ? secSteps.length + ' шаг.' : ''), renderAdvicePlanStepsHtml(secSteps), {
+        return analysisBlock(analysisSummaryTitle(secTitle, secSteps.length ? secSteps.length + ' шаг.' : ''), renderAdvicePlanStepsHtml(secSteps), {
             nested: true
         });
     }
@@ -3534,26 +3615,22 @@
         return true;
     }
 
-    /** Подписи у вершин радара: 0 — верх, 1 — слева, 2 — низ, 3 — справа (по часовой от верха). */
-    const RADAR_AXIS_POS = ['↑', '←', '↓', '→'];
+    /** Цвета вершин радара: 0 — верх, 1 — слева, 2 — низ, 3 — справа (по часовой от верха). */
+    const RADAR_AXIS_COLORS = ['#4caf50', '#5c9ded', '#f0a030', '#e07098'];
 
-    function radarLabelAnchor(rad) {
-        const c = Math.cos(rad);
-        if (c < -0.35) return 'end';
-        if (c > 0.35) return 'start';
-        return 'middle';
+    function radarAxisColor(i) {
+        return RADAR_AXIS_COLORS[i % RADAR_AXIS_COLORS.length];
     }
 
     function buildRadarSvg(axes) {
         const ax = axes || [];
         if (!ax.length) return '';
         const n = ax.length;
-        const pad = 44;
+        const pad = 18;
         const vb = 200 + pad * 2;
         const cx = vb / 2;
         const cy = vb / 2;
         const R = 76;
-        const labelR = R + 26;
         let grid = '';
         for (let g = 1; g <= 4; g++) {
             const r = (R * g) / 4;
@@ -3569,7 +3646,6 @@
         let spokes = '';
         let pts = '';
         let nodes = '';
-        let labels = '';
         for (let i = 0; i < n; i++) {
             const pct = Math.max(0, Math.min(100, ax[i].value_percent != null ? ax[i].value_percent : 0));
             const rad = Math.PI / 2 + (i * 2 * Math.PI) / n;
@@ -3589,42 +3665,21 @@
             const x = cx + rr * Math.cos(rad);
             const y = cy - rr * Math.sin(rad);
             pts += (i ? ' ' : '') + x.toFixed(1) + ',' + y.toFixed(1);
+            const nodeColor = radarAxisColor(i);
             nodes +=
                 '<circle class="radar-node" cx="' +
                 x.toFixed(1) +
                 '" cy="' +
                 y.toFixed(1) +
-                '" r="4.5" aria-label="' +
+                '" r="5.5" fill="' +
+                nodeColor +
+                '" stroke="var(--card)" aria-label="' +
                 esc((ax[i].label || '') + ' ' + pct + '%') +
                 '"/>';
-            const lx = cx + labelR * Math.cos(rad);
-            const ly = cy - labelR * Math.sin(rad);
-            const anchor = radarLabelAnchor(rad);
-            const dy = Math.sin(rad) > 0.25 ? 4 : Math.sin(rad) < -0.25 ? -2 : 0;
-            const title = esc(ax[i].label || '');
-            labels +=
-                '<text x="' +
-                lx.toFixed(1) +
-                '" y="' +
-                (ly + dy).toFixed(1) +
-                '" text-anchor="' +
-                anchor +
-                '">' +
-                '<tspan class="radar-axis-label" x="' +
-                lx.toFixed(1) +
-                '" dy="0">' +
-                title +
-                '</tspan>' +
-                '<tspan class="radar-axis-pct" x="' +
-                lx.toFixed(1) +
-                '" dy="11">' +
-                pct +
-                '%</tspan></text>';
         }
         const ariaParts = ax
             .map(function (a, i) {
-                const pos = RADAR_AXIS_POS[i] || '';
-                return (pos ? pos + ' ' : '') + (a.label || '') + ' ' + (a.value_percent != null ? a.value_percent : 0) + '%';
+                return (a.label || '') + ' ' + (a.value_percent != null ? a.value_percent : 0) + '%';
             })
             .join('; ');
         return (
@@ -3641,7 +3696,6 @@
             pts +
             '"/>' +
             nodes +
-            labels +
             '</svg>'
         );
     }
@@ -5352,7 +5406,10 @@
                 if (items[ii]) list += '<li style="margin-bottom:4px">' + esc(String(items[ii])) + '</li>';
             }
             list += '</ul>';
-            html += analysisSpoiler(analysisSummaryTitle(b.label, items.length + ' пункта'), list, { nested: true });
+            html += analysisBlock(analysisSummaryTitle(b.label, items.length + ' пункта'), list, {
+                nested: true,
+                neverSpoiler: items.length <= 2
+            });
         }
         return html;
     }
@@ -5370,10 +5427,10 @@
             r.why && (r.pros || r.cons)
                 ? { why: r.why, pros: r.pros || [], cons: r.cons || [] }
                 : buildReadinessInsightFallback(v, ctx);
-        let whyBlock = analysisSpoiler(
+        let whyBlock = analysisBlock(
             analysisSummaryTitle('Почему ' + v + '%', truncHint(insight.why, 48)),
             '<p class="readiness-metric__why muted" style="margin:0;font-size:.82rem;line-height:1.5">' + esc(insight.why || '') + '</p>',
-            { nested: true }
+            { nested: true, neverSpoiler: true }
         );
         return (
             '<div class="readiness-metric">' +
@@ -5393,10 +5450,12 @@
         for (let i = 0; i < axes.length; i++) {
             const a = axes[i];
             const pct = a.value_percent != null ? a.value_percent : 0;
-            const pos = RADAR_AXIS_POS[i] || '';
+            const col = radarAxisColor(i);
             h +=
                 '<span class="radar-chip">' +
-                (pos ? '<span class="radar-chip-pos" aria-hidden="true">' + pos + '</span>' : '') +
+                '<span class="radar-chip-dot" style="background:' +
+                col +
+                '" aria-hidden="true"></span>' +
                 esc(a.label) +
                 ' · ' +
                 pct +
@@ -5420,7 +5479,7 @@
             let summaryInner = '';
             if (d.readiness) {
                 const rv = d.readiness.value_percent != null ? d.readiness.value_percent : 0;
-                summaryInner += analysisSpoiler(
+                summaryInner += analysisBlock(
                     analysisSummaryTitle('Готовность к цели трека', rv + '%'),
                     renderReadinessGauge(d.readiness, {
                         axes: axes,
@@ -5428,25 +5487,28 @@
                         scenarios: d.scenarios,
                         preparation_level: prepLevel
                     }),
-                    { nested: true }
+                    { nested: true, neverSpoiler: true }
                 );
             }
             if (axes.length) {
-                summaryInner += analysisSpoiler(
+                summaryInner += analysisBlock(
                     analysisSummaryTitle('Оси методики', '4 показателя'),
                     '<div class="radar-svg-wrap">' + buildRadarSvg(axes) + radarLegendChips(axes) + '</div>',
-                    { nested: true }
+                    { nested: true, neverSpoiler: true }
                 );
             }
             if (summaryInner) {
-                html += analysisSpoiler(analysisSummaryTitle('Сводка', 'готовность и оси'), summaryInner, { root: true });
+                html += analysisBlock(analysisSummaryTitle('Сводка', 'готовность и оси'), summaryInner, {
+                    root: true,
+                    neverSpoiler: countAnalysisSpoilersInHtml(summaryInner) === 0
+                });
             }
 
             if (d.behavioral_hint) {
-                html += analysisSpoiler(
+                html += analysisBlock(
                     analysisSummaryTitle('Поведенческая подсказка', truncHint(d.behavioral_hint, 40)),
                     '<p class="muted" style="font-size:.9rem;line-height:1.5;margin:0">' + esc(d.behavioral_hint) + '</p>',
-                    { root: true }
+                    { root: true, neverSpoiler: true }
                 );
             }
             const gap = d.gap_analysis;
@@ -5464,22 +5526,22 @@
                     const bar = gap.bars[gi];
                     const userPct = bar.user_percent != null ? bar.user_percent : 0;
                     const targetPct = bar.target_percent != null ? bar.target_percent : 0;
-                    gapBody += analysisSpoiler(
+                    gapBody += analysisBlock(
                         analysisSummaryTitle(bar.label || 'Навык', userPct + '% → ' + targetPct + '%'),
                         '<div class="plan-bar-outer"><div class="plan-bar-inner" style="width:' +
                             Math.min(100, userPct) +
                             '%"></div></div>',
-                        { nested: true }
+                        { nested: true, neverSpoiler: true }
                     );
                 }
                 if (gap.closing_skills && gap.closing_skills.length) {
-                    gapBody += analysisSpoiler(
+                    gapBody += analysisBlock(
                         analysisSummaryTitle('Закрыть в первую очередь', gap.closing_skills.length + ' навыка'),
                         '<p class="muted" style="font-size:.82rem;margin:0">' + esc(gap.closing_skills.join(', ')) + '</p>',
-                        { nested: true }
+                        { nested: true, neverSpoiler: gap.closing_skills.length <= 3 }
                     );
                 }
-                html += analysisSpoiler(analysisSummaryTitle(gapTitle, gap.bars.length + ' показателя'), gapBody, { root: true });
+                html += analysisBlock(analysisSummaryTitle(gapTitle, gap.bars.length + ' показателя'), gapBody, { root: true });
             }
             const pain = d.pain_focus;
             if (pain && (pain.summary || pain.label)) {
@@ -5499,15 +5561,19 @@
                 const tips = pain.tips || [];
                 for (let pi = 0; pi < tips.length; pi++) {
                     if (!tips[pi]) continue;
-                    painBody += analysisSpoiler(analysisSummaryTitle('Шаг ' + (pi + 1), truncHint(tips[pi], 40)), '<p class="muted" style="margin:0;font-size:.85rem;line-height:1.5">' + esc(tips[pi]) + '</p>', { nested: true });
+                    painBody += analysisBlock(
+                        analysisSummaryTitle('Шаг ' + (pi + 1), truncHint(tips[pi], 40)),
+                        '<p class="muted" style="margin:0;font-size:.85rem;line-height:1.5">' + esc(tips[pi]) + '</p>',
+                        { nested: true, neverSpoiler: true }
+                    );
                 }
-                html += analysisSpoiler(analysisSummaryTitle('Фокус по вашей ситуации', pain.label || truncHint(pain.summary, 36)), painBody, { root: true });
+                html += analysisBlock(analysisSummaryTitle('Фокус по вашей ситуации', pain.label || truncHint(pain.summary, 36)), painBody, { root: true });
             }
             if (d.ai_narrative) {
-                html += analysisSpoiler(
+                html += analysisBlock(
                     analysisSummaryTitle('Краткий вывод', truncHint(d.ai_narrative, 44)),
                     '<p class="analysis-narrative" style="font-size:.9rem;line-height:1.6;margin:0">' + esc(d.ai_narrative) + '</p>',
-                    { root: true }
+                    { root: true, neverSpoiler: stripHtmlTextLen(d.ai_narrative) <= 420 }
                 );
             }
             const sc = d.scenarios || {};
@@ -5531,13 +5597,21 @@
                 for (let i = 0; i < plans.length; i++) {
                     const p = plans[i];
                     const pct = p.score_percent != null ? p.score_percent : 0;
-                    scenBody += analysisSpoiler(
-                        analysisSummaryTitle(p.name || 'Сценарий', pct + '%'),
-                        '<div class="plan-bar-outer"><div class="plan-bar-inner" style="width:' + pct + '%"></div></div>',
-                        { nested: true }
-                    );
+                    scenBody +=
+                        '<div class="scenario-plan-row" style="margin:10px 0 0">' +
+                        '<div class="muted" style="font-size:.8rem;margin:0 0 4px">' +
+                        esc(p.name || 'Сценарий') +
+                        ' · ' +
+                        pct +
+                        '%</div>' +
+                        '<div class="plan-bar-outer"><div class="plan-bar-inner" style="width:' +
+                        pct +
+                        '%"></div></div></div>';
                 }
-                html += analysisSpoiler(analysisSummaryTitle(scenTitle, bestPct + '% · ' + bestName), scenBody, { root: true });
+                html += analysisBlock(analysisSummaryTitle(scenTitle, bestPct + '% · ' + bestName), scenBody, {
+                    root: true,
+                    neverSpoiler: plans.length <= 4
+                });
             }
             const mts = (d.mts_matrix && d.mts_matrix.rows) || [];
             if (mts.length) {
@@ -5562,19 +5636,23 @@
                     const row = mts[i];
                     const pct = row.match_percent != null ? row.match_percent : row.percent != null ? row.percent : 0;
                     const rank = row.rank != null ? row.rank : i;
-                    mtsBody += analysisSpoiler(
-                        analysisSummaryTitle(row.role_name || 'Роль', pct + '%'),
+                    mtsBody +=
+                        '<div style="margin:8px 0 0">' +
+                        '<div class="muted" style="font-size:.78rem;margin:0 0 4px">' +
+                        esc(row.role_name || 'Роль') +
+                        '</div>' +
                         '<div class="mts-row" style="margin:0"><div class="mts-thermo" style="flex:1"><div class="mts-fill" style="width:' +
-                            pct +
-                            '%;background:' +
-                            mtsFillStyle(rank) +
-                            '"></div></div><div class="mts-pct">' +
-                            pct +
-                            '%</div></div>',
-                        { nested: true }
-                    );
+                        pct +
+                        '%;background:' +
+                        mtsFillStyle(rank) +
+                        '"></div></div><div class="mts-pct">' +
+                        pct +
+                        '%</div></div></div>';
                 }
-                html += analysisSpoiler(analysisSummaryTitle(mtsTitle, mts.length + ' варианта'), mtsBody, { root: true });
+                html += analysisBlock(analysisSummaryTitle(mtsTitle, mts.length + ' варианта'), mtsBody, {
+                    root: true,
+                    neverSpoiler: mts.length <= 5
+                });
             }
             const learnCards = d.learning || [];
             if (learnCards.length) {
@@ -5583,7 +5661,7 @@
                 for (let lc = 0; lc < learnCards.length; lc++) {
                     learnBody += renderLearnResourceSpoiler(learnCards[lc], 'card');
                 }
-                html += analysisSpoiler(analysisSummaryTitle('Материалы и ссылки', learnCards.length + ' ресурса'), learnBody, { root: true });
+                html += analysisBlock(analysisSummaryTitle('Материалы и ссылки', learnCards.length + ' ресурса'), learnBody, { root: true });
             }
             const lp = d.learning_path || {};
             const lpMetrics = lp.metrics || {};
@@ -5618,13 +5696,13 @@
                     for (let ri = 0; ri < resList.length; ri++) {
                         stepBody += renderLearnResourceSpoiler(resList[ri], 'inline');
                     }
-                    lpBody += analysisSpoiler(
+                    lpBody += analysisBlock(
                         analysisSummaryTitle(String(st.order || si + 1) + '. ' + (st.title || 'Шаг'), statusLbl),
                         stepBody,
                         { nested: true }
                     );
                 }
-                html += analysisSpoiler(
+                html += analysisBlock(
                     analysisSummaryTitle(lp.title || 'Путь развития', lpSteps.length + ' шагов'),
                     lpBody,
                     { root: true }
@@ -5646,12 +5724,12 @@
                             '</p>';
                     }
                     if (block.priority_skills && block.priority_skills.length) {
-                        planBody += analysisSpoiler(
+                        planBody += analysisBlock(
                             analysisSummaryTitle('Сначала подтянуть', truncHint(block.priority_skills.join(', '), 40)),
                             '<p class="muted" style="margin:0;font-size:.8rem;line-height:1.45">' +
                                 esc(block.priority_skills.join(', ')) +
                                 '</p>',
-                            { nested: true }
+                            { nested: true, neverSpoiler: block.priority_skills.length <= 4 }
                         );
                     }
                     const sections =
@@ -5663,14 +5741,14 @@
                     for (let si = 0; si < sections.length; si++) {
                         planBody += renderAdvicePlanSectionHtml(sections[si]);
                     }
-                    advBody += analysisSpoiler(
+                    advBody += analysisBlock(
                         analysisSummaryTitle(block.title || 'План ' + ids[k], block.priority_skills && block.priority_skills[0] ? block.priority_skills[0] : ''),
                         planBody,
                         { nested: true }
                     );
                 }
                 if (advBody) {
-                    html += analysisSpoiler(analysisSummaryTitle('Индивидуальные советы', 'планы A / B / C'), advBody, { root: true });
+                    html += analysisBlock(analysisSummaryTitle('Индивидуальные советы', 'планы A / B / C'), advBody, { root: true });
                 }
             }
             const weekly = d.weekly_roadmap || [];
@@ -5690,10 +5768,10 @@
                         for (let ri = 0; ri < rows.length; ri++) {
                             const row = rows[ri];
                             if (!row.text) continue;
-                            wInner += analysisSpoiler(
+                            wInner += analysisBlock(
                                 analysisSummaryTitle(row.label, truncHint(row.text, 36)),
                                 '<p style="margin:0;font-size:.84rem;line-height:1.45">' + esc(String(row.text)) + '</p>',
-                                { nested: true }
+                                { nested: true, neverSpoiler: true }
                             );
                         }
                     } else {
@@ -5705,9 +5783,9 @@
                         list += '</ul>';
                         wInner = list;
                     }
-                    weekBody += analysisSpoiler(analysisSummaryTitle(w.week_range || 'Неделя ' + (wi + 1), hasMini ? '3 блока' : 'темы'), wInner, { nested: true });
+                    weekBody += analysisBlock(analysisSummaryTitle(w.week_range || 'Неделя ' + (wi + 1), hasMini ? '3 блока' : 'темы'), wInner, { nested: true });
                 }
-                html += analysisSpoiler(analysisSummaryTitle('План на 4 недели', weekly.length + ' недели'), weekBody, { root: true });
+                html += analysisBlock(analysisSummaryTitle('План на 4 недели', weekly.length + ' недели'), weekBody, { root: true });
             }
             const stages = d.growth_stages || [];
             if (stages.length) {
@@ -5731,26 +5809,26 @@
                         stBody += tagH;
                     }
                     if (s.horizon) {
-                        stBody += analysisSpoiler(
+                        stBody += analysisBlock(
                             analysisSummaryTitle('Срок этапа', s.horizon),
                             '<p class="muted" style="margin:0;font-size:.75rem">' + esc(s.horizon) + '</p>',
-                            { nested: true }
+                            { nested: true, neverSpoiler: true }
                         );
                     }
                     if (s.continues_from) {
-                        stBody += analysisSpoiler(
+                        stBody += analysisBlock(
                             analysisSummaryTitle('Связь с прошлым этапом', truncHint(s.continues_from, 36)),
                             '<p class="muted" style="margin:0;font-size:.8rem;line-height:1.45">' + esc(String(s.continues_from)) + '</p>',
-                            { nested: true }
+                            { nested: true, neverSpoiler: true }
                         );
                     }
                     const plan = s.plan || [];
                     for (let pi = 0; pi < plan.length; pi++) {
                         const ps = plan[pi];
-                        stBody += analysisSpoiler(
+                        stBody += analysisBlock(
                             analysisSummaryTitle(ps.label || 'Шаг плана', truncHint(ps.text, 32)),
                             '<p style="margin:0;font-size:.84rem;line-height:1.45">' + esc(ps.text || '') + '</p>',
-                            { nested: true }
+                            { nested: true, neverSpoiler: true }
                         );
                     }
                     const checklist = s.checklist || s.milestones || [];
@@ -5760,14 +5838,14 @@
                             list += '<li style="margin-bottom:4px">' + esc(checklist[m]) + '</li>';
                         }
                         list += '</ul>';
-                        stBody += analysisSpoiler(analysisSummaryTitle('Чеклист', checklist.length + ' пункта'), list, { nested: true });
+                        stBody += analysisBlock(analysisSummaryTitle('Чеклист', checklist.length + ' пункта'), list, { nested: true });
                     }
                     const route = (s.path_route || '').trim();
                     if (route) {
-                        stBody += analysisSpoiler(
+                        stBody += analysisBlock(
                             analysisSummaryTitle('Маршрут обучения', truncHint(route, 36)),
                             '<p class="muted" style="margin:0;font-size:.8rem;line-height:1.45">' + esc(route) + '</p>',
-                            { nested: true }
+                            { nested: true, neverSpoiler: route.length <= 220 }
                         );
                     }
                     const stMats = s.materials || [];
@@ -5775,14 +5853,14 @@
                         stBody += renderLearnResourceSpoiler(stMats[sm], 'inline');
                     }
                     if (s.when_next) {
-                        stBody += analysisSpoiler(
+                        stBody += analysisBlock(
                             analysisSummaryTitle('Когда идти дальше', truncHint(s.when_next, 36)),
                             '<p style="margin:0;font-size:.84rem;line-height:1.45">' + esc(s.when_next) + '</p>',
-                            { nested: true }
+                            { nested: true, neverSpoiler: true }
                         );
                     }
                     const stageHint = (s.subtitle || s.horizon || '').trim();
-                    stagesBody += analysisSpoiler(
+                    stagesBody += analysisBlock(
                         analysisSummaryTitle(
                             'Этап ' + (s.stage != null ? s.stage : i + 1) + ': ' + (s.title || ''),
                             stageHint
@@ -5791,7 +5869,7 @@
                         { nested: true }
                     );
                 }
-                html += analysisSpoiler(analysisSummaryTitle('Этапы роста', stages.length + ' этапа'), stagesBody, { root: true });
+                html += analysisBlock(analysisSummaryTitle('Этапы роста', stages.length + ' этапа'), stagesBody, { root: true });
             }
         return html;
     }

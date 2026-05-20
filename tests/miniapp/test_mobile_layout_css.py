@@ -37,19 +37,22 @@ def test_reset_password_miniapp_back_link():
 
 def test_miniapp_analysis_nested_spoilers():
     html = MINIAPP_HTML.read_text(encoding="utf-8")
-    assert "analysisSpoiler" in html
+    assert "analysisBlock" in html
+    assert "shouldWrapAnalysisSpoiler" in html
+    assert "analysis-block--plain" in html
     assert "analysis-spoiler--nested" in html
     assert "analysis-spoiler--root" in html
     assert "renderAdvicePlanSectionHtml" in html
     assert "renderLearnResourceSpoiler" in html
 
 
-def test_miniapp_radar_chart_has_axis_labels_on_graph():
+def test_miniapp_radar_chart_colored_nodes_and_legend_dots():
     html = MINIAPP_HTML.read_text(encoding="utf-8")
-    assert "radar-axis-label" in html
-    assert "radar-axis-pct" in html
-    assert "RADAR_AXIS_POS" in html
+    assert "RADAR_AXIS_COLORS" in html
+    assert "radar-chip-dot" in html
+    assert "radarAxisColor" in html
     assert "radar-spoke" in html
+    assert "radar-axis-label" not in html
 
 
 def test_miniapp_resolves_test_sphere_from_profile_and_web_interest():
