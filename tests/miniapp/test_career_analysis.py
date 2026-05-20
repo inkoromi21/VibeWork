@@ -82,3 +82,5 @@ def test_public_payload_omits_internal_keys() -> None:
     pub = public_analysis_payload(full)
     assert "profile_summary" not in pub
     assert "directions_hint" not in pub
+    assert "learning_path_detail" in pub
+    assert "growth_stages_rich" in pub

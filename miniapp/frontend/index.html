@@ -26,6 +26,7 @@
     })();
     </script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="/static/vw_shared_ui.js"></script>
     <script>
     (function () {
         try {
@@ -1154,6 +1155,65 @@
             box-shadow: none;
         }
         .scale-val { font-family: var(--font-mono); font-size: .9rem; min-width: 1.5rem; color: var(--accent-dark); }
+        .profile-complete {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+        .profile-complete-lead { margin: 0; font-size: 0.9rem; }
+        .profile-complete-block {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1rem 1.1rem;
+            background: var(--surface-2, rgba(255, 255, 255, 0.02));
+        }
+        .profile-complete-block-title {
+            margin: 0 0 0.75rem;
+            font-size: 0.92rem;
+            font-weight: 700;
+        }
+        .profile-complete-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.65rem 1rem;
+        }
+        .profile-complete-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+            min-width: 0;
+        }
+        .profile-complete-item--wide { grid-column: 1 / -1; }
+        .profile-complete-label { font-size: 0.78rem; color: var(--muted); }
+        .profile-complete-value { font-size: 0.9rem; line-height: 1.45; word-break: break-word; }
+        .profile-complete-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+        .profile-complete-chip {
+            display: inline-block;
+            padding: 0.2rem 0.55rem;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            background: var(--accent-soft);
+        }
+        .profile-complete-actions { display: flex; justify-content: center; padding-top: 0.5rem; }
+        @media (max-width: 640px) {
+            .profile-complete-grid { grid-template-columns: 1fr; }
+        }
+        .quiz-module-block {
+            margin-bottom: 1.35rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px dashed var(--border);
+        }
+        .quiz-module-block:last-child { border-bottom: none; margin-bottom: 0; }
+        .quiz-module-title { margin: 0 0 0.85rem; font-size: 0.95rem; font-weight: 700; }
+        .quiz-track-hint {
+            margin: 0 0 12px;
+            padding: 10px 14px;
+            background: var(--accent-soft);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--accent-border);
+            font-size: 0.82rem;
+            line-height: 1.45;
+        }
         .quiz-q {
             margin-bottom: 22px;
             padding: 18px 16px 16px;
@@ -2184,6 +2244,8 @@
     let profileSchema = null;
     let profileDraft = {};
     let profileWizardStep = 0;
+    /** true — показывать мастер анкеты, а не сводку (после «Пройти заново» или онбординг). */
+    let profileForceWizard = false;
     /** userId, для которого profileDraft уже подтянут с сервера (не сбрасывать при «Далее»). */
     let profileDraftSessionUser = null;
     let cachedProfile = {};
@@ -2196,7 +2258,10 @@
         questions: [],
         answers: {},
         testGradeLabel: '',
-        testGradeHint: ''
+        testGradeHint: '',
+        trackLabel: '',
+        trackHint: '',
+        modules: []
     };
     let chatMessages = [];
     let chatReplyPending = false;
@@ -2953,7 +3018,14 @@
         localStorage.setItem(USER_EMAIL_KEY, data.email || email);
         userId = data.user_id;
         profileFetchDone = false;
-        currentTab = 'home';
+        profileDraftSessionUser = null;
+        if (data.onboarding) {
+            const sh = vwShared();
+            if (sh && sh.setNewAccountOnboardingFlag) sh.setNewAccountOnboardingFlag();
+            startProfileOnboarding();
+        } else {
+            currentTab = 'home';
+        }
         await renderShell();
     }
 
@@ -3266,6 +3338,88 @@
         return html;
     }
 
+    function vwShared() {
+        return window.VibeWorkShared || null;
+    }
+
+    function shouldShowProfileSummary(schema, profile) {
+        return isProfileComplete(schema, profile) && !profileForceWizard;
+    }
+
+    function buildProfileCompleteSummaryHtml(schema, profile) {
+        const sh = vwShared();
+        if (sh && sh.buildProfileSummaryHtml) {
+            return sh.buildProfileSummaryHtml(schema, profile, esc, {
+                profileFieldDisplay: profileFieldDisplayForAbout,
+                sectionTitle: function (sec) {
+                    return sec.title || '';
+                },
+                skipSections: { skills_soft: true },
+            });
+        }
+        return buildAboutYouHtml(schema, profile, null, {});
+    }
+
+    function renderProfileSummaryView(schema, profile) {
+        const el = document.getElementById('tabContent');
+        if (!el) return;
+        el.innerHTML =
+            '<h2>Анкета</h2>' +
+            '<div class="profile-shell"><div class="profile-card profile-complete">' +
+            '<p class="profile-complete-lead muted">Ваши ответы по всем блокам анкеты.</p>' +
+            buildProfileCompleteSummaryHtml(schema, profile) +
+            '<div class="profile-complete-actions">' +
+            '<button type="button" class="btn-secondary" id="btnProfileRetake">Пройти заново</button>' +
+            '</div></div></div>';
+        const btn = document.getElementById('btnProfileRetake');
+        if (btn && !btn.dataset.bound) {
+            btn.dataset.bound = '1';
+            btn.onclick = function () {
+                profileForceWizard = true;
+                profileWizardStep = 0;
+                profileDraft = Object.assign({}, cachedProfile);
+                renderProfileTab();
+            };
+        }
+    }
+
+    function startProfileOnboarding() {
+        const sh = vwShared();
+        if (sh && sh.clearNewAccountOnboardingFlag) sh.clearNewAccountOnboardingFlag();
+        profileForceWizard = true;
+        profileWizardStep = 0;
+        profileDraft = {};
+        profileDraftSessionUser = null;
+        cachedProfile = {};
+        profileFetchDone = false;
+        currentTab = 'profile';
+    }
+
+    function syncCourseGradeInProfileForm(root) {
+        const sh = vwShared();
+        if (!sh || !sh.syncCourseGradeField) return;
+        sh.syncCourseGradeField(root, {
+            esc: esc,
+            onChange: function (val) {
+                profileDraft.course_grade = val;
+            },
+            onEducationChange: function (val) {
+                profileDraft.education_detail = val;
+            },
+        });
+        if (sh.wireEducationDetailForCourseGrade) {
+            sh.wireEducationDetailForCourseGrade(root, {
+                esc: esc,
+                onChange: function (val) {
+                    profileDraft.course_grade = val;
+                },
+                onEducationChange: function (val) {
+                    profileDraft.education_detail = val;
+                },
+            });
+        }
+    }
+
     async function ensureSchema() {
         if (profileSchema) return profileSchema;
         const res = await fetchJson('/api/profile/schema');
@@ -3531,6 +3685,7 @@
             };
         });
         wireProfileCityAutocomplete(root);
+        syncCourseGradeInProfileForm(root);
     }
 
     function wireProfileCityAutocomplete(root) {
@@ -3558,7 +3713,11 @@
             if (profileDraftSessionUser !== userId) {
                 profileDraft = Object.assign({}, profile);
                 profileDraftSessionUser = userId;
-                profileWizardStep = 0;
+                if (!profileForceWizard) profileWizardStep = 0;
+            }
+            if (shouldShowProfileSummary(schema, profile)) {
+                renderProfileSummaryView(schema, profile);
+                return;
             }
             const sections = schema.sections || [];
             if (profileWizardStep < 0) profileWizardStep = 0;
@@ -3647,7 +3806,8 @@
                             profileDraft = Object.assign({}, cachedProfile);
                             profileDraftSessionUser = userId;
                         } catch (e2) {}
-                        currentTab = 'home';
+                        profileForceWizard = false;
+                        currentTab = 'profile';
                         await renderShell();
                         showAppAlert('Анкета сохранена.', 'Готово');
                     } catch (e) {
@@ -3670,6 +3830,9 @@
         quizState.interest = data.interest || '';
         quizState.testGradeLabel = data.test_grade_label || '';
         quizState.testGradeHint = data.test_grade_hint || '';
+        quizState.trackLabel = data.track_label || '';
+        quizState.trackHint = data.track_hint || '';
+        quizState.modules = Array.isArray(data.modules) ? data.modules : [];
         quizState.technical = data.technical || [];
         quizState.personality = data.personality || [];
         quizState.questions =
@@ -3748,25 +3911,39 @@
             }
             let answered = 0;
             for (let i = 0; i < qs.length; i++) if (quizState.answers[qs[i].id]) answered++;
+            const testTitle = quizState.trackLabel
+                ? 'Профориентационный тест (' + quizState.trackLabel + ')'
+                : 'Профориентационный тест';
+            const trackHintBanner = quizState.trackHint
+                ? '<p class="quiz-track-hint">' + esc(quizState.trackHint) + '</p>'
+                : '';
+            const orientMods = (quizState.modules || []).filter(function (m) {
+                return m && m.id && m.id !== 'sphere' && (m.questions || []).length;
+            });
+            const test2Heading =
+                orientMods.length > 1
+                    ? 'Тест 2 — профориентация (несколько блоков)'
+                    : 'Тест 2 — интересы и тип среды';
             let html =
-                '<h2>Профориентационный тест</h2>' +
+                '<h2>' + esc(testTitle) + '</h2>' +
                 warnBanner +
                 gradeBanner +
+                trackHintBanner +
                 '<label for="testSphereSelect">Сфера для теста</label>' +
                 '<select id="testSphereSelect">' + sphereOpts + '</select>' +
                 '<p class="muted" id="quizProgCaption" style="margin:0 0 14px;font-size:.95rem">Отвечено ' +
                 answered +
                 ' из ' +
                 qs.length +
-                ' (техника до ' +
+                ' (техника ' +
                 techQs.length +
-                ', личность ' +
+                ', профориентация ' +
                 persQs.length +
                 ')</p>';
 
-            function renderQuizBlock(title, blockQs) {
+            function renderQuizQuestions(blockQs) {
                 if (!blockQs.length) return '';
-                let blockHtml = '<div class="section-title" style="margin-top:20px">' + esc(title) + '</div>';
+                let blockHtml = '';
                 for (let bi = 0; bi < blockQs.length; bi++) {
                     const q = blockQs[bi];
                     const qid = q.id;
@@ -3780,18 +3957,20 @@
                     const opts = q.options || [];
                     for (let j = 0; j < opts.length; j++) {
                         const o = opts[j];
-                        const sel = picked === o.id ? ' selected' : '';
+                        const choice = o.id != null ? o.id : o.k;
+                        const label = o.label != null ? o.label : o.t || '';
+                        const sel = picked === choice ? ' selected' : '';
                         blockHtml +=
                             '<button type="button" class="quiz-opt' +
                             sel +
                             '" data-qid="' +
                             qid +
                             '" data-choice="' +
-                            esc(o.id) +
+                            esc(String(choice)) +
                             '">' +
-                            esc(o.id) +
+                            esc(String(choice)) +
                             '. ' +
-                            esc(o.label) +
+                            esc(String(label)) +
                             '</button>';
                     }
                     blockHtml += '</div>';
@@ -3799,8 +3978,44 @@
                 return blockHtml;
             }
 
-            html += renderQuizBlock('Блок 1 — по специальности (10 вопросов)', techQs);
-            html += renderQuizBlock('Блок 2 — тип личности и профориентация (5 вопросов)', persQs);
+            function renderQuizBlock(title, blockQs) {
+                if (!blockQs.length) return '';
+                return (
+                    '<div class="section-title" style="margin-top:20px">' +
+                    esc(title) +
+                    '</div>' +
+                    renderQuizQuestions(blockQs)
+                );
+            }
+
+            function renderTest2Blocks() {
+                let out = '<div class="section-title" style="margin-top:20px">' + esc(test2Heading) + '</div>';
+                if (orientMods.length) {
+                    for (let mi = 0; mi < orientMods.length; mi++) {
+                        const mod = orientMods[mi];
+                        out +=
+                            '<div class="quiz-module-block"><h3 class="quiz-module-title">' +
+                            esc(mod.title || mod.id) +
+                            '</h3>' +
+                            renderQuizQuestions(mod.questions || []) +
+                            '</div>';
+                    }
+                    const careerQs = persQs.filter(function (q) {
+                        return q.module === 'career' || q.block === 'career';
+                    });
+                    if (careerQs.length) {
+                        out +=
+                            '<div class="quiz-module-block"><h3 class="quiz-module-title">Карьерные ориентиры</h3>' +
+                            renderQuizQuestions(careerQs) +
+                            '</div>';
+                    }
+                    return out;
+                }
+                return out + renderQuizQuestions(persQs);
+            }
+
+            html += renderQuizBlock('Тест 1 — задачи в вашей сфере', techQs);
+            html += renderTest2Blocks();
             html += '<button type="button" class="btn-primary" id="btnSubmitQuiz">Отправить ответы и получить разбор</button>';
             el.innerHTML = html;
             document.getElementById('testSphereSelect').onchange = async function () {
@@ -6050,8 +6265,13 @@
         }
         const tok = localStorage.getItem(ACCESS_TOKEN_KEY);
         if (userId && tok) {
-            if (await validateStoredSession()) await renderShell();
-            else {
+            if (await validateStoredSession()) {
+                const sh = vwShared();
+                if (sh && sh.isNewAccountOnboarding && sh.isNewAccountOnboarding()) {
+                    startProfileOnboarding();
+                }
+                await renderShell();
+            } else {
                 clearAuth();
                 showAuthScreen();
             }

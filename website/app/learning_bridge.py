@@ -11,16 +11,12 @@ _BACKEND = _REPO / "miniapp" / "backend"
 if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
-from wibe_work.services.learning.engine import build_learning_for_analysis  # noqa: E402
-from wibe_work.services.learning.growth_stages import build_growth_stages  # noqa: E402
-from wibe_work.services.learning.personalized_advice import build_individual_advice  # noqa: E402
+from wibe_work.services.learning_pack import build_learning_extras, normalize_preparation_level  # noqa: E402
 from wibe_work.questionnaire_fields import SPHERE_TO_WEB_INTEREST  # noqa: E402
 from wibe_work.services.user_context import parse_interest_spheres  # noqa: E402
 
 from app.api_schemas import CareerDirection, DiagnosisPayload, GapAnalysis, Interest, LearningResource  # noqa: E402
 from app.profession_packs import resolve_profession_pack  # noqa: E402
-
-_PREP_RU_TO_EN = {"слабый": "weak", "средний": "medium", "сильный": "strong"}
 
 _WEB_TO_SPHERE: dict[str, str] = {}
 for _sid, _web in SPHERE_TO_WEB_INTEREST.items():
@@ -56,7 +52,7 @@ def _track_from_pack(interest: Interest) -> str | None:
 def _profile_dict(payload: DiagnosisPayload) -> dict[str, Any]:
     p = dict(payload.profile_extra or {})
     p.setdefault("age", payload.age)
-    p["preparation_level"] = _PREP_RU_TO_EN.get(payload.preparation_level, "medium")
+    p["preparation_level"] = normalize_preparation_level(str(payload.preparation_level))
     if payload.motivation:
         p.setdefault("motivation_ai", payload.motivation)
     if not p.get("main_sphere"):
@@ -131,46 +127,24 @@ def build_learning_pack_for_website(
     """Каталог, пути обучения, индивидуальные советы и этапы роста с материалами."""
     profile = _profile_dict(payload)
     sphere = _sphere_from_payload(payload)
-    prep = _PREP_RU_TO_EN.get(payload.preparation_level, "medium")
     scenarios = _scenarios_from_directions(directions, payload.interests[0])
     gap_d = _gap_dict(gap)
-    readiness = int(gap.overall_hp or 50)
 
-    pack = build_learning_for_analysis(
-        user_id=None,
+    extras = build_learning_extras(
         profile=profile,
         interest=sphere,
-        preparation_level=prep,
+        preparation_level=str(payload.preparation_level),
         scenarios=scenarios,
         gap=gap_d,
-    )
-    learning_path = pack.get("learning_path") or {}
-    advice = build_individual_advice(
-        scenarios=scenarios,
-        preparation_level=prep,
-        profile=profile,
-        gap=gap_d,
-        interest=sphere,
-        learning_path=learning_path,
         profile_summary=profile_summary,
         user_id=None,
-    )
-    stages = build_growth_stages(
-        interest=sphere,
         eff_interest=sphere,
-        preparation_level=prep,
-        readiness_percent=readiness,
-        profile=profile,
-        gap=gap_d,
-        scenarios=scenarios,
-        individual_advice=advice,
-        learning_path=learning_path,
     )
-    cards = pack.get("learning") or []
+    cards = extras.get("learning") or []
     resources = _cards_to_learning_resources(cards)
     return {
         "learning_resources": resources,
-        "learning_path_detail": learning_path,
-        "individual_advice": advice,
-        "growth_stages_rich": stages,
+        "learning_path_detail": extras.get("learning_path_detail"),
+        "individual_advice": extras.get("individual_advice"),
+        "growth_stages_rich": extras.get("growth_stages_rich"),
     }

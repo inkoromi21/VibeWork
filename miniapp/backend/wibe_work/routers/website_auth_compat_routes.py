@@ -250,7 +250,7 @@ async def register(body: RegisterBody, response: Response):
 
     token, _exp_iso = _create_cookie_session(user_id)
     _set_cookie(response, token)
-    return {"ok": True, "email": body.email}
+    return {"ok": True, "email": body.email, "onboarding": True}
 
 
 @router.post("/login")

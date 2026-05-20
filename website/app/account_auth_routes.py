@@ -125,7 +125,7 @@ async def register(body: RegisterBody, response: Response, db: AsyncSession = De
     await db.commit()
 
     response.set_cookie(**_session_cookie_value(token, SESSION_DAYS * 86400))
-    return {"ok": True, "email": user.email}
+    return {"ok": True, "email": user.email, "onboarding": True}
 
 
 @router.post("/login")

@@ -203,6 +203,7 @@ async def email_register(body: EmailRegisterBody, response: Response):
         "token_type": "bearer",
         "user_id": user_id,
         "email": email,
+        "onboarding": True,
     }
 
 

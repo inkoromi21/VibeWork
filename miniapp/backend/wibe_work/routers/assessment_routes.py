@@ -32,6 +32,7 @@ from wibe_work.services.workday_simulator import (
     start as sim_start,
     step as sim_step,
 )
+from wibe_work.services.quiz_web_bundle import quiz_bundle_for_web
 from wibe_work.services.ai_chat_sessions import (
     get_messages as load_chat_session_messages,
     list_sessions as list_chat_sessions,
@@ -157,6 +158,7 @@ async def quiz_questions(
         "personality": bundle["personality"],
         "questions": bundle["questions"],
         "expected_question_ids": expected_question_ids(profile, intr),
+        "website_quiz_bundle": quiz_bundle_for_web(profile, intr),
     }
 
 

@@ -268,60 +268,43 @@ function profileForAssessmentApi() {
 }
 
 function courseGradeOptionsForEducation(eduDetail) {
-  const d = String(eduDetail || "").trim();
-  if (d === "school_8_11") {
-    return [
-      { v: "8 класс", l: "8 класс" },
-      { v: "9 класс", l: "9 класс" },
-      { v: "10 класс", l: "10 класс" },
-      { v: "11 класс", l: "11 класс" },
-    ];
-  }
-  if (d === "spo") {
-    return [1, 2, 3, 4].map((n) => ({ v: `${n} курс`, l: `${n} курс` }));
-  }
-  if (d === "univ_bachelor" || d === "univ_master") {
-    return [1, 2, 3, 4, 5, 6].map((n) => ({ v: `${n} курс`, l: `${n} курс` }));
-  }
-  if (d === "graduate") {
-    return [{ v: "выпускник", l: "Выпускник" }];
-  }
+  const sh = window.VibeWorkShared;
+  if (sh && sh.courseGradeOptionsForEducation) return sh.courseGradeOptionsForEducation(eduDetail);
   return null;
 }
 
 function syncCourseGradeField() {
-  const edu = document.querySelector('[data-sheet-field="education_detail"]');
-  const cg = document.querySelector('[data-sheet-field="course_grade"]');
-  if (!edu || !cg) return;
-  const opts = courseGradeOptionsForEducation(edu.value);
-  const prev = String(cg.value || "").trim();
-  if (!opts) {
-    if (cg.tagName !== "INPUT") {
-      const inp = document.createElement("input");
-      inp.type = "text";
-      inp.setAttribute("data-sheet-field", "course_grade");
-      inp.placeholder = "10 класс, 2 курс…";
-      inp.className = cg.className || "";
-      inp.value = prev;
-      cg.replaceWith(inp);
-    }
-    return;
-  }
-  let sel = cg;
-  if (cg.tagName !== "SELECT") {
-    sel = document.createElement("select");
-    sel.setAttribute("data-sheet-field", "course_grade");
-    cg.replaceWith(sel);
-    sel.addEventListener("change", () => {
+  const sh = window.VibeWorkShared;
+  const root = document.getElementById("sheet-profile-root") || document;
+  if (!sh || !sh.syncCourseGradeField) return;
+  sh.syncCourseGradeField(root, {
+    esc,
+    onChange: () => {
       scheduleSaveProfileDraft();
       updateFlowUI();
       debouncedQuizReload();
+    },
+    onEducationChange: () => {
+      scheduleSaveProfileDraft();
+      updateFlowUI();
+      debouncedQuizReload();
+    },
+  });
+  if (sh.wireEducationDetailForCourseGrade) {
+    sh.wireEducationDetailForCourseGrade(root, {
+      esc,
+      onChange: () => {
+        scheduleSaveProfileDraft();
+        updateFlowUI();
+        debouncedQuizReload();
+      },
+      onEducationChange: () => {
+        scheduleSaveProfileDraft();
+        updateFlowUI();
+        debouncedQuizReload();
+      },
     });
   }
-  sel.innerHTML =
-    '<option value="">— выберите —</option>' +
-    opts.map((o) => `<option value="${esc(o.v)}">${esc(o.l)}</option>`).join("");
-  if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
 }
 
 let ASSESSMENT_TRACK = null;
@@ -1898,9 +1881,12 @@ function applyServerSnapshot(snap) {
   }
 }
 
-const NEW_ACCOUNT_FLAG = "vibework_new_account";
+const NEW_ACCOUNT_FLAG =
+  (window.VibeWorkShared && window.VibeWorkShared.NEW_ACCOUNT_FLAG) || "vibework_new_account";
 
 function isNewAccountOnboarding() {
+  const sh = window.VibeWorkShared;
+  if (sh && sh.isNewAccountOnboarding) return sh.isNewAccountOnboarding();
   try {
     if (localStorage.getItem(NEW_ACCOUNT_FLAG) === "1") return true;
     return new URLSearchParams(window.location.search).get("onboarding") === "1";
@@ -1910,6 +1896,8 @@ function isNewAccountOnboarding() {
 }
 
 function clearNewAccountOnboardingFlag() {
+  const sh = window.VibeWorkShared;
+  if (sh && sh.clearNewAccountOnboardingFlag) return sh.clearNewAccountOnboardingFlag();
   try {
     localStorage.removeItem(NEW_ACCOUNT_FLAG);
     const u = new URL(window.location.href);

@@ -20,6 +20,7 @@ from wibe_work.services.user_context import (
     profile_skill_blob,
 )
 from wibe_work.services.user_pain_mapping import align_pains
+from wibe_work.services.learning_pack import build_learning_extras
 
 _SKILL_ORDER = (
     "programming",
@@ -1776,48 +1777,25 @@ def build_analysis_result(
     top_track = re.sub(r"^План [ABC]:\s*", "", top_track).strip() or interest
     gap = _build_gap_analysis(profile, interest, top_track, axes, fp)
     mts_rows = _rank_mts_rows(profile, profile_extra, eff_interest, answers, axes)
-    from wibe_work.services.learning.engine import build_learning_for_analysis
-
-    _learning_pack = build_learning_for_analysis(
-        user_id=str(profile.get("_user_id") or "") or None,
-        profile=profile,
-        interest=eff_interest,
-        preparation_level=preparation_level,
-        scenarios=scenarios,
-        gap=gap,
-    )
-    learning = _learning_pack.get("learning") or _learning_cards(
-        eff_interest, preparation_level
-    )
-    learning_path = _learning_pack.get("learning_path")
-    from wibe_work.services.learning.personalized_advice import build_individual_advice
-
     profile_summary_pre = _profile_summary_rich(
         profile, profile_extra, interest, education, preparation_level
     )
-    advice = build_individual_advice(
-        scenarios=scenarios,
-        preparation_level=preparation_level,
+    learn_x = build_learning_extras(
         profile=profile,
+        interest=interest,
+        preparation_level=preparation_level,
+        scenarios=scenarios,
         gap=gap,
-        interest=eff_interest,
-        learning_path=learning_path,
         profile_summary=profile_summary_pre,
         user_id=str(profile.get("_user_id") or "") or None,
-    )
-    from wibe_work.services.learning.growth_stages import build_growth_stages
-
-    stages = build_growth_stages(
-        interest=interest,
         eff_interest=eff_interest,
-        preparation_level=preparation_level,
-        readiness_percent=readiness,
-        profile=profile,
-        gap=gap,
-        scenarios=scenarios,
-        individual_advice=advice,
-        learning_path=learning_path,
     )
+    learning = learn_x.get("learning") or _learning_cards(eff_interest, preparation_level)
+    learning_path = learn_x.get("learning_path")
+    learning_path_detail = learn_x.get("learning_path_detail")
+    advice = learn_x.get("individual_advice")
+    stages = learn_x.get("growth_stages")
+    growth_stages_rich = learn_x.get("growth_stages_rich")
     pain_focus = _pain_focus(
         profile,
         gap=gap,
@@ -1882,8 +1860,10 @@ def build_analysis_result(
         "mts_matrix": {"rows": mts_rows},
         "learning": learning,
         "learning_path": learning_path,
+        "learning_path_detail": learning_path_detail,
         "individual_advice": advice,
         "growth_stages": stages,
+        "growth_stages_rich": growth_stages_rich,
         "gap_analysis": gap,
         "pain_focus": pain_focus,
         "weekly_roadmap": weekly,
@@ -1912,8 +1892,10 @@ def public_analysis_payload(full: Dict[str, Any]) -> Dict[str, Any]:
         "mts_matrix",
         "learning",
         "learning_path",
+        "learning_path_detail",
         "individual_advice",
         "growth_stages",
+        "growth_stages_rich",
         "gap_analysis",
         "pain_focus",
         "weekly_roadmap",
