@@ -273,8 +273,22 @@
             .filter(Boolean);
     }
 
+    var EDUCATION_RU_TO_DETAIL = {
+        школа: 'school_8_11',
+        колледж: 'spo',
+        вуз: 'univ_bachelor',
+    };
+
     function normalizeProfileForCompletion(profile) {
         const p = Object.assign({}, profile || {});
+        if (!String(p.education_detail || '').trim()) {
+            var eduRaw = p.education_level || p.education;
+            if (eduRaw != null && String(eduRaw).trim()) {
+                var ek = String(eduRaw).trim().toLowerCase();
+                if (EDUCATION_RU_TO_DETAIL[ek]) p.education_detail = EDUCATION_RU_TO_DETAIL[ek];
+                else if (String(eduRaw).indexOf('_') >= 0) p.education_detail = String(eduRaw).trim();
+            }
+        }
         if (!String(p.course_grade || '').trim() && p.course_or_grade != null && p.course_or_grade !== '') {
             p.course_grade = String(p.course_or_grade).trim();
         }
@@ -337,6 +351,25 @@
         return false;
     }
 
+    function listIncompleteProfileFields(schema, profile) {
+        const p = normalizeProfileForCompletion(profile);
+        const comp = schema && schema.completion;
+        const missing = [];
+        if (!comp || !comp.required) return missing;
+        for (let i = 0; i < comp.required.length; i++) {
+            const fid = comp.required[i];
+            if (!isProfileFieldFilled(p, fid)) missing.push(fid);
+        }
+        const anyOf = comp.any_of || comp.anyOf || [];
+        for (let g = 0; g < anyOf.length; g++) {
+            const group = anyOf[g];
+            if (!group.some(function (fid) { return isProfileFieldFilled(p, fid); })) {
+                missing.push(group[0]);
+            }
+        }
+        return missing;
+    }
+
     function clearNewAccountOnboardingFlag() {
         try {
             localStorage.removeItem(NEW_ACCOUNT_FLAG);
@@ -366,6 +399,7 @@
         normalizeProfileForCompletion: normalizeProfileForCompletion,
         isProfileFieldFilled: isProfileFieldFilled,
         isProfileCompleteCheck: isProfileCompleteCheck,
+        listIncompleteProfileFields: listIncompleteProfileFields,
         parseInterestSpheres: parseInterestSpheres,
     };
 })(typeof window !== 'undefined' ? window : this);

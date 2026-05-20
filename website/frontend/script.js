@@ -56,7 +56,7 @@ function handleAuthUserSwitch(userId, snapshot) {
   if (hasProf) {
     applyProfileToForm(prof);
     try {
-      localStorage.setItem(getProfileDraftStorageKey(), JSON.stringify({ sheet: prof }));
+      localStorage.setItem(getProfileDraftStorageKey(), JSON.stringify(prof));
     } catch (_) {}
   } else {
     clearProfileFormFields();
@@ -293,6 +293,11 @@ function setTab(name) {
   if (name === "jobs") wireJobCityAutocomplete();
   if (name === "sim") loadSimRoleOptions().catch(() => {});
   if (name === "profile") refreshProfilePanelMode();
+  if (name === "test") {
+    ensureProfileSchemaRendered()
+      .then(() => fetchAndRenderQuiz())
+      .catch(() => {});
+  }
   schedulePushServerSnapshot();
 }
 
@@ -317,12 +322,12 @@ function getPreparationLevel() {
 }
 
 function profileForAssessmentApi() {
-  const extra = collectSheetExtra();
+  const p = profilePayloadForCompletion();
   const out = {
-    education_detail: String(extra.education_detail || "").trim(),
-    course_grade: String(extra.course_grade || "").trim(),
+    education_detail: String(p.education_detail || "").trim(),
+    course_grade: String(p.course_grade || p.course_or_grade || "").trim(),
   };
-  const age = parseInt(String(extra.age ?? ""), 10);
+  const age = parseInt(String(p.age ?? ""), 10);
   if (Number.isFinite(age)) out.age = age;
   return out;
 }
@@ -381,8 +386,14 @@ function updateTestPanelHeadings() {
   const h2b = document.querySelector(".quiz-test-section--personality .quiz-test-heading");
   const hintTrack = document.getElementById("quiz-track-hint");
   if (hintTrack) {
-    hintTrack.textContent = ASSESSMENT_TRACK?.track_hint || "";
-    hintTrack.hidden = !ASSESSMENT_TRACK?.track_hint;
+    const parts = [];
+    if (ASSESSMENT_TRACK?.test_grade_label) {
+      parts.push("Грейд теста: " + ASSESSMENT_TRACK.test_grade_label);
+      if (ASSESSMENT_TRACK.test_grade_hint) parts.push(ASSESSMENT_TRACK.test_grade_hint);
+    }
+    if (ASSESSMENT_TRACK?.track_hint) parts.push(ASSESSMENT_TRACK.track_hint);
+    hintTrack.textContent = parts.join(" — ");
+    hintTrack.hidden = !parts.length;
   }
   if (h2a) h2a.textContent = "Тест 1 — задачи в вашей сфере";
   if (h2b) {
@@ -411,6 +422,8 @@ async function fetchAndRenderQuiz() {
       track_id: data.track_id,
       track_label: data.track_label,
       track_hint: data.track_hint,
+      test_grade_label: data.test_grade_label || "",
+      test_grade_hint: data.test_grade_hint || "",
     };
     ASSESSMENT_MODULES = Array.isArray(data.modules) ? data.modules : [];
     if (data.questions && data.questions.length >= 10) {
@@ -1035,9 +1048,16 @@ function getSphereToWebMap() {
 }
 
 function getPrimarySphereId() {
-  const sheet = collectSheetExtra();
+  const sheet = profilePayloadForCompletion();
   const spheres = sheet.interest_spheres;
   if (Array.isArray(spheres) && spheres[0]) return String(spheres[0]);
+  if (typeof spheres === "string" && spheres.trim()) {
+    try {
+      const arr = JSON.parse(spheres);
+      if (Array.isArray(arr) && arr[0]) return String(arr[0]);
+    } catch (_) {}
+  }
+  if (sheet.main_sphere) return String(sheet.main_sphere);
   return "";
 }
 
@@ -1049,7 +1069,7 @@ function getPrimaryQuizInterest() {
 }
 
 function getProfileSphereIds() {
-  const sheet = collectSheetExtra();
+  const sheet = profilePayloadForCompletion();
   const raw = sheet.interest_spheres;
   if (Array.isArray(raw)) return raw.map((x) => String(x));
   if (typeof raw === "string" && raw.trim()) {
@@ -1257,6 +1277,26 @@ function normalizeProfilePayload(sheet) {
   return p;
 }
 
+function sheetFromProfileDraft(draft) {
+  if (!draft || typeof draft !== "object") return {};
+  if (draft.sheet && typeof draft.sheet === "object") {
+    const outer = draft.sheet;
+    if (outer.sheet && typeof outer.sheet === "object") {
+      const merged = { ...outer.sheet };
+      if (outer.age != null && merged.age == null) merged.age = outer.age;
+      if (draft.age != null && merged.age == null) merged.age = draft.age;
+      if (outer.education && merged.education == null) merged.education = outer.education;
+      if (draft.education && merged.education == null) merged.education = draft.education;
+      return merged;
+    }
+    const merged = { ...outer };
+    if (draft.age != null && merged.age == null) merged.age = draft.age;
+    if (draft.education && merged.education == null) merged.education = draft.education;
+    return merged;
+  }
+  return { ...draft };
+}
+
 function profilePayloadForCompletion() {
   if (document.querySelector("[data-sheet-field]")) {
     const sh = window.VibeWorkShared;
@@ -1269,10 +1309,7 @@ function profilePayloadForCompletion() {
     const raw = localStorage.getItem(getProfileDraftStorageKey());
     if (!raw) return {};
     const draft = JSON.parse(raw);
-    const sheet = draft?.sheet && typeof draft.sheet === "object" ? draft.sheet : {};
-    const merged = { ...sheet };
-    if (draft.age != null && merged.age == null) merged.age = draft.age;
-    if (draft.education && !merged.education_detail) merged.education = draft.education;
+    const merged = sheetFromProfileDraft(draft);
     const sh = window.VibeWorkShared;
     if (sh && sh.normalizeProfileForCompletion) {
       return sh.normalizeProfileForCompletion(normalizeProfilePayload(merged));
@@ -1591,7 +1628,30 @@ function updateFlowUI() {
     const qOk = quizComplete();
 
     const testBanner = document.getElementById("test-blocked-banner");
-    if (testBanner) testBanner.hidden = pOk;
+    if (testBanner) {
+      testBanner.hidden = pOk;
+      if (!pOk) {
+        const sh = window.VibeWorkShared;
+        let extra = "";
+        if (sh && sh.listIncompleteProfileFields && PROFILE_SCHEMA) {
+          const ids = sh.listIncompleteProfileFields(PROFILE_SCHEMA, profilePayloadForCompletion());
+          if (ids.length) {
+            const labels = ids.map((fid) => {
+              for (const sec of schemaSections()) {
+                for (const f of sec.fields || []) {
+                  if (f.id === fid) return f.label || fid;
+                }
+              }
+              if (fid === "interest_spheres") return "Сферы интересов";
+              return fid;
+            });
+            extra = " Не хватает: " + labels.join(", ") + ".";
+          }
+        }
+        testBanner.textContent =
+          "Сначала заполните этап 1 — обязательные поля анкеты (база, интересы, цели)." + extra;
+      }
+    }
 
     if (!btn || !hint) {
       updateQuizMetricsVisibility();

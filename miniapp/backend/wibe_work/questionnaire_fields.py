@@ -79,8 +79,22 @@ def normalize_profile_for_completion(profile: Dict[str, Any]) -> Dict[str, Any]:
             part = wfp.split(",")[0].strip()
             if part:
                 p["work_format_preference"] = part
-    if not (p.get("education_detail") or "").strip() and (p.get("education_level") or "").strip():
-        p["education_detail"] = str(p["education_level"]).strip()
+    if not (p.get("education_detail") or "").strip():
+        _edu_ru = {
+            "школа": "school_8_11",
+            "колледж": "spo",
+            "вуз": "univ_bachelor",
+        }
+        for raw in (p.get("education_level"), p.get("education")):
+            if raw is None or not str(raw).strip():
+                continue
+            key = str(raw).strip().lower()
+            if key in _edu_ru:
+                p["education_detail"] = _edu_ru[key]
+                break
+            if "_" in str(raw):
+                p["education_detail"] = str(raw).strip()
+                break
     if not (p.get("like_to_do") or "").strip() and (p.get("interests") or "").strip():
         p["like_to_do"] = str(p["interests"]).strip()
     return p
