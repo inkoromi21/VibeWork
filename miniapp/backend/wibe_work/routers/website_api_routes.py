@@ -178,32 +178,30 @@ async def hh_area_suggest(q: str = Query("", max_length=120)):
 
 @router.get("/api/hh/search-url")
 async def hh_search_url(
-    profession: str | None = Query(None),
+    profession: str | None = Query(None, description="id сферы анкеты"),
     interest: str | None = Query(None, description="Код интереса: IT, дизайн, маркетинг, …"),
     level: str | None = Query(None),
     city: str | None = Query(None),
     work_format: str | None = Query(None, description="удалённо | офис | гибрид"),
     salary_bracket: str | None = Query(None, description="low | medium | high"),
+    track_hint: str | None = Query(None, max_length=400),
 ):
     """
     Ссылка на web-поиск hh.ru по текущим фильтрам сайта.
     Никаких запросов к API hh.ru (важно при блокировках).
     """
-    txt = (profession or "").strip()
-    if not txt and interest:
-        try:
-            from app.hh_client import _INTEREST_SEARCH  # type: ignore
+    from app.hh_search_templates import search_text_for_match
 
-            intr = Interest(interest.strip())
-            tmpl = _INTEREST_SEARCH.get(intr, "")
-            if tmpl:
-                txt = re.sub(r"\s+OR\s+", " ", tmpl, flags=re.IGNORECASE).strip()[:120]
-        except (ValueError, ImportError):
-            txt = interest.strip().replace("_", " ")
-    if not txt:
-        txt = "вакансии"
+    txt = search_text_for_match(
+        interest=interest,
+        profession=profession,
+        track_hint=track_hint,
+    )
+    from app.hh_client import normalize_job_experience
+
     only_remote = bool(work_format and ("удал" in work_format.lower() or "remote" in work_format.lower()))
-    only_entry = bool(level and ("стаж" in level.lower() or "intern" in level.lower()))
+    hh_exp = normalize_job_experience(level)
+    only_entry = hh_exp == "noExperience"
     # salary_bracket маппится внутри build_hh_web_search_url (через int-попытку не пройдёт),
     # поэтому конвертируем вручную для предсказуемости:
     min_salary = None
@@ -220,9 +218,9 @@ async def hh_search_url(
         city=city,
         only_remote=only_remote,
         only_entry_level=only_entry,
+        hh_experience=hh_exp,
         min_salary=min_salary,
         work_format=work_format,
-        level=level,
     )
     return {"url": url}
 

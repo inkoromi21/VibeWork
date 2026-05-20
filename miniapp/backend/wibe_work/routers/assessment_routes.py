@@ -148,6 +148,8 @@ async def quiz_questions(
         "test_grade_label": bundle.get("test_grade_label") or quiz_grade_label(grade),
         "test_grade_hint": bundle.get("test_grade_hint") or quiz_grade_hint(grade),
         "orientation_count": bundle.get("orientation_count", 0),
+        "assessment_focus": bundle.get("assessment_focus", "proforientation"),
+        "career_module_title": bundle.get("career_module_title", "Карьера и мотивы"),
         "technical_count": bundle["technical_count"],
         "personality_count": bundle["personality_count"],
         "career_count": bundle.get("career_count", bundle["personality_count"]),

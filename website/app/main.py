@@ -232,6 +232,59 @@ async def hh_area_suggest(q: str = Query("", max_length=120)):
     return {"items": await suggest_areas(q.strip(), limit=15)}
 
 
+@app.get("/api/hh/search-url")
+async def hh_search_url(
+    profession: str | None = Query(None, description="id сферы анкеты (marketing, it_dev, …)"),
+    interest: str | None = Query(None, description="Код Interest из API"),
+    level: str | None = Query(None),
+    city: str | None = Query(None),
+    work_format: str | None = Query(None, description="удалённо | офис | гибрид"),
+    salary_bracket: str | None = Query(None, description="low | medium | high"),
+    track_hint: str | None = Query(None, max_length=400),
+):
+    """Ссылка на web-поиск hh.ru по фильтрам вкладки «Вакансии» (без запроса к API)."""
+    import sys
+
+    repo = ROOT.parent
+    backend = repo / "miniapp" / "backend"
+    if str(backend) not in sys.path:
+        sys.path.insert(0, str(backend))
+    from wibe_work.services.hh_web_link import build_hh_web_search_url
+
+    from app.hh_search_templates import search_text_for_match
+
+    txt = search_text_for_match(
+        interest=interest,
+        profession=profession,
+        track_hint=track_hint,
+    )
+    only_remote = bool(
+        work_format and ("удал" in work_format.lower() or "remote" in work_format.lower())
+    )
+    from app.hh_client import normalize_job_experience
+
+    hh_exp = normalize_job_experience(level)
+    min_salary = None
+    if salary_bracket:
+        b = salary_bracket.strip().lower()
+        if b == "low":
+            min_salary = 50_000
+        elif b == "medium":
+            min_salary = 80_000
+        elif b == "high":
+            min_salary = 120_000
+    url = build_hh_web_search_url(
+        text=txt,
+        city=city,
+        only_remote=only_remote,
+        only_entry_level=hh_exp == "noExperience",
+        hh_experience=hh_exp,
+        min_salary=min_salary,
+        work_format=work_format,
+    )
+    return {"url": url}
+
+
 @app.post("/api/jobs/match", response_model=list[VacancyEnriched])
 async def jobs_match(body: JobMatchRequest) -> list[VacancyEnriched]:
     try:

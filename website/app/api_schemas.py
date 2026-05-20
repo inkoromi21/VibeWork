@@ -226,7 +226,10 @@ class JobMatchRequest(BaseModel):
     skills: list[SkillKey] = Field(default_factory=list)
     interests: list[Interest] = Field(min_length=1)
     profession: str | None = None
-    level: str | None = None
+    level: str | None = Field(
+        None,
+        description="Опыт для hh.ru: noExperience | between1And3 | between3And6 | moreThan6 (пусто — любой)",
+    )
     city: str | None = None
     work_format: str | None = None
     salary_bracket: str | None = Field(

@@ -3400,12 +3400,17 @@
                 const disp = profileFieldDisplayForAbout(schema, p, f);
                 if (!disp) continue;
                 const wide = f.type === 'textarea';
+                const fieldLabel = String(f.label || '').trim();
+                const labelHtml = fieldLabel
+                    ? '<span class="about-you-label">' + esc(fieldLabel) + '</span>'
+                    : '';
                 blockHtml +=
                     '<div class="about-you-item' +
                     (wide ? ' about-you-item--wide' : '') +
-                    '"><span class="about-you-label">' +
-                    esc(f.label || f.id) +
-                    '</span><span class="about-you-value">';
+                    (fieldLabel ? '' : ' about-you-item--no-label') +
+                    '">' +
+                    labelHtml +
+                    '<span class="about-you-value">';
                 if (disp.chips && disp.chips.length) {
                     blockHtml += '<span class="about-sphere-chips">';
                     for (let ci = 0; ci < disp.chips.length; ci++) {
@@ -3491,6 +3496,7 @@
         quizState.modules = [];
         quizState.trackLabel = '';
         quizState.trackHint = '';
+        quizState.assessmentFocus = '';
     }
 
     function startProfileOnboarding() {
@@ -3942,6 +3948,8 @@
         quizState.testGradeHint = data.test_grade_hint || '';
         quizState.trackLabel = data.track_label || '';
         quizState.trackHint = data.track_hint || '';
+        quizState.assessmentFocus = data.assessment_focus || '';
+        quizState.careerModuleTitle = data.career_module_title || '';
         quizState.modules = Array.isArray(data.modules) ? data.modules : [];
         quizState.technical = data.technical || [];
         quizState.personality = data.personality || [];
@@ -4036,19 +4044,25 @@
             }
             let answered = 0;
             for (let i = 0; i < qs.length; i++) if (quizState.answers[qs[i].id]) answered++;
+            const jobSearch = quizState.assessmentFocus === 'job_search';
             const testTitle = quizState.trackLabel
-                ? 'Профориентационный тест (' + quizState.trackLabel + ')'
-                : 'Профориентационный тест';
+                ? (jobSearch ? 'Тест: ' : 'Профориентационный тест (') +
+                  quizState.trackLabel +
+                  (jobSearch ? '' : ')')
+                : jobSearch
+                  ? 'Тест по сфере и выходу на работу'
+                  : 'Профориентационный тест';
             const trackHintBanner = quizState.trackHint
                 ? '<p class="quiz-track-hint">' + esc(quizState.trackHint) + '</p>'
                 : '';
             const orientMods = (quizState.modules || []).filter(function (m) {
                 return m && m.id && m.id !== 'sphere' && (m.questions || []).length;
             });
-            const test2Heading =
-                orientMods.length > 1
-                    ? 'Тест 2 — профориентация (несколько блоков)'
-                    : 'Тест 2 — интересы и тип среды';
+            const test2Heading = jobSearch
+                ? 'Тест 2 — роль, должность и выход на работу'
+                : orientMods.length > 1
+                  ? 'Тест 2 — профориентация (несколько блоков)'
+                  : 'Тест 2 — интересы и тип среды';
             let html =
                 '<h2>' + esc(testTitle) + '</h2>' +
                 warnBanner +
@@ -4062,7 +4076,7 @@
                 qs.length +
                 ' (техника ' +
                 techQs.length +
-                ', профориентация ' +
+                (jobSearch ? ', роль и вакансии ' : ', профориентация ') +
                 persQs.length +
                 ')</p>';
 
@@ -4130,7 +4144,9 @@
                     });
                     if (careerQs.length) {
                         out +=
-                            '<div class="quiz-module-block"><h3 class="quiz-module-title">Карьерные ориентиры</h3>' +
+                            '<div class="quiz-module-block"><h3 class="quiz-module-title">' +
+                            esc(quizState.careerModuleTitle || 'Карьерные ориентиры') +
+                            '</h3>' +
                             renderQuizQuestions(careerQs) +
                             '</div>';
                     }
@@ -4159,7 +4175,9 @@
                         qs.length +
                         (quizState.technicalCount === 0
                             ? ' (без задач по сфере — только профориентация)'
-                            : ' (техника до ' + techQs.length + ', личность ' + persQs.length + ')');
+                            : jobSearch
+                              ? ' (техника ' + techQs.length + ', роль и вакансии ' + persQs.length + ')'
+                              : ' (техника ' + techQs.length + ', личность ' + persQs.length + ')');
                 }
             }
             el.querySelectorAll('.quiz-opt').forEach(function (b) {

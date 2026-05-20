@@ -82,6 +82,8 @@ def quiz_bundle_for_web(profile: dict[str, Any], form_interest: str) -> dict[str
         "questions": technical,
         "personality_questions": second_block,
         "orientation_count": len(orient),
+        "assessment_focus": bundle.get("assessment_focus", "proforientation"),
+        "career_module_title": bundle.get("career_module_title", "Карьера и мотивы"),
         "career_count": len(career),
         "personality_count": len(second_block),
         "modules": modules_ui,

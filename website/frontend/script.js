@@ -312,9 +312,9 @@ function showAnalysisPanel(hasReport) {
 }
 
 function syncAnalysisTabView() {
-  if (window.lastAnalysis && quizComplete()) {
+  if (window.lastAnalysis) {
     showAnalysisPanel(true);
-    renderResults(window.lastAnalysis);
+    renderResults(window.lastAnalysis, { requireQuiz: false });
   } else {
     showAnalysisPanel(false);
   }
@@ -398,6 +398,9 @@ function syncCourseGradeField() {
 
 let ASSESSMENT_TRACK = null;
 let ASSESSMENT_MODULES = [];
+let GLOBAL_QUESTION_MAP = null;
+/** Последний snapshot с /api/auth/me — для восстановления разбора после перезагрузки теста. */
+window._lastMeSnapshot = null;
 
 function _isSchoolProfileQuiz(prof) {
   const d = String(prof?.education_detail || "").toLowerCase();
@@ -441,9 +444,16 @@ function updateTestPanelHeadings() {
         "Первые пять вопросов зависят от первой выбранной сферы в анкете; далее — общий блок.";
     }
   }
+  const jobSearch =
+    ASSESSMENT_TRACK?.assessment_focus === "job_search" ||
+    String(ASSESSMENT_TRACK?.test_grade || "").toLowerCase() === "university" ||
+    (ASSESSMENT_MODULES.length === 1 &&
+      ASSESSMENT_MODULES[0]?.id === "career" &&
+      QUIZ.length > 0);
   if (h2b) {
-    h2b.textContent =
-      ASSESSMENT_MODULES.length > 1
+    h2b.textContent = jobSearch
+      ? "Тест 2 — роль, должность и выход на работу"
+      : ASSESSMENT_MODULES.length > 1
         ? "Тест 2 — профориентация (несколько блоков)"
         : QUIZ.length
           ? "Тест 2 — интересы и тип среды"
@@ -469,8 +479,11 @@ async function fetchAndRenderQuiz() {
       track_id: data.track_id,
       track_label: data.track_label,
       track_hint: data.track_hint,
+      test_grade: data.test_grade || "",
       test_grade_label: data.test_grade_label || "",
       test_grade_hint: data.test_grade_hint || "",
+      assessment_focus: data.assessment_focus || "",
+      career_module_title: data.career_module_title || "",
     };
     ASSESSMENT_MODULES = Array.isArray(data.modules) ? data.modules : [];
     const schoolTrack =
@@ -484,6 +497,7 @@ async function fetchAndRenderQuiz() {
     } else {
       QUIZ = [...QUIZ_FALLBACK];
     }
+    GLOBAL_QUESTION_MAP = data.global_question_map || null;
     if (data.personality_questions && data.personality_questions.length >= 4) {
       PERSONALITY_QUIZ = data.personality_questions;
     } else {
@@ -492,6 +506,7 @@ async function fetchAndRenderQuiz() {
   } catch (_) {
     ASSESSMENT_TRACK = null;
     ASSESSMENT_MODULES = [];
+    GLOBAL_QUESTION_MAP = null;
     QUIZ = [...QUIZ_FALLBACK];
     PERSONALITY_QUIZ = [...PERSONALITY_QUIZ_FALLBACK];
   }
@@ -500,7 +515,7 @@ async function fetchAndRenderQuiz() {
   Object.keys(questionStartedAtPersonality).forEach((k) => delete questionStartedAtPersonality[k]);
   renderQuiz();
   renderPersonalityQuiz();
-  clearReportUi();
+  syncReportToQuizState();
   updateQuizProgress();
   updateFlowUI();
 }
@@ -1495,7 +1510,11 @@ function buildProfileCompleteHtml() {
       } else {
         valueHtml = esc(disp.text || "—");
       }
-      itemsHtml += `<div class="profile-complete-item${wide}"><span class="profile-complete-label">${esc(f.label || f.id)}</span><span class="profile-complete-value">${valueHtml}</span></div>`;
+      const fieldLabel = String(f.label || "").trim();
+      const labelHtml = fieldLabel
+        ? `<span class="profile-complete-label">${esc(fieldLabel)}</span>`
+        : "";
+      itemsHtml += `<div class="profile-complete-item${wide}${fieldLabel ? "" : " profile-complete-item--no-label"}">${labelHtml}<span class="profile-complete-value">${valueHtml}</span></div>`;
     }
     if (!itemsHtml) continue;
     blocks.push(
@@ -1561,6 +1580,164 @@ function refreshProfilePanelMode() {
 
 function isProfilePanelActive() {
   return document.getElementById("panel-profile")?.classList.contains("active");
+}
+
+function isAnalysisPayload(obj) {
+  if (!obj || typeof obj !== "object") return false;
+  return Boolean(
+    obj.directions ||
+    obj.gap_analysis ||
+    obj.readiness ||
+    obj.profile_summary ||
+    obj.ai_narrative
+  );
+}
+
+function pickCachedAnalysis(me, stored) {
+  const snap = me?.snapshot;
+  if (snap?.analysis && isAnalysisPayload(snap.analysis)) return snap.analysis;
+  const sr = snap?.stored_result;
+  if (sr?.data && isAnalysisPayload(sr.data)) return sr.data;
+  if (stored?.data && isAnalysisPayload(stored.data)) return stored.data;
+  return null;
+}
+
+function buildGlobalChoiceMap(testAnswers, persAnswers, gmap) {
+  const byGlobal = {};
+  if (!gmap) return byGlobal;
+  const techGlobals = gmap.technical || [];
+  const persGlobals = gmap.personality || [];
+  (testAnswers || []).forEach((a) => {
+    const idx = Number(a.question_id) - 1;
+    const gid = techGlobals[idx];
+    if (gid) byGlobal[Number(gid)] = String(a.choice || "").trim();
+  });
+  (persAnswers || []).forEach((a) => {
+    const idx = Number(a.question_id) - 1;
+    const gid = persGlobals[idx];
+    if (gid) byGlobal[Number(gid)] = String(a.choice || "").trim();
+  });
+  return byGlobal;
+}
+
+function applyAnswersByGlobalChoiceMap(byGlobal) {
+  let applied = 0;
+  for (const q of QUIZ) {
+    const gid = q._global_id;
+    const choice = gid != null ? byGlobal[Number(gid)] : null;
+    if (!choice) continue;
+    const inp = document.querySelector(`input[name="q${q.id}"][value="${choice}"]`);
+    if (inp) {
+      inp.checked = true;
+      applied += 1;
+    }
+  }
+  for (const q of PERSONALITY_QUIZ) {
+    const gid = q._global_id;
+    const choice = gid != null ? byGlobal[Number(gid)] : null;
+    if (!choice) continue;
+    const inp = document.querySelector(`input[name="pq${q.id}"][value="${choice}"]`);
+    if (inp) {
+      inp.checked = true;
+      applied += 1;
+    }
+  }
+  updateQuizProgress();
+  return applied;
+}
+
+function remapStoredAnswers(testAnswers, persAnswers, fromGmap, toGmap) {
+  const byGlobal = buildGlobalChoiceMap(testAnswers, persAnswers, fromGmap);
+  const outTest = [];
+  const outPers = [];
+  (toGmap?.technical || []).forEach((gid, i) => {
+    const g = Number(gid);
+    if (g && byGlobal[g]) outTest.push({ question_id: i + 1, choice: byGlobal[g] });
+  });
+  (toGmap?.personality || []).forEach((gid, i) => {
+    const g = Number(gid);
+    if (g && byGlobal[g]) outPers.push({ question_id: i + 1, choice: byGlobal[g] });
+  });
+  return { test_answers: outTest, personality_test_answers: outPers };
+}
+
+function getStoredAnswersSources(me, stored) {
+  const snap = me?.snapshot || {};
+  const pay = stored?.analyzePayload;
+  return {
+    test_answers: snap.test_answers || pay?.test_answers || null,
+    personality_test_answers: snap.personality_test_answers || pay?.personality_test_answers || null,
+    global_question_map: pay?.global_question_map || snap.global_question_map || null,
+  };
+}
+
+function applyStoredQuizAnswers(me, stored) {
+  const src = getStoredAnswersSources(me, stored);
+  let test = Array.isArray(src.test_answers) ? [...src.test_answers] : null;
+  let pers = Array.isArray(src.personality_test_answers) ? [...src.personality_test_answers] : null;
+
+  const needRemap =
+    (test && test.length !== QUIZ.length) || (pers && pers.length !== PERSONALITY_QUIZ.length);
+
+  if (needRemap && src.global_question_map && GLOBAL_QUESTION_MAP) {
+    const remapped = remapStoredAnswers(test, pers, src.global_question_map, GLOBAL_QUESTION_MAP);
+    test = remapped.test_answers;
+    pers = remapped.personality_test_answers;
+  } else if (needRemap && pers && pers.length > PERSONALITY_QUIZ.length) {
+    pers = pers.slice(-PERSONALITY_QUIZ.length).map((a, i) => ({
+      question_id: i + 1,
+      choice: a.choice,
+    }));
+  }
+
+  if (test?.length === QUIZ.length) applyTestAnswersToDom(test);
+  if (pers?.length === PERSONALITY_QUIZ.length) applyPersonalityAnswersToDom(pers);
+
+  if (GLOBAL_QUESTION_MAP && (test?.length || pers?.length)) {
+    const byGlobal = buildGlobalChoiceMap(
+      test,
+      pers,
+      src.global_question_map || GLOBAL_QUESTION_MAP
+    );
+    if (Object.keys(byGlobal).length) applyAnswersByGlobalChoiceMap(byGlobal);
+  }
+}
+
+function setAnalysisStaleHint(show, message) {
+  let el = document.getElementById("analysis-stale-hint");
+  const host = document.getElementById("analysis-results");
+  if (!el && show && host) {
+    el = document.createElement("p");
+    el.id = "analysis-stale-hint";
+    el.className = "muted small";
+    host.insertBefore(el, host.firstChild);
+  }
+  if (el) {
+    el.hidden = !show;
+    if (show && message) el.textContent = message;
+  }
+}
+
+/** Вернуть сохранённый разбор и ответы после смены набора вопросов / перезагрузки теста. */
+function restorePostTestUi(me, stored) {
+  const analysis = pickCachedAnalysis(me, stored);
+  if (!analysis) {
+    syncReportToQuizState();
+    return false;
+  }
+  applyStoredQuizAnswers(me, stored);
+  const complete = quizComplete();
+  renderResults(analysis, { requireQuiz: false });
+  if (!complete) {
+    setAnalysisStaleHint(
+      true,
+      "Разбор сохранён. Чтобы обновить метрики, откройте «Тестирование» и отправьте ответы заново (набор вопросов мог измениться)."
+    );
+  } else {
+    setAnalysisStaleHint(false);
+    lastReportAnswerFingerprint = quizAnswerFingerprint();
+  }
+  return true;
 }
 
 function quizComplete() {
@@ -1639,11 +1816,12 @@ function clearReportUi() {
 
 function syncReportToQuizState() {
   if (!window.lastAnalysis) return;
+  if (!lastReportAnswerFingerprint) return;
   if (!quizComplete()) {
     clearReportUi();
     return;
   }
-  if (lastReportAnswerFingerprint && quizAnswerFingerprint() !== lastReportAnswerFingerprint) {
+  if (quizAnswerFingerprint() !== lastReportAnswerFingerprint) {
     clearReportUi();
   }
 }
@@ -1734,9 +1912,15 @@ function updateFlowUI() {
   }
 
   if (hint) {
+    const prof = profileForAssessmentApi();
+    const uni =
+      String(prof.education_detail || "").startsWith("univ") ||
+      prof.education_detail === "graduate";
     hint.textContent = QUIZ.length
-      ? "Профиль готов. Перейдите к тесту — вопросы по первой выбранной сфере."
-      : "Профиль готов. Для вашего уровня — профориентационный блок (без «технических» задач по сфере; они для колледжа и вуза).";
+      ? uni
+        ? "Профиль готов. Тест: задачи по вашей сфере и блок про должность и вакансии (без профориентации «кем быть»)."
+        : "Профиль готов. Перейдите к тесту — вопросы по первой выбранной сфере."
+      : "Профиль готов. Для школьников — профориентация; для колледжа и вуза — с блоком по сфере.";
   }
 
   if (!qOk) {
@@ -1750,8 +1934,14 @@ function updateFlowUI() {
       if (tff) {
         const nTech = QUIZ.length;
         const nPers = PERSONALITY_QUIZ.length;
+        const prof = profileForAssessmentApi();
+        const uni =
+          String(prof.education_detail || "").startsWith("univ") ||
+          prof.education_detail === "graduate";
         tff.textContent = nTech
-          ? `Пройдите оба блока на вкладке «Тест» (${nTech} по сфере + ${nPers} профориентация).`
+          ? uni
+            ? `Пройдите тест на вкладке «Тест»: ${nTech} по сфере + ${nPers} про роль и вакансии.`
+            : `Пройдите оба блока на вкладке «Тест» (${nTech} по сфере + ${nPers} профориентация).`
           : `Пройдите блок профориентации на вкладке «Тест» (${nPers} вопросов) — техническая часть для школьников не показывается.`;
       }
       if (aiBtn) aiBtn.hidden = true;
@@ -1890,7 +2080,11 @@ function collectPayload() {
     throw new Error(`Ответьте на все вопросы теста 1 — сфера (${QUIZ.length} шт., вкладка «Тест»).`);
   }
   if (personality_test_answers.some((a) => !a)) {
-    throw new Error(`Ответьте на все вопросы теста 2 — профориентация (${PERSONALITY_QUIZ.length} шт.).`);
+    const t2 =
+      ASSESSMENT_TRACK?.assessment_focus === "job_search"
+        ? "роль и вакансии"
+        : "профориентация";
+    throw new Error(`Ответьте на все вопросы теста 2 — ${t2} (${PERSONALITY_QUIZ.length} шт.).`);
   }
 
   const skills = [];
@@ -1915,6 +2109,7 @@ function collectPayload() {
     profile_extra: Object.keys(profile_extra).length ? profile_extra : null,
     preparation_level,
     target_mts_role_id: null,
+    global_question_map: GLOBAL_QUESTION_MAP || undefined,
   };
 }
 
@@ -1937,7 +2132,9 @@ function collectMatchBody() {
   const fd = new FormData(form);
   const interest = getJobMatchInterest();
   const skills = skillsFromAnalysis(window.lastAnalysis);
-  const profession = null;
+  const sphereSel = document.getElementById("job-sphere");
+  const profession =
+    (sphereSel && !sphereSel.disabled && sphereSel.value) || getPrimarySphereId() || null;
   const level = document.getElementById("job-level").value || null;
   let city = document.getElementById("job-city").value.trim() || null;
   if (!city) {
@@ -2059,6 +2256,7 @@ function buildServerSnapshot() {
   return {
     profile,
     analysis: window.lastAnalysis || undefined,
+    global_question_map: GLOBAL_QUESTION_MAP || undefined,
     test_answers:
       !QUIZ.length || answers.length === QUIZ.length ? (QUIZ.length ? answers : undefined) : undefined,
     personality_test_answers: pAnswers.length === PERSONALITY_QUIZ.length ? pAnswers : undefined,
@@ -2472,6 +2670,7 @@ async function refreshAuthState() {
       } else {
         applyServerSnapshot(j.snapshot || {});
       }
+      window._lastMeSnapshot = j.snapshot || null;
       return j;
     }
   } catch (_) {}
@@ -3226,8 +3425,8 @@ function renderLearningBlock(res) {
   if (res.learning_path_detail) renderLearningPathDetail(learnHost, res.learning_path_detail);
 }
 
-function renderResults(res) {
-  if (!quizComplete()) {
+function renderResults(res, { requireQuiz = true } = {}) {
+  if (requireQuiz && !quizComplete()) {
     return;
   }
   window.lastAnalysis = res;
@@ -3337,6 +3536,7 @@ async function refreshHhSearchLink() {
   const qs = new URLSearchParams();
   if (m.interests?.[0]) qs.set("interest", m.interests[0]);
   if (m.profession) qs.set("profession", m.profession);
+  if (m.recommended_track_hint) qs.set("track_hint", m.recommended_track_hint);
   if (m.level) qs.set("level", m.level);
   if (m.city) qs.set("city", m.city);
   if (m.work_format) qs.set("work_format", m.work_format);
@@ -3648,28 +3848,12 @@ document.getElementById("btn-restore")?.addEventListener("click", async () => {
   try {
     await fetchAndRenderQuiz();
   } catch (_) {}
-  if (stored.analyzePayload) {
-    applyAnalyzePayloadToDom(stored.analyzePayload);
-  } else {
-    applyTestAnswersToDom(stored.data.test_answers);
-    applyPersonalityAnswersToDom(stored.data.personality_test_answers);
-  }
-  if (!quizComplete()) {
-    showError("Отчёт не подходит к текущему набору вопросов (смените сферу в профиле на ту же, что при сохранении, или пройдите оба теста заново).");
-    clearReportUi();
-    return;
-  }
-  const pay = stored.analyzePayload;
-  const okMatch = pay
-    ? answersMatchPayloadTest(pay.test_answers, pay.personality_test_answers)
-    : answersMatchPayloadTest(stored.data.test_answers, stored.data.personality_test_answers);
-  if (!okMatch) {
-    showError("Ответы в форме не совпадают с сохранённым отчётом.");
-    clearReportUi();
+  const me = window.serverLoggedIn ? { snapshot: window._lastMeSnapshot } : null;
+  if (!restorePostTestUi(me, stored)) {
+    showError("Сохранённых результатов нет или они не подходят к текущему профилю.");
     return;
   }
   chatMessages = [];
-  renderResults(stored.data);
   setTab("analysis");
   loadJobsData().catch(() => {});
 });
@@ -3700,8 +3884,12 @@ function debounce(fn, ms) {
   };
 }
 
-const debouncedQuizReload = debounce(() => {
-  fetchAndRenderQuiz().catch(() => {});
+const debouncedQuizReload = debounce(async () => {
+  await fetchAndRenderQuiz().catch(() => {});
+  restorePostTestUi(
+    window.serverLoggedIn ? { snapshot: window._lastMeSnapshot } : null,
+    loadResult()
+  );
 }, 380);
 
 const debouncedReanalyze = debounce(() => {
@@ -3889,24 +4077,7 @@ async function submitAuthLogin() {
     }
     const me = await refreshAuthState();
     await fetchAndRenderQuiz();
-    if (me.snapshot?.test_answers?.length === QUIZ.length) {
-      applyTestAnswersToDom(me.snapshot.test_answers);
-    }
-    if (me.snapshot?.personality_test_answers?.length === PERSONALITY_QUIZ.length) {
-      applyPersonalityAnswersToDom(me.snapshot.personality_test_answers);
-    }
-    if (
-      me.snapshot?.analysis &&
-      quizComplete() &&
-      me.snapshot.test_answers?.length === QUIZ.length &&
-      me.snapshot.personality_test_answers?.length === PERSONALITY_QUIZ.length &&
-      answersMatchPayloadTest(me.snapshot.test_answers, me.snapshot.personality_test_answers)
-    ) {
-      renderResults(me.snapshot.analysis);
-      await loadJobsData().catch(() => {});
-    } else {
-      clearReportUi();
-    }
+    restorePostTestUi(me, loadResult());
     updateQuizProgress();
     showToast("Вошли: профиль с сервера.");
     schedulePushServerSnapshot();
@@ -4001,50 +4172,10 @@ document.getElementById("btn-auth-logout")?.addEventListener("click", async () =
     refreshProfilePanelMode();
   }
 
-  if (me.authenticated && me.snapshot?.test_answers?.length === QUIZ.length) {
-    applyTestAnswersToDom(me.snapshot.test_answers);
-  } else if (stored?.analyzePayload?.test_answers?.length === QUIZ.length) {
-    applyTestAnswersToDom(stored.analyzePayload.test_answers);
-  } else if (stored?.data?.test_answers?.length === QUIZ.length) {
-    applyTestAnswersToDom(stored.data.test_answers);
-  }
-  if (me.authenticated && me.snapshot?.personality_test_answers?.length === PERSONALITY_QUIZ.length) {
-    applyPersonalityAnswersToDom(me.snapshot.personality_test_answers);
-  } else if (stored?.analyzePayload?.personality_test_answers?.length === PERSONALITY_QUIZ.length) {
-    applyPersonalityAnswersToDom(stored.analyzePayload.personality_test_answers);
-  } else if (stored?.data?.personality_test_answers?.length === PERSONALITY_QUIZ.length) {
-    applyPersonalityAnswersToDom(stored.data.personality_test_answers);
-  }
-
-  if (
-    me.authenticated &&
-    me.snapshot?.analysis &&
-    quizComplete() &&
-    me.snapshot.test_answers?.length === QUIZ.length &&
-    me.snapshot.personality_test_answers?.length === PERSONALITY_QUIZ.length &&
-    answersMatchPayloadTest(me.snapshot.test_answers, me.snapshot.personality_test_answers)
-  ) {
-    renderResults(me.snapshot.analysis);
-    loadJobsData().catch(() => {});
-  } else if (
-    stored &&
-    stored.data &&
-    quizComplete() &&
-    stored.analyzePayload &&
-    answersMatchPayloadTest(stored.analyzePayload.test_answers, stored.analyzePayload.personality_test_answers)
-  ) {
-    renderResults(stored.data);
-    loadJobsData().catch(() => {});
-  } else if (
-    stored &&
-    stored.data &&
-    quizComplete() &&
-    answersMatchPayloadTest(stored.data.test_answers, stored.data.personality_test_answers)
-  ) {
-    renderResults(stored.data);
-    loadJobsData().catch(() => {});
-  } else {
+  if (!restorePostTestUi(me, stored)) {
     clearReportUi();
+  } else {
+    loadJobsData().catch(() => {});
   }
   updateQuizProgress();
 })();

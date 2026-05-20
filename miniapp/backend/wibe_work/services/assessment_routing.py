@@ -23,8 +23,8 @@ TRACK_LABELS: Dict[str, str] = {
     TRACK_SCHOOL_SENIOR: "Школа: 10–11 класс",
     TRACK_VOCATIONAL_EARLY: "СПО: 1–2 курс",
     TRACK_VOCATIONAL: "СПО / колледж",
-    TRACK_UNIVERSITY: "Вуз",
-    TRACK_UNIVERSITY_SENIOR: "Вуз: старшие курсы / выпускник",
+    TRACK_UNIVERSITY: "Бакалавр и выше: роль и вакансии",
+    TRACK_UNIVERSITY_SENIOR: "Выпускник / магистр: выход на работу",
 }
 
 TRACK_HINTS: Dict[str, str] = {
@@ -33,19 +33,19 @@ TRACK_HINTS: Dict[str, str] = {
     TRACK_SCHOOL_SENIOR: "Полный школьный набор: деятельность, среда работы и мотивы перед выпуском.",
     TRACK_VOCATIONAL_EARLY: "Практика, ценности и среда — первые курсы колледжа.",
     TRACK_VOCATIONAL: "Сочетание практики, мотивов и типа рабочей среды под вашу специальность.",
-    TRACK_UNIVERSITY: "Тип рабочей среды и ценности — плюс задачи в выбранной сфере.",
-    TRACK_UNIVERSITY_SENIOR: "Акцент на выход на рынок труда: среда, мотивы и первые шаги.",
+    TRACK_UNIVERSITY: "Сфера уже выбрана: 10 задач по специальности + блок про должность, уровень и выход на работу (без профориентации «кем быть»).",
+    TRACK_UNIVERSITY_SENIOR: "Акцент на конкретную вакансию: уровень позиции, резюме, отклики и первые шаги.",
 }
 
-# Модули по треку: profil, klimov, jovaisa, holland, readiness
+# Модули по треку: profil, klimov, jovaisa, holland, readiness (пусто = без блока профориентации)
 TRACK_MODULES: Dict[str, Tuple[str, ...]] = {
     TRACK_SCHOOL_EARLY: ("profil", "jovaisa"),
     TRACK_SCHOOL_GRADE9: ("profil", "klimov", "readiness"),
     TRACK_SCHOOL_SENIOR: ("klimov", "holland", "jovaisa"),
     TRACK_VOCATIONAL_EARLY: ("jovaisa", "klimov", "holland"),
     TRACK_VOCATIONAL: ("klimov", "jovaisa", "holland"),
-    TRACK_UNIVERSITY: ("holland", "jovaisa"),
-    TRACK_UNIVERSITY_SENIOR: ("holland", "jovaisa", "readiness"),
+    TRACK_UNIVERSITY: (),
+    TRACK_UNIVERSITY_SENIOR: (),
 }
 
 _MODULE_TITLES: Dict[str, str] = {
@@ -154,6 +154,17 @@ def _profile_age(profile: Dict[str, Any]) -> Optional[int]:
 
 def track_modules(track_id: str) -> Tuple[str, ...]:
     return TRACK_MODULES.get(track_id, TRACK_MODULES[TRACK_UNIVERSITY])
+
+
+def uses_job_search_assessment(profile: Dict[str, Any]) -> bool:
+    """Бакалавр и выше: сфера задана, нужен поиск роли/должности, не профориентация."""
+    return compute_quiz_grade(profile) == "university"
+
+
+def career_block_title(profile: Dict[str, Any]) -> str:
+    if uses_job_search_assessment(profile):
+        return "Роль, должность и выход на работу"
+    return "Карьера и мотивы"
 
 
 def track_meta(profile: Dict[str, Any]) -> Dict[str, Any]:

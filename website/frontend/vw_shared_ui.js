@@ -212,12 +212,17 @@
                 } else {
                     valueHtml = esc(disp.text || '—');
                 }
+                var fieldLabel = String(f.label || '').trim();
+                var labelHtml = fieldLabel
+                    ? '<span class="profile-complete-label">' + esc(fieldLabel) + '</span>'
+                    : '';
                 itemsHtml +=
                     '<div class="profile-complete-item' +
                     wide +
-                    '"><span class="profile-complete-label">' +
-                    esc(f.label || f.id) +
-                    '</span><span class="profile-complete-value">' +
+                    (fieldLabel ? '' : ' profile-complete-item--no-label') +
+                    '">' +
+                    labelHtml +
+                    '<span class="profile-complete-value">' +
                     valueHtml +
                     '</span></div>';
             }

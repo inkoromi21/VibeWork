@@ -115,6 +115,60 @@ _EXPERT_SCHOOL: List[Dict[str, Any]] = [
 ]
 
 # Грейд СПО / колледж / техникум.
+# Бакалавр и выше: не «кем стать», а какая роль/должность и выход на работу.
+_EXPERT_JOB_SEARCH: List[Dict[str, Any]] = [
+    {
+        "id": 11,
+        "text": "Что вы ищете сейчас в первую очередь?",
+        "options": [
+            {"id": "A", "label": "Первую работу или стажировку по своей специальности"},
+            {"id": "B", "label": "Смену должности внутри уже выбранной сферы"},
+            {"id": "C", "label": "Переход на смежную роль с понятным названием вакансии"},
+            {"id": "D", "label": "Понять, какие реальные позиции подходят моему уровню"},
+        ],
+    },
+    {
+        "id": 12,
+        "text": "Какой уровень позиции вам ближе на текущем этапе?",
+        "options": [
+            {"id": "A", "label": "Стажёр / intern"},
+            {"id": "B", "label": "Junior / младший специалист"},
+            {"id": "C", "label": "Middle — есть опыт 1–3 года"},
+            {"id": "D", "label": "Пока неясно — нужна ориентир по рынку"},
+        ],
+    },
+    {
+        "id": 13,
+        "text": "Что важнее при выборе конкретной вакансии?",
+        "options": [
+            {"id": "A", "label": "Понятные обязанности и название должности"},
+            {"id": "B", "label": "Зарплата, график и условия"},
+            {"id": "C", "label": "Рост до senior/lead за 2–3 года"},
+            {"id": "D", "label": "Стабильность компании и соцпакет"},
+        ],
+    },
+    {
+        "id": 14,
+        "text": "Что сильнее мешает выйти на нужную должность?",
+        "options": [
+            {"id": "A", "label": "Не знаю, какие тайтлы искать на job-сайтах"},
+            {"id": "B", "label": "Мало кейсов в резюме под эту роль"},
+            {"id": "C", "label": "Страшно собеседование или отказы"},
+            {"id": "D", "label": "В городе мало подходящих вакансий"},
+        ],
+    },
+    {
+        "id": 15,
+        "text": "Какой формат работы нужен для выбранной роли?",
+        "options": [
+            {"id": "A", "label": "Офис или гибрид"},
+            {"id": "B", "label": "Полностью удалённо"},
+            {"id": "C", "label": "Смены, объект, выезды"},
+            {"id": "D", "label": "Не принципиально"},
+        ],
+    },
+]
+
 _EXPERT_VOCATIONAL: List[Dict[str, Any]] = [
     {
         "id": 11,
@@ -702,7 +756,7 @@ def _expert_block_for_grade(grade: str) -> List[Dict[str, Any]]:
         return _EXPERT_SCHOOL
     if g == "vocational":
         return _EXPERT_VOCATIONAL
-    return _EXPERT_UNIVERSITY
+    return _EXPERT_JOB_SEARCH
 
 
 def _technical_questions(interest: str) -> List[Dict[str, Any]]:
@@ -722,12 +776,15 @@ def _personality_questions(interest: str, grade: str) -> List[Dict[str, Any]]:
     from wibe_work.services.aptitude_quiz_content_bridge import personality_track_for_interest
 
     expert = copy.deepcopy(_expert_block_for_grade(grade))
-    track = personality_track_for_interest(interest)
-    q12 = _SPHERE_EXPERT_Q12.get(track) or _SPHERE_EXPERT_Q12["general"]
+    g = (grade or "university").strip().lower()
+    if g != "university":
+        track = personality_track_for_interest(interest)
+        q12 = _SPHERE_EXPERT_Q12.get(track) or _SPHERE_EXPERT_Q12["general"]
+        for q in expert:
+            if q.get("id") == 12 and q12:
+                q["text"] = q12
     for q in expert:
-        if q.get("id") == 12 and q12:
-            q["text"] = q12
-        q["block"] = "personality"
+        q["block"] = "career" if g == "university" else "personality"
     return expert
 
 

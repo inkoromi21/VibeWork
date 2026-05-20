@@ -1929,17 +1929,34 @@ def filter_vacancy_list(
     if profession:
         items = _filter_by_profession(items, profession)
     if level and not skip_level_filter:
-        l = level.strip().lower()
-        items = [v for v in items if v.level.value.lower() == l]
+        from app.hh_client import normalize_job_experience
+
+        hh_exp = normalize_job_experience(level)
+        if hh_exp:
+            _EXP_TO_DEMO_LEVELS = {
+                "noExperience": ("стажер",),
+                "between1And3": ("стажер", "джуниор"),
+                "between3And6": ("джуниор", "мидл"),
+                "moreThan6": ("мидл", "сеньор"),
+            }
+            allowed = _EXP_TO_DEMO_LEVELS.get(hh_exp, ())
+            items = [v for v in items if v.level.value.lower() in allowed]
+        else:
+            l = level.strip().lower()
+            items = [v for v in items if v.level.value.lower() == l]
+    wf_raw = (work_format or "").strip().lower()
     if city:
         c = city.strip().lower()
         if c in ("удалённо", "удаленно", "remote"):
             items = [v for v in items if v.work_format == WorkFormat.REMOTE or "удал" in v.city.lower()]
-        else:
-            items = [v for v in items if c in v.city.lower()]
+        elif wf_raw not in ("удалённо", "удаленно"):
+            items = [
+                v
+                for v in items
+                if c in v.city.lower() or c in (v.city or "").replace("ё", "е").lower()
+            ]
     if work_format:
-        wf = work_format.strip().lower()
-        items = [v for v in items if v.work_format.value.lower() == wf]
+        items = [v for v in items if v.work_format.value.lower() == wf_raw]
     if salary_bracket:
         br = salary_bracket.strip().lower()
 

@@ -99,19 +99,21 @@ def build_hh_web_search_url(
     if text:
         q["text"] = str(text).strip()
 
-    area_id = _area_id_for_city(city)
-    if area_id:
-        q["area"] = area_id
-    elif city:
-        # fallback: добавим город в текстовый запрос
-        base = q.get("text") or ""
-        c = str(city).strip()
-        if c and c.lower() not in str(base).lower():
-            q["text"] = (str(base) + " " + c).strip()
-
-    # remote flags
     wf = (work_format or "").strip().lower()
-    if only_remote or "удал" in wf or "remote" in wf:
+    is_remote = only_remote or "удал" in wf or "remote" in wf
+
+    # Удалёнка — без привязки к региону; иначе город/area из справочника
+    if not is_remote:
+        area_id = _area_id_for_city(city)
+        if area_id:
+            q["area"] = area_id
+        elif city:
+            base = q.get("text") or ""
+            c = str(city).strip()
+            if c and c.lower() not in str(base).lower():
+                q["text"] = (str(base) + " " + c).strip()
+
+    if is_remote:
         q["schedule"] = "remote"
 
     if only_entry_level:

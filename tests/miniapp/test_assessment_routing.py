@@ -60,5 +60,9 @@ def test_bundle_counts() -> None:
 
     uni = get_assessment_bundle({"education_detail": "univ_bachelor", "course_grade": "1 курс"}, "it_dev")
     assert uni["track_id"] == TRACK_UNIVERSITY
+    assert uni["orientation_count"] == 0
     assert uni["technical_count"] == 10
+    assert uni["career_count"] == 5
+    assert uni["total_count"] == 15
     assert len(uni["questions"]) == uni["total_count"]
+    assert uni["assessment_focus"] == "job_search"

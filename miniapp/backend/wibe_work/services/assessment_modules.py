@@ -2,9 +2,34 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+from wibe_work.services.aptitude_quiz_content_bridge import personality_track_for_interest
 
 W4 = Tuple[int, int, int, int]  # самопознание, люди, структура, баланс
+
+_SCHOOL_TRACKS = frozenset(
+    {"school_early", "school_grade9", "school_senior"},
+)
+
+# Сферы, для которых не показываем пары «программирование vs …»
+_NON_TECH_INTERESTS = frozenset(
+    {
+        "medicine",
+        "education",
+        "creative",
+        "sport",
+        "sales",
+        "hr_edu",
+        "logistics",
+        "finance",
+        "mgmt",
+        "marketing",
+        "design",
+        "other",
+    },
+)
+_TECH_INTERESTS = frozenset({"it_dev", "data", "engineering"})
 
 # --- Профиль (интересы к учёбе) — ответ: нравится A / скорее нет B ---
 _PROFIL: List[Dict[str, Any]] = [
@@ -99,6 +124,16 @@ _KLIMOV: List[Dict[str, Any]] = [
             {"id": "B", "label": "Считать, программировать, анализировать данные"},
         ],
         "weights": [(2, 0, 0, 2), (3, 0, 2, 0)],
+        "only_interests": tuple(_TECH_INTERESTS),
+    },
+    {
+        "text": "Что приятнее?",
+        "options": [
+            {"id": "A", "label": "Рисовать, оформлять, придумывать образ"},
+            {"id": "B", "label": "Сводить таблицу или схему по правилам"},
+        ],
+        "weights": [(2, 0, 0, 2), (2, 0, 3, 0)],
+        "skip_interests": tuple(_TECH_INTERESTS),
     },
     {
         "text": "Что приятнее?",
@@ -271,6 +306,157 @@ _HOLLAND: List[Dict[str, Any]] = [
             {"id": "B", "label": "Программировать или автоматизировать процессы"},
         ],
         "weights": [(1, 3, 1, 0), (2, 0, 3, 0)],
+        "only_interests": tuple(_TECH_INTERESTS),
+    },
+    {
+        "text": "Выберите более близкий вариант:",
+        "options": [
+            {"id": "A", "label": "Помогать людям в сервисе или заботе"},
+            {"id": "B", "label": "Вести учёт, документы, чёткий регламент"},
+        ],
+        "weights": [(1, 3, 1, 0), (2, 0, 3, 1)],
+        "skip_interests": tuple(_TECH_INTERESTS),
+    },
+]
+
+# --- Климов / Йовайша: формулировки для колледжа и вуза (без «класса» и школьного контекста) ---
+_KLIMOV_ADULT: List[Dict[str, Any]] = [
+    {
+        "text": "Что приятнее?",
+        "options": [
+            {"id": "A", "label": "Ухаживать за растениями или животными"},
+            {"id": "B", "label": "Настраивать технику или механизм"},
+        ],
+        "weights": [(0, 1, 2, 0), (1, 0, 3, 0)],
+    },
+    {
+        "text": "Что приятнее?",
+        "options": [
+            {"id": "A", "label": "Объяснять тему коллеге или одногруппнику"},
+            {"id": "B", "label": "Сводить таблицу или схему по правилам"},
+        ],
+        "weights": [(1, 3, 1, 0), (2, 0, 3, 0)],
+    },
+    {
+        "text": "Что приятнее?",
+        "options": [
+            {"id": "A", "label": "Рисовать, оформлять, придумывать образ"},
+            {"id": "B", "label": "Считать, программировать, анализировать данные"},
+        ],
+        "weights": [(2, 0, 0, 2), (3, 0, 2, 0)],
+        "only_interests": tuple(_TECH_INTERESTS),
+    },
+    {
+        "text": "Что приятнее?",
+        "options": [
+            {"id": "A", "label": "Рисовать, оформлять, придумывать образ"},
+            {"id": "B", "label": "Сводить отчёт или схему по правилам"},
+        ],
+        "weights": [(2, 0, 0, 2), (2, 0, 3, 0)],
+        "skip_interests": tuple(_TECH_INTERESTS),
+    },
+    {
+        "text": "Что приятнее?",
+        "options": [
+            {"id": "A", "label": "Работать в команде над проектом для людей"},
+            {"id": "B", "label": "Работать один по чёткому заданию"},
+        ],
+        "weights": [(1, 3, 1, 0), (2, 0, 2, 1)],
+    },
+    {
+        "text": "Что приятнее?",
+        "options": [
+            {"id": "A", "label": "Проводить опыт или эксперимент"},
+            {"id": "B", "label": "Вести документацию и отчёт"},
+        ],
+        "weights": [(2, 0, 2, 0), (2, 0, 3, 1)],
+    },
+    {
+        "text": "Что приятнее?",
+        "options": [
+            {"id": "A", "label": "Помогать в трудной ситуации (поддержка)"},
+            {"id": "B", "label": "Организовывать процесс и сроки"},
+        ],
+        "weights": [(1, 3, 0, 1), (1, 1, 3, 0)],
+    },
+    {
+        "text": "Что приятнее?",
+        "options": [
+            {"id": "A", "label": "Мастерить предмет своими руками"},
+            {"id": "B", "label": "Писать текст, статью, сценарий"},
+        ],
+        "weights": [(1, 0, 3, 0), (2, 1, 1, 2)],
+    },
+    {
+        "text": "Что приятнее?",
+        "options": [
+            {"id": "A", "label": "Учиться новому по книге/курсу сам"},
+            {"id": "B", "label": "Учиться через общение и обмен опытом"},
+        ],
+        "weights": [(3, 0, 1, 1), (1, 3, 1, 0)],
+    },
+]
+
+_JOVAISA_ADULT: List[Dict[str, Any]] = [
+    {
+        "text": "В свободное время вам скорее интересно…",
+        "options": [
+            {"id": "A", "label": "делать поделку, ремонт, что-то материальное"},
+            {"id": "B", "label": "читать, разбирать идеи, смотреть лекции"},
+            {"id": "C", "label": "встречаться с людьми, помогать близким"},
+            {"id": "D", "label": "заработать или спланировать бюджет"},
+        ],
+        "weights": [(0, 0, 3, 0), (3, 0, 0, 1), (1, 3, 0, 0), (1, 1, 2, 0)],
+    },
+    {
+        "text": "В учебном или рабочем проекте вы бы охотнее…",
+        "options": [
+            {"id": "A", "label": "отвечали за порядок и сроки"},
+            {"id": "B", "label": "придумывали оформление и подачу"},
+            {"id": "C", "label": "договаривались с участниками команды"},
+            {"id": "D", "label": "искали факты и проверяли логику"},
+        ],
+        "weights": [(1, 0, 3, 0), (2, 0, 1, 2), (1, 3, 1, 0), (3, 0, 2, 0)],
+    },
+    {
+        "text": "Вас больше уважают, когда вы…",
+        "options": [
+            {"id": "A", "label": "надёжно доводите дело до конца"},
+            {"id": "B", "label": "находите нестандартное решение"},
+            {"id": "C", "label": "поддерживаете других в сложный момент"},
+            {"id": "D", "label": "разбираетесь в теме глубже остальных"},
+        ],
+        "weights": [(1, 0, 3, 1), (2, 0, 0, 2), (1, 3, 0, 0), (3, 0, 2, 0)],
+    },
+    {
+        "text": "Если бы не нужно было срочно «выбирать путь», вы бы…",
+        "options": [
+            {"id": "A", "label": "тренировались в спорте или активности"},
+            {"id": "B", "label": "общались и помогали людям"},
+            {"id": "C", "label": "создавали что-то красивое или музыкальное"},
+            {"id": "D", "label": "разбирались в устройстве вещей"},
+        ],
+        "weights": [(1, 1, 2, 1), (1, 3, 0, 0), (2, 0, 0, 2), (2, 0, 3, 0)],
+    },
+    {
+        "text": "В спорной ситуации в группе вы чаще…",
+        "options": [
+            {"id": "A", "label": "ищете компромисс между людьми"},
+            {"id": "B", "label": "опираетесь на правила и факты"},
+            {"id": "C", "label": "предлагаете новый формат обсуждения"},
+            {"id": "D", "label": "стараетесь не ввязываться — важен личный баланс"},
+        ],
+        "weights": [(1, 3, 1, 0), (2, 0, 3, 0), (2, 1, 0, 2), (1, 0, 1, 3)],
+    },
+    {
+        "text": "Деньги и стабильность для вас сейчас…",
+        "options": [
+            {"id": "A", "label": "важны, но не главный критерий выбора"},
+            {"id": "B", "label": "менее важны, чем смысл и интерес"},
+            {"id": "C", "label": "важны наравне с признанием и ростом"},
+            {"id": "D", "label": "важны как опора для семьи и планов"},
+        ],
+        "weights": [(1, 0, 2, 1), (2, 1, 0, 2), (1, 2, 2, 0), (1, 1, 2, 1)],
     },
 ]
 
@@ -295,6 +481,7 @@ _READINESS: List[Dict[str, Any]] = [
             {"id": "D", "label": "Уже определился(ась), проверяю выбор"},
         ],
         "weights": [(3, 0, 0, 1), (2, 2, 1, 0), (2, 0, 2, 1), (2, 0, 3, 1)],
+        "audience": "school",
     },
     {
         "text": "Обсуждали ли вы планы с психологом, классным или карьерным консультантом?",
@@ -305,6 +492,7 @@ _READINESS: List[Dict[str, Any]] = [
             {"id": "D", "label": "Сам(а) по тестам и статьям"},
         ],
         "weights": [(1, 1, 0, 0), (1, 2, 1, 0), (2, 2, 2, 0), (3, 0, 2, 1)],
+        "audience": "school",
     },
     {
         "text": "Есть ли у вас конкретный шаг на ближайший месяц?",
@@ -315,15 +503,62 @@ _READINESS: List[Dict[str, Any]] = [
             {"id": "D", "label": "Уже пробую (практика, курс, подработка)"},
         ],
         "weights": [(2, 0, 0, 0), (2, 0, 1, 1), (2, 1, 2, 0), (2, 0, 3, 1)],
+        "audience": "school",
+    },
+]
+
+_READINESS_ADULT: List[Dict[str, Any]] = [
+    {
+        "text": "Насколько вы понимаете, чем отличаются направления, которые рассматриваете?",
+        "options": [
+            {"id": "A", "label": "Почти не понимаю"},
+            {"id": "B", "label": "Есть общее представление"},
+            {"id": "C", "label": "Разбирался(ась) в деталях"},
+            {"id": "D", "label": "Могу объяснить разницу коллеге"},
+        ],
+        "weights": [(3, 0, 0, 0), (2, 0, 2, 0), (2, 1, 2, 0), (2, 2, 2, 1)],
+    },
+    {
+        "text": "Насколько уверенно вы готовы к следующему шагу (учёба, стажировка, работа)?",
+        "options": [
+            {"id": "A", "label": "Очень тревожно, откладываю"},
+            {"id": "B", "label": "Нужна поддержка наставника или карьерного консультанта"},
+            {"id": "C", "label": "Есть 2–3 варианта, сравниваю"},
+            {"id": "D", "label": "Уже определился(ась), проверяю выбор"},
+        ],
+        "weights": [(3, 0, 0, 1), (2, 2, 1, 0), (2, 0, 2, 1), (2, 0, 3, 1)],
+    },
+    {
+        "text": "Обсуждали ли вы планы с психологом или карьерным консультантом?",
+        "options": [
+            {"id": "A", "label": "Нет, только с друзьями"},
+            {"id": "B", "label": "С близкими / наставником"},
+            {"id": "C", "label": "Со специалистом (университет, центр карьеры)"},
+            {"id": "D", "label": "Сам(а) по тестам и статьям"},
+        ],
+        "weights": [(1, 1, 0, 0), (1, 2, 1, 0), (2, 2, 2, 0), (3, 0, 2, 1)],
+    },
+    {
+        "text": "Есть ли у вас конкретный шаг на ближайший месяц?",
+        "options": [
+            {"id": "A", "label": "Нет плана"},
+            {"id": "B", "label": "Думаю, но не начал(а)"},
+            {"id": "C", "label": "Записался(ась) на курс, стажировку или консультацию"},
+            {"id": "D", "label": "Уже пробую (практика, проект, подработка)"},
+        ],
+        "weights": [(2, 0, 0, 0), (2, 0, 1, 1), (2, 1, 2, 0), (2, 0, 3, 1)],
     },
 ]
 
 _BANKS: Dict[str, List[Dict[str, Any]]] = {
     "profil": _PROFIL,
     "klimov": _KLIMOV,
+    "klimov_adult": _KLIMOV_ADULT,
     "jovaisa": _JOVAISA,
+    "jovaisa_adult": _JOVAISA_ADULT,
     "holland": _HOLLAND,
     "readiness": _READINESS,
+    "readiness_adult": _READINESS_ADULT,
 }
 
 # Сколько вопросов брать из каждого модуля по треку (None = все)
@@ -338,16 +573,79 @@ _MODULE_LIMITS: Dict[str, Dict[str, int]] = {
 }
 
 
-def module_question_slice(module_id: str, track_id: str) -> List[Dict[str, Any]]:
-    bank = _BANKS.get(module_id) or []
+def _is_school_track(track_id: str) -> bool:
+    return track_id in _SCHOOL_TRACKS
+
+
+def _resolve_module_bank_id(module_id: str, track_id: str) -> str:
+    if module_id == "klimov" and not _is_school_track(track_id):
+        return "klimov_adult"
+    if module_id == "jovaisa" and not _is_school_track(track_id):
+        return "jovaisa_adult"
+    if module_id == "readiness" and not _is_school_track(track_id):
+        return "readiness_adult"
+    return module_id
+
+
+def _question_matches_track(q: Dict[str, Any], track_id: str) -> bool:
+    aud = q.get("audience")
+    if aud == "school" and not _is_school_track(track_id):
+        return False
+    if aud == "adult" and _is_school_track(track_id):
+        return False
+    return True
+
+
+def _question_matches_interest(q: Dict[str, Any], interest: str) -> bool:
+    key = (interest or "").strip()
+    only = q.get("only_interests")
+    if only and key not in only:
+        return False
+    skip = q.get("skip_interests") or ()
+    if key in skip:
+        return False
+    only_groups = q.get("only_sphere_groups")
+    if only_groups:
+        group = personality_track_for_interest(key)
+        if group not in only_groups:
+            return False
+    skip_groups = q.get("skip_sphere_groups") or ()
+    if skip_groups:
+        group = personality_track_for_interest(key)
+        if group in skip_groups:
+            return False
+    return True
+
+
+def module_question_slice(
+    module_id: str,
+    track_id: str,
+    *,
+    interest: str = "",
+) -> List[Dict[str, Any]]:
+    bank_id = _resolve_module_bank_id(module_id, track_id)
+    bank = _BANKS.get(bank_id) or []
     limits = _MODULE_LIMITS.get(track_id) or {}
     n = limits.get(module_id)
+    filtered: List[Dict[str, Any]] = []
+    for q in bank:
+        if not _question_matches_track(q, track_id):
+            continue
+        if not _question_matches_interest(q, interest):
+            continue
+        filtered.append(q)
+        if n is not None and len(filtered) >= n:
+            break
     if n is None:
-        return list(bank)
-    return list(bank[: max(0, n)])
+        return filtered
+    return filtered[: max(0, n)]
 
 
-def orientation_weights_for_track(track_id: str) -> List[List[W4]]:
+def orientation_weights_for_track(
+    track_id: str,
+    *,
+    interest: str = "",
+) -> List[List[W4]]:
     """Строки весов для orientation-вопросов (порядок как в bundle)."""
     rows: List[List[W4]] = []
     limits = _MODULE_LIMITS.get(track_id) or {}
@@ -360,6 +658,6 @@ def orientation_weights_for_track(track_id: str) -> List[List[W4]]:
     ):
         if mod_id not in limits:
             continue
-        for q in module_question_slice(mod_id, track_id):
+        for q in module_question_slice(mod_id, track_id, interest=interest):
             rows.append(list(q["weights"]))
     return rows

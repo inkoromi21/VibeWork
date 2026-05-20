@@ -315,48 +315,48 @@
           <h1>Вакансии</h1>
           <p class="muted">Матчинг — после разбора и (если есть) чата. Переключайте <strong>классика</strong> или <strong>тиндер</strong>.</p>
         </div>
-        <div class="filters">
-          <label>
-            Область
+        <div class="filters jobs-filters-grid">
+          <div class="job-filter-field">
+            <label for="job-sphere">Область</label>
             <select id="job-sphere">
               <option value="">Загрузка…</option>
             </select>
-          </label>
-          <label>
-            Уровень
+          </div>
+          <div class="job-filter-field">
+            <label for="job-level">Опыт</label>
             <select id="job-level">
               <option value="">Любой</option>
-              <option value="стажер">Стажёр</option>
-              <option value="джуниор">Джуниор</option>
-              <option value="мидл">Мидл</option>
-              <option value="сеньор">Сеньор</option>
+              <option value="noExperience">Нет опыта</option>
+              <option value="between1And3">От 1 до 3 лет</option>
+              <option value="between3And6">От 3 до 6 лет</option>
+              <option value="moreThan6">Более 6 лет</option>
             </select>
-          </label>
-          <label>
-            Город
-            <span class="city-ac-wrap">
-              <input type="text" id="job-city" placeholder="Начните вводить: кем…" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="job-filter-field job-filter-field--city">
+            <label for="job-city">Город</label>
+            <div class="city-ac-wrap">
+              <input type="text" id="job-city" class="job-filter-control" placeholder="Начните вводить: кем…" autocomplete="off" spellcheck="false" />
               <ul id="job-city-suggest" class="city-suggest-list" hidden></ul>
-            </span>
-          </label>
-          <label>
-            Формат
+            </div>
+          </div>
+          <div class="job-filter-field">
+            <label for="job-format">Формат</label>
             <select id="job-format">
               <option value="">Любой</option>
               <option value="удалённо">Удалённо</option>
               <option value="офис">Офис</option>
               <option value="гибрид">Гибрид</option>
             </select>
-          </label>
-          <label>
-            Зарплата
+          </div>
+          <div class="job-filter-field">
+            <label for="job-salary">Зарплата</label>
             <select id="job-salary">
               <option value="">Любая</option>
               <option value="low">До ~70k</option>
               <option value="medium">70–120k</option>
               <option value="high">120k+</option>
             </select>
-          </label>
+          </div>
         </div>
         <div class="view-toggle">
           <button type="button" class="btn tab-toggle active" data-view="match">Классика</button>

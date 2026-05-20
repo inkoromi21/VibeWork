@@ -13,26 +13,48 @@ from typing import Any
 import httpx
 
 from app.api_schemas import EducationLevel, Interest, JobMatchRequest, MockVacancy, WorkFormat
+from app.hh_search_templates import search_text_for_match
 
 logger = logging.getLogger(__name__)
 
 HH_VACANCIES_URL = "https://api.hh.ru/vacancies"
 HH_SUGGEST_AREAS_URL = "https://api.hh.ru/suggests/areas"
 
+# Как в OpenAPI hh.ru GET /vacancies (параметр experience)
+HH_EXPERIENCE_API_IDS = frozenset(
+    {"noExperience", "between1And3", "between3And6", "moreThan6"}
+)
+
+_LEGACY_LEVEL_TO_HH: dict[str, str] = {
+    "стажер": "noExperience",
+    "intern": "noExperience",
+    "джуниор": "between1And3",
+    "junior": "between1And3",
+    "мидл": "between3And6",
+    "middle": "between3And6",
+    "сеньор": "moreThan6",
+    "senior": "moreThan6",
+}
+
 # Населённые пункты: id из справочника areas (частые города РФ)
 _CITY_TO_AREA: dict[str, str] = {
     "москва": "1",
     "мск": "1",
+    "moscow": "1",
     "санкт-петербург": "2",
+    "санкт петербург": "2",
     "спб": "2",
     "питер": "2",
+    "saint petersburg": "2",
     "екатеринбург": "3",
     "новосибирск": "4",
+    "novosibirsk": "4",
     "нижний новгород": "66",
     "казань": "88",
     "самара": "78",
     "омск": "68",
     "ростов-на-дону": "76",
+    "ростов на дону": "76",
     "ростов": "76",
     "уфа": "99",
     "красноярск": "54",
@@ -49,27 +71,8 @@ _CITY_TO_AREA: dict[str, str] = {
     "ярославль": "112",
     "тула": "92",
     "калининград": "41",
-}
-
-_INTEREST_SEARCH: dict[Interest, str] = {
-    Interest.IT: "программист OR разработчик OR developer",
-    Interest.DATA_AI: "аналитик данных OR data analyst OR BI",
-    Interest.DEVOPS: "DevOps OR SRE OR инженер инфраструктуры",
-    Interest.DESIGN: "дизайнер UX OR UI OR figma",
-    Interest.MARKETING: "маркетолог OR digital marketing OR SMM",
-    Interest.SALES: "менеджер по продажам OR sales",
-    Interest.ENGINEERING: "инженер OR проектировщик CAD",
-    Interest.SCIENCE: "лаборант OR научный сотрудник OR исследователь",
-    Interest.BUSINESS: "менеджер проектов OR project manager OR ассистент",
-    Interest.FINANCE: "финансовый аналитик OR бухгалтер OR экономист",
-    Interest.HR: "HR OR рекрутер OR специалист по подбору",
-    Interest.LEGAL: "юрист OR legal counsel",
-    Interest.PROCUREMENT: "закупки OR снабжение",
-    Interest.LOGISTICS: "логист OR склад OR supply chain",
-    Interest.REAL_ESTATE: "недвижимость OR эксплуатация зданий",
-    Interest.ADMIN: "офис-менеджер OR администратор",
-    Interest.PRODUCT: "product manager OR продакт",
-    Interest.SUPPORT: "техподдержка OR support OR customer service",
+    "кемерово": "47",
+    "томск": "90",
 }
 
 
@@ -94,7 +97,23 @@ def _area_id_for_city(city: str | None) -> str | None:
     n = _norm_city(city)
     if n in ("удалённо", "удаленно", "remote", "дистанцион"):
         return None
-    return _CITY_TO_AREA.get(n)
+    hit = _CITY_TO_AREA.get(n)
+    if hit:
+        return hit
+    try:
+        import sys
+        from pathlib import Path
+
+        repo = Path(__file__).resolve().parents[2]
+        backend = repo / "miniapp" / "backend"
+        if str(backend) not in sys.path:
+            sys.path.insert(0, str(backend))
+        from wibe_work.services.hh_client import suggest_area_id
+
+        return suggest_area_id(city.strip())
+    except Exception as e:
+        logger.debug("hh.ru area suggest for %s: %s", city, e)
+        return None
 
 
 def _primary_profession_tag(interest: Interest) -> str:
@@ -174,30 +193,32 @@ def _infer_profession_tag(title: str, reqs: list[str], primary: Interest) -> str
 
 
 def _build_search_text(req: JobMatchRequest) -> str:
-    if req.profession and req.profession.strip():
-        p = req.profession.strip()
-        # Короткая подпись сферы («Маркетинг») — ищем по шаблону интереса, не дословно.
-        if len(p) < 40 and " or " not in p.lower():
-            templ = _INTEREST_SEARCH.get(req.interests[0])
-            if templ:
-                return templ
-        return p
-    return _INTEREST_SEARCH.get(req.interests[0], "специалист")
+    primary = req.interests[0]
+    interest_code = primary.value if isinstance(primary, Interest) else str(primary)
+    return search_text_for_match(
+        interest=interest_code,
+        profession=req.profession,
+        track_hint=req.recommended_track_hint,
+    )
+
+
+def normalize_job_experience(level: str | None) -> str | None:
+    """Код опыта для hh.ru: noExperience | between1And3 | between3And6 | moreThan6."""
+    if not level or not str(level).strip():
+        return None
+    raw = str(level).strip()
+    if raw.lower() in ("any", "любой", ""):
+        return None
+    if raw in HH_EXPERIENCE_API_IDS:
+        return raw
+    return _LEGACY_LEVEL_TO_HH.get(raw.lower())
 
 
 def _experience_params(level: str | None) -> list[tuple[str, str]]:
-    if not level or not level.strip():
+    code = normalize_job_experience(level)
+    if not code:
         return []
-    l = level.strip().lower()
-    if l == EducationLevel.INTERN.value:
-        return [("experience", "noExperience")]
-    if l == EducationLevel.JUNIOR.value:
-        return [("experience", "noExperience"), ("experience", "between1And3")]
-    if l == EducationLevel.MIDDLE.value:
-        return [("experience", "between3And6")]
-    if l == EducationLevel.SENIOR.value:
-        return [("experience", "moreThan6")]
-    return []
+    return [("experience", code)]
 
 
 def _schedule_param(work_format: str | None) -> str | None:
@@ -373,15 +394,17 @@ async def fetch_hh_vacancies(req: JobMatchRequest) -> list[MockVacancy]:
         ("only_with_salary", "false"),
     ]
 
-    aid = _area_id_for_city(req.city)
-    if aid:
-        params.append(("area", aid))
-
-    params.extend(_experience_params(req.level))
-
     sched = _schedule_param(req.work_format)
     if sched:
         params.append(("schedule", sched))
+
+    # Удалёнка — по всей РФ; регион только для офиса/гибрида
+    if sched != "remote":
+        aid = _area_id_for_city(req.city)
+        if aid:
+            params.append(("area", aid))
+
+    params.extend(_experience_params(req.level))
 
     # Зарплатный коридор как подсказка API (мягкий)
     sb = (req.salary_bracket or "").strip().lower()

@@ -16,10 +16,12 @@ from wibe_work.services.aptitude_quiz import (
 from wibe_work.services.aptitude_quiz_grading import quiz_grade_hint, quiz_grade_label
 from wibe_work.services.assessment_modules import module_question_slice
 from wibe_work.services.assessment_routing import (
+    career_block_title,
     module_title,
     resolve_assessment_track,
     track_meta,
     track_modules,
+    uses_job_search_assessment,
 )
 
 WRow = List[tuple]
@@ -45,12 +47,18 @@ def _format_question(
     }
 
 
-def _build_orientation(profile: Dict[str, Any], track_id: str, start_id: int) -> tuple[List[Dict[str, Any]], List[List[tuple]], int]:
+def _build_orientation(
+    profile: Dict[str, Any],
+    track_id: str,
+    start_id: int,
+    *,
+    interest: str = "",
+) -> tuple[List[Dict[str, Any]], List[List[tuple]], int]:
     questions: List[Dict[str, Any]] = []
     weights: List[List[tuple]] = []
     qid = start_id
     for mod_id in track_modules(track_id):
-        for raw in module_question_slice(mod_id, track_id):
+        for raw in module_question_slice(mod_id, track_id, interest=interest):
             questions.append(_format_question(qid, raw, module_id=mod_id, block="orientation"))
             weights.append(list(raw["weights"]))
             qid += 1
@@ -60,15 +68,18 @@ def _build_orientation(profile: Dict[str, Any], track_id: str, start_id: int) ->
 def get_assessment_bundle(profile: Dict[str, Any], interest: str) -> Dict[str, Any]:
     """
     Полный набор вопросов для пользователя.
-    orientation (1..O) → technical (O+1..O+10) → career/personality (O+11..O+15).
-    Для школьников (test_grade school) блок technical пустой — только ориентация и
-    школьные «карьерные» вопросы (без задач по сфере).
+    Школа: orientation → career (без technical).
+    СПО: orientation → technical → career.
+    Бакалавр+: technical → job_search (без профориентации).
     """
     meta = track_meta(profile)
     track_id = meta["track_id"]
     grade = meta["test_grade"]
 
-    orientation, orient_weights, next_id = _build_orientation(profile, track_id, 1)
+    interest_key = (interest or "").strip() or "other"
+    orientation, orient_weights, next_id = _build_orientation(
+        profile, track_id, 1, interest=interest_key
+    )
     orient_count = len(orientation)
 
     include_technical = grade != "school"
@@ -118,7 +129,7 @@ def get_assessment_bundle(profile: Dict[str, Any], interest: str) -> Dict[str, A
     modules_out.append(
         {
             "id": "career",
-            "title": "Карьера и мотивы",
+            "title": career_block_title(profile),
             "questions": expert,
         }
     )
@@ -155,6 +166,8 @@ def get_assessment_bundle(profile: Dict[str, Any], interest: str) -> Dict[str, A
         "questions": all_questions,
         "weights_matrix": full_weights,
         "personality_count": len(expert),
+        "assessment_focus": "job_search" if uses_job_search_assessment(profile) else "proforientation",
+        "career_module_title": career_block_title(profile),
     }
 
 
