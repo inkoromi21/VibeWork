@@ -1,4 +1,4 @@
-"""Формат банка вопросов как на сайте (тест 1: id 1–10, тест 2: профориентация)."""
+"""Формат банка вопросов как на сайте: до 10 задач по сфере + блок профориентации (школа — без задач по сфере)."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def _to_website_bank(questions: list[dict], *, renumber_from: int = 1) -> list[d
 
 def quiz_bundle_for_web(profile: dict[str, Any], form_interest: str) -> dict[str, Any]:
     """
-    Тест 1 — 10 вопросов по сфере (id 1–10).
+    Тест 1 — до 10 вопросов по выбранной сфере (для школьников пустой список).
     Тест 2 — ориентация + карьера (id 1..N) с блоками modules.
     """
     sphere_key = sphere_id_for_profile(profile, form_interest)

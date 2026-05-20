@@ -1,4 +1,5 @@
-"""Сборка опроса: модули профориентации + 10 по сфере + 5 карьерных."""
+"""Сборка опроса: профориентация + по уровню — 10 технических по сфере + 5 карьерных."""
+
 
 from __future__ import annotations
 
@@ -6,11 +7,13 @@ import copy
 from typing import Any, Dict, List
 
 from wibe_work.services.aptitude_quiz import (
+    _EXPERT_WEIGHTS,
+    _interest_key,
     _personality_questions,
     _technical_questions,
-    get_pro_weights_matrix_for_interest,
+    _WEIGHT_PROFILE,
 )
-from wibe_work.services.aptitude_quiz_grading import compute_quiz_grade, quiz_grade_hint, quiz_grade_label
+from wibe_work.services.aptitude_quiz_grading import quiz_grade_hint, quiz_grade_label
 from wibe_work.services.assessment_modules import module_question_slice
 from wibe_work.services.assessment_routing import (
     module_title,
@@ -58,6 +61,8 @@ def get_assessment_bundle(profile: Dict[str, Any], interest: str) -> Dict[str, A
     """
     Полный набор вопросов для пользователя.
     orientation (1..O) → technical (O+1..O+10) → career/personality (O+11..O+15).
+    Для школьников (test_grade school) блок technical пустой — только ориентация и
+    школьные «карьерные» вопросы (без задач по сфере).
     """
     meta = track_meta(profile)
     track_id = meta["track_id"]
@@ -66,17 +71,21 @@ def get_assessment_bundle(profile: Dict[str, Any], interest: str) -> Dict[str, A
     orientation, orient_weights, next_id = _build_orientation(profile, track_id, 1)
     orient_count = len(orientation)
 
-    technical = copy.deepcopy(_technical_questions(interest))
-    for i, q in enumerate(technical):
-        q["id"] = next_id + i
-        q["block"] = "technical"
-        q["module"] = "sphere"
-        opts = q.get("options") or []
-        q["options"] = [
-            {"id": o.get("id") or o.get("k"), "label": o.get("label") or o.get("t") or ""}
-            for o in opts
-        ]
-    next_id += len(technical)
+    include_technical = grade != "school"
+
+    technical: List[Dict[str, Any]] = []
+    if include_technical:
+        technical = copy.deepcopy(_technical_questions(interest))
+        for i, q in enumerate(technical):
+            q["id"] = next_id + i
+            q["block"] = "technical"
+            q["module"] = "sphere"
+            opts = q.get("options") or []
+            q["options"] = [
+                {"id": o.get("id") or o.get("k"), "label": o.get("label") or o.get("t") or ""}
+                for o in opts
+            ]
+        next_id += len(technical)
 
     expert = copy.deepcopy(_personality_questions(interest, grade))
     for q in expert:
@@ -98,13 +107,14 @@ def get_assessment_bundle(profile: Dict[str, Any], interest: str) -> Dict[str, A
                     "questions": mod_qs,
                 }
             )
-    modules_out.append(
-        {
-            "id": "sphere",
-            "title": "Задачи в вашей сфере",
-            "questions": technical,
-        }
-    )
+    if technical:
+        modules_out.append(
+            {
+                "id": "sphere",
+                "title": "Задачи в вашей сфере",
+                "questions": technical,
+            }
+        )
     modules_out.append(
         {
             "id": "career",
@@ -113,8 +123,14 @@ def get_assessment_bundle(profile: Dict[str, Any], interest: str) -> Dict[str, A
         }
     )
 
-    core_matrix = get_pro_weights_matrix_for_interest(interest)
-    full_weights = orient_weights + list(core_matrix)
+    # Веса строго в порядке question_id: ориентация → (опц.) техника → карьера
+    k = _interest_key(interest)
+    tech_w = _WEIGHT_PROFILE.get(k, _WEIGHT_PROFILE["default"])
+    core_rows: List[WRow] = list(orient_weights)
+    if include_technical:
+        core_rows.extend(list(tech_w))
+    core_rows.extend(list(_EXPERT_WEIGHTS))
+    full_weights = core_rows
 
     return {
         "interest": (interest or "").strip() or "other",

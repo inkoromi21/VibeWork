@@ -8,7 +8,11 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from wibe_work.miniapp_paths import data_file
 from wibe_work.services.llm_client import fetch_llm_completion, llm_configured
-from wibe_work.services.llm_prompts import ANALYSIS_NARRATIVE_SYSTEM, build_analysis_user_prompt
+from wibe_work.services.llm_prompts import (
+    ANALYSIS_NARRATIVE_SCHOOL_SYSTEM,
+    ANALYSIS_NARRATIVE_SYSTEM,
+    build_analysis_user_prompt,
+)
 from wibe_work.services.aptitude_quiz import get_pro_weights_matrix_for_interest, letter_to_index
 from wibe_work.questionnaire_fields import INTEREST_SPHERES
 from wibe_work.services.user_context import (
@@ -21,6 +25,16 @@ from wibe_work.services.user_context import (
 )
 from wibe_work.services.user_pain_mapping import align_pains
 from wibe_work.services.learning_pack import build_learning_extras
+from wibe_work.services.career_analysis_school import (
+    analysis_mode_for_profile,
+    build_school_gap_analysis,
+    mock_school_narrative,
+    pick_school_path_plans,
+    school_education_hints,
+    school_learning_extras,
+    school_pain_first_step,
+    school_weekly_roadmap,
+)
 
 _SKILL_ORDER = (
     "programming",
@@ -974,6 +988,7 @@ def _analysis_narrative_llm(
     axes: List[Dict[str, Any]],
     readiness_percent: int,
     answers_count: int,
+    analysis_mode: str = "career",
 ) -> Tuple[str, str, Optional[str]]:
     """(текст, источник llm|mock, notice)."""
     plans = scenarios.get("plans") or []
@@ -982,11 +997,12 @@ def _analysis_narrative_llm(
         for p in plans[:3]
     )
     axes_line = _format_axes_for_llm(axes)
-    short_quiz = answers_count < 15
+    min_full = 15 if analysis_mode != "school" else 12
+    short_quiz = answers_count < min_full
     caveat = ""
     if short_quiz:
         caveat = (
-            f"Опрос неполный: только {answers_count} ответов из 15 по полной методике. "
+            f"Опрос неполный: только {answers_count} ответов. "
             "Не утверждай высокую точность профиля; используй формулировки «по текущим данным», «предварительно»."
         )
     prompt = build_analysis_user_prompt(
@@ -996,6 +1012,12 @@ def _analysis_narrative_llm(
         plan_line=plan_line,
         answers_count=answers_count,
         short_quiz_caveat=caveat,
+        analysis_mode=analysis_mode,
+    )
+    system = (
+        ANALYSIS_NARRATIVE_SCHOOL_SYSTEM
+        if analysis_mode == "school"
+        else ANALYSIS_NARRATIVE_SYSTEM
     )
     if not llm_configured():
         return "", "mock", None
@@ -1003,7 +1025,7 @@ def _analysis_narrative_llm(
         prompt,
         max_tokens=560,
         temperature=0.42,
-        system_prompt=ANALYSIS_NARRATIVE_SYSTEM,
+        system_prompt=system,
     )
     if text:
         return text, "llm", None
@@ -1771,25 +1793,51 @@ def build_analysis_result(
         readiness = readiness_vec
     fp = _answer_fingerprint(answers)
     eff_interest = _resolve_effective_interest(profile, interest)
-    scenarios = _pick_scenario_plans(eff_interest, axes, fp, answers)
-    plans = scenarios.get("plans") or []
-    top_track = str(scenarios.get("best_plan_name") or (plans[0].get("name") if plans else interest))
-    top_track = re.sub(r"^План [ABC]:\s*", "", top_track).strip() or interest
-    gap = _build_gap_analysis(profile, interest, top_track, axes, fp)
-    mts_rows = _rank_mts_rows(profile, profile_extra, eff_interest, answers, axes)
-    profile_summary_pre = _profile_summary_rich(
-        profile, profile_extra, interest, education, preparation_level
-    )
-    learn_x = build_learning_extras(
-        profile=profile,
-        interest=interest,
-        preparation_level=preparation_level,
-        scenarios=scenarios,
-        gap=gap,
-        profile_summary=profile_summary_pre,
-        user_id=str(profile.get("_user_id") or "") or None,
-        eff_interest=eff_interest,
-    )
+    mode = analysis_mode_for_profile(profile)
+
+    if mode == "school":
+        scenarios = pick_school_path_plans(profile, eff_interest, axes, fp)
+        plans = scenarios.get("plans") or []
+        top_track = str(scenarios.get("best_plan_name") or (plans[0].get("name") if plans else interest))
+        top_track = re.sub(r"^Вариант\s+[ABC]:\s*", "", top_track, flags=re.IGNORECASE).strip() or interest
+        gap = build_school_gap_analysis(profile, eff_interest, top_track, axes, fp)
+        mts_matrix = school_education_hints(profile, eff_interest, scenarios)
+        profile_summary_pre = _profile_summary_rich(
+            profile, profile_extra, interest, education, preparation_level
+        )
+        learn_x = school_learning_extras(
+            profile=profile,
+            interest=interest,
+            preparation_level=preparation_level,
+            scenarios=scenarios,
+            gap=gap,
+            profile_summary=profile_summary_pre,
+            user_id=str(profile.get("_user_id") or "") or None,
+            eff_interest=eff_interest,
+        )
+        weekly = school_weekly_roadmap(profile, top_track, eff_interest)
+    else:
+        scenarios = _pick_scenario_plans(eff_interest, axes, fp, answers)
+        plans = scenarios.get("plans") or []
+        top_track = str(scenarios.get("best_plan_name") or (plans[0].get("name") if plans else interest))
+        top_track = re.sub(r"^План [ABC]:\s*", "", top_track).strip() or interest
+        gap = _build_gap_analysis(profile, interest, top_track, axes, fp)
+        mts_matrix = {"rows": _rank_mts_rows(profile, profile_extra, eff_interest, answers, axes)}
+        profile_summary_pre = _profile_summary_rich(
+            profile, profile_extra, interest, education, preparation_level
+        )
+        learn_x = build_learning_extras(
+            profile=profile,
+            interest=interest,
+            preparation_level=preparation_level,
+            scenarios=scenarios,
+            gap=gap,
+            profile_summary=profile_summary_pre,
+            user_id=str(profile.get("_user_id") or "") or None,
+            eff_interest=eff_interest,
+        )
+        weekly = _weekly_roadmap(top_track, interest, preparation=preparation_level)
+
     learning = learn_x.get("learning") or _learning_cards(eff_interest, preparation_level)
     learning_path = learn_x.get("learning_path")
     learning_path_detail = learn_x.get("learning_path_detail")
@@ -1804,7 +1852,12 @@ def build_analysis_result(
         readiness_percent=readiness,
         top_track=top_track,
     )
-    weekly = _weekly_roadmap(top_track, interest, preparation=preparation_level)
+    if mode == "school" and pain_focus:
+        pid = (profile.get("primary_pain") or "").strip()
+        school_step = school_pain_first_step(pid) if pid else None
+        if school_step:
+            tips = list(pain_focus.get("tips") or [])
+            pain_focus["tips"] = [school_step] + [t for t in tips if school_step not in t][:2]
 
     profile_summary = profile_summary_pre
     directions_hint = ", ".join(
@@ -1817,22 +1870,34 @@ def build_analysis_result(
         axes=axes,
         readiness_percent=readiness,
         answers_count=len(answers),
+        analysis_mode=mode,
     )
     if llm_text.strip():
         narrative = llm_text.strip()
         ai_narrative_source = "llm"
         ai_narrative_notice = None
     else:
-        narrative = _mock_ai_narrative(
-            profile,
-            interest,
-            preparation_level,
-            scenarios,
-            axes,
-            fp,
-            readiness_percent=readiness,
-            gap=gap,
-        )
+        if mode == "school":
+            narrative = mock_school_narrative(
+                profile,
+                eff_interest,
+                scenarios,
+                axes,
+                fp,
+                readiness_percent=readiness,
+                gap=gap,
+            )
+        else:
+            narrative = _mock_ai_narrative(
+                profile,
+                interest,
+                preparation_level,
+                scenarios,
+                axes,
+                fp,
+                readiness_percent=readiness,
+                gap=gap,
+            )
         ai_narrative_source = "mock"
         ai_narrative_notice = None
     behavioral = _behavioral_hint(question_timings_ms)
@@ -1856,8 +1921,9 @@ def build_analysis_result(
             **readiness_insight,
         },
         "style_radar": {"axes": axes},
+        "analysis_mode": mode,
         "scenarios": scenarios,
-        "mts_matrix": {"rows": mts_rows},
+        "mts_matrix": mts_matrix,
         "learning": learning,
         "learning_path": learning_path,
         "learning_path_detail": learning_path_detail,
@@ -1885,6 +1951,7 @@ def public_analysis_payload(full: Dict[str, Any]) -> Dict[str, Any]:
     """Только то, что видит пользователь в разделе разбора."""
     keys = (
         "analyzed_at",
+        "analysis_mode",
         "readiness",
         "style_radar",
         "scenarios",

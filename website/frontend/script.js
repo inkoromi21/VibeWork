@@ -375,6 +375,12 @@ function syncCourseGradeField() {
 let ASSESSMENT_TRACK = null;
 let ASSESSMENT_MODULES = [];
 
+function _isSchoolProfileQuiz(prof) {
+  const d = String(prof?.education_detail || "").toLowerCase();
+  if (d === "school_8_11" || d === "school_9" || d === "school_11") return true;
+  return false;
+}
+
 function updateTestPanelHeadings() {
   const h1 = document.querySelector("#panel-test .card-head h1");
   if (h1 && ASSESSMENT_TRACK?.track_label) {
@@ -382,7 +388,9 @@ function updateTestPanelHeadings() {
   } else if (h1) {
     h1.textContent = "Этап 2 — тест";
   }
-  const h2a = document.querySelector(".quiz-test-section:not(.quiz-test-section--personality) .quiz-test-heading");
+  const techSection = document.querySelector(".quiz-test-section:not(.quiz-test-section--personality)");
+  const h2a = techSection?.querySelector(".quiz-test-heading");
+  const techLead = techSection?.querySelector(".quiz-test-lead");
   const h2b = document.querySelector(".quiz-test-section--personality .quiz-test-heading");
   const hintTrack = document.getElementById("quiz-track-hint");
   if (hintTrack) {
@@ -395,12 +403,27 @@ function updateTestPanelHeadings() {
     hintTrack.textContent = parts.join(" — ");
     hintTrack.hidden = !parts.length;
   }
-  if (h2a) h2a.textContent = "Тест 1 — задачи в вашей сфере";
+  const noTech = !QUIZ.length;
+  if (techSection) techSection.hidden = noTech;
+  if (h2a) {
+    h2a.textContent = noTech
+      ? ""
+      : "Тест 1 — задачи в вашей сфере";
+  }
+  if (techLead) {
+    techLead.hidden = noTech;
+    if (!noTech) {
+      techLead.innerHTML =
+        "Первые пять вопросов зависят от первой выбранной сферы в анкете; далее — общий блок.";
+    }
+  }
   if (h2b) {
     h2b.textContent =
       ASSESSMENT_MODULES.length > 1
         ? "Тест 2 — профориентация (несколько блоков)"
-        : "Тест 2 — интересы и тип среды";
+        : QUIZ.length
+          ? "Тест 2 — интересы и тип среды"
+          : "Профориентация по сфере и мотивам";
   }
 }
 
@@ -426,7 +449,13 @@ async function fetchAndRenderQuiz() {
       test_grade_hint: data.test_grade_hint || "",
     };
     ASSESSMENT_MODULES = Array.isArray(data.modules) ? data.modules : [];
-    if (data.questions && data.questions.length >= 10) {
+    const schoolTrack =
+      _isSchoolProfileQuiz(prof) ||
+      String(data.track_id || "").startsWith("school") ||
+      String(data.test_grade || "").toLowerCase() === "school";
+    if (schoolTrack && Array.isArray(data.questions)) {
+      QUIZ = data.questions;
+    } else if (data.questions && data.questions.length >= 10) {
       QUIZ = data.questions;
     } else {
       QUIZ = [...QUIZ_FALLBACK];
@@ -484,14 +513,21 @@ function updateQuizMetricsVisibility() {
 
 function updateQuizProgress() {
   updateQuizMetricsVisibility();
+  const metrics = document.getElementById("quiz-metrics-wrap");
+  const techRow = metrics?.querySelector(".progress-wrap");
+  if (techRow) techRow.hidden = !QUIZ.length;
   const n1 = QUIZ.filter((q) => document.querySelector(`input[name="q${q.id}"]:checked`)).length;
   const n2 = PERSONALITY_QUIZ.filter((q) => document.querySelector(`input[name="pq${q.id}"]:checked`)).length;
   const label = document.getElementById("quiz-progress-label");
   const bar = document.getElementById("quiz-bar");
   const labelP = document.getElementById("quiz-personality-progress-label");
   const barP = document.getElementById("quiz-personality-bar");
-  if (label) label.textContent = `${n1}/${QUIZ.length}`;
-  if (bar) bar.style.width = `${(n1 / Math.max(1, QUIZ.length)) * 100}%`;
+  if (label) {
+    label.textContent = QUIZ.length ? `${n1}/${QUIZ.length}` : "—";
+  }
+  if (bar) {
+    bar.style.width = QUIZ.length ? `${(n1 / Math.max(1, QUIZ.length)) * 100}%` : "0%";
+  }
   if (labelP) labelP.textContent = `${n2}/${PERSONALITY_QUIZ.length}`;
   if (barP) barP.style.width = `${(n2 / Math.max(1, PERSONALITY_QUIZ.length)) * 100}%`;
   syncReportToQuizState();
@@ -1503,7 +1539,7 @@ function isProfilePanelActive() {
 }
 
 function quizComplete() {
-  const t1 = QUIZ.every((q) => document.querySelector(`input[name="q${q.id}"]:checked`));
+  const t1 = !QUIZ.length || QUIZ.every((q) => document.querySelector(`input[name="q${q.id}"]:checked`));
   const t2 = PERSONALITY_QUIZ.every((q) => document.querySelector(`input[name="pq${q.id}"]:checked`));
   return t1 && t2;
 }
@@ -1536,7 +1572,8 @@ function quizAnswerFingerprint() {
 }
 
 function answersMatchPayloadTest(testAnswers, personalityTestAnswers) {
-  if (!testAnswers || testAnswers.length !== QUIZ.length) return false;
+  const wantLen = QUIZ.length;
+  if (!testAnswers || testAnswers.length !== wantLen) return false;
   const want = new Map(testAnswers.map((a) => [a.question_id, a.choice]));
   if (
     !QUIZ.every((q) => {
@@ -1669,7 +1706,9 @@ function updateFlowUI() {
       return;
     }
 
-    hint.textContent = "Профиль готов. Переходите к тесту — вопросы по первой выбранной сфере.";
+    hint.textContent = QUIZ.length
+      ? "Профиль готов. Перейдите к тесту — вопросы по первой выбранной сфере."
+      : "Профиль готов. Для вашего уровня — профориентационный блок (без «технических» задач по сфере; они для колледжа и вуза).";
 
     if (!qOk) {
       btn.disabled = false;
@@ -1677,8 +1716,13 @@ function updateFlowUI() {
       btn.classList.remove("glow");
       if (tf) {
         tf.hidden = false;
-        if (tff)
-          tff.textContent = `Пройдите оба теста на вкладке «Тест» (${QUIZ.length} + ${PERSONALITY_QUIZ.length} вопросов) — затем появятся навыки в %, разбор и чат.`;
+        if (tff) {
+          const nTech = QUIZ.length;
+          const nPers = PERSONALITY_QUIZ.length;
+          tff.textContent = nTech
+            ? `Пройдите оба блока на вкладке «Тест» (${nTech} по сфере + ${nPers} профориентация).`
+            : `Пройдите блок профориентации на вкладке «Тест» (${nPers} вопросов) — техническая часть для школьников не показывается.`;
+        }
         if (aiBtn) aiBtn.hidden = true;
       }
       updateQuizMetricsVisibility();
@@ -1798,7 +1842,7 @@ function collectPayload() {
     return { question_id: q.id, choice: sel.value };
   });
 
-  if (test_answers.some((a) => !a)) {
+  if (QUIZ.length && test_answers.some((a) => !a)) {
     throw new Error(`Ответьте на все вопросы теста 1 — сфера (${QUIZ.length} шт., вкладка «Тест»).`);
   }
   if (personality_test_answers.some((a) => !a)) {
@@ -1958,7 +2002,8 @@ function buildServerSnapshot() {
   return {
     profile,
     analysis: window.lastAnalysis || undefined,
-    test_answers: answers.length === QUIZ.length ? answers : undefined,
+    test_answers:
+      !QUIZ.length || answers.length === QUIZ.length ? (QUIZ.length ? answers : undefined) : undefined,
     personality_test_answers: pAnswers.length === PERSONALITY_QUIZ.length ? pAnswers : undefined,
     chat_messages: chatMessages.length ? chatMessages : undefined,
     last_tab: localStorage.getItem("vibework_last_tab") || undefined,
@@ -2658,10 +2703,15 @@ function renderInsightTilesFromResult(res) {
   renderInsightTiles(tiles);
 }
 
-function renderGradePlan(rows) {
+function renderGradePlan(rows, res) {
   const wrap = document.getElementById("grade-plan-wrap");
   const root = document.getElementById("grade-plan-block");
   if (!wrap || !root) return;
+  if (isSchoolAnalysis(res || window.lastAnalysis) || analysisPanelLabels(res).hideGradePlan) {
+    wrap.hidden = true;
+    root.innerHTML = "";
+    return;
+  }
   if (!rows || !rows.length) {
     wrap.hidden = true;
     root.innerHTML = "";
@@ -2689,7 +2739,7 @@ function renderGradePlan(rows) {
     </table>`;
 }
 
-function renderMtsMetrics(root, items) {
+function renderMtsMetrics(root, items, res) {
   const card = document.getElementById("res-mts-metrics");
   if (!root || !card) return;
   if (!items || !items.length) {
@@ -2698,6 +2748,7 @@ function renderMtsMetrics(root, items) {
     return;
   }
   card.hidden = false;
+  const school = isSchoolAnalysis(res || window.lastAnalysis);
   const top = [...items].sort((a, b) => b.relevance - a.relevance).slice(0, 8);
   root.innerHTML = top
     .map(
@@ -2823,6 +2874,10 @@ function renderGrowthStagesRich(host, stages) {
 
 function renderAdviceBlock(root, res) {
   if (!root) return;
+  if (typeof res.individual_advice === "string" && res.individual_advice.trim()) {
+    root.innerHTML = `<p class="analysis-narrative" style="font-size:.9rem;line-height:1.6;margin:0">${esc(res.individual_advice.trim())}</p>`;
+    return;
+  }
   if (renderIndividualAdviceBlock(root, res.individual_advice)) return;
   const dirs = res.directions || [];
   const chunks = dirs.map((d) => {
@@ -2834,8 +2889,9 @@ function renderAdviceBlock(root, res) {
   });
   const g = res.gap_analysis;
   if (g && g.closing_skills && g.closing_skills.length) {
+    const gapLbl = analysisPanelLabels(res).adviceGapPrefix;
     chunks.push(
-      `<p class="advice-gap muted"><strong>В приоритете по навыкам:</strong> ${g.closing_skills.map((x) => esc(x)).join(", ")}</p>`
+      `<p class="advice-gap muted"><strong>${esc(gapLbl)}</strong> ${g.closing_skills.map((x) => esc(x)).join(", ")}</p>`
     );
   }
   root.innerHTML =
@@ -2846,7 +2902,57 @@ async function refreshMtsPreview() {
   /* Матрица МТС показывается только в разборе после теста */
 }
 
-function renderGap(gap) {
+function isSchoolAnalysis(res) {
+  return res?.analysis_mode === "school";
+}
+
+function analysisPanelLabels(res) {
+  if (isSchoolAnalysis(res)) {
+    return {
+      gapTitle: "Что подтянуть (предметы и подготовка)",
+      gapClosingPrefix: "В фокусе:",
+      mtsTitle: "Куда идти учиться",
+      mtsLead: "Варианты маршрута (колледж, 11 класс, вуз) — не вакансии.",
+      insightsLead:
+        "Ясность маршрута, лучший вариант A/B/C и предметы для поступления — ориентиры для школьника.",
+      stagesTitle: "Шаги на ближайший месяц",
+      adviceGapPrefix: "В приоритете по предметам:",
+      hideGradePlan: true,
+    };
+  }
+  return {
+    gapTitle: "Готовность к цели трека",
+    gapClosingPrefix: "В фокусе:",
+    mtsTitle: "Роли: близость по профилю",
+    mtsLead: "Топ направлений из матрицы.",
+    insightsLead:
+      "Психологическая готовность к роли, тест личности, совпадение сферы с треком и работа с людьми.",
+    stagesTitle: "Этапы роста",
+    adviceGapPrefix: "В приоритете по навыкам:",
+    hideGradePlan: false,
+  };
+}
+
+function applyAnalysisPanelLabels(res) {
+  const L = analysisPanelLabels(res);
+  const gapCard = document.getElementById("res-gap");
+  const gapTitleEl = gapCard?.querySelector(".metric-panel-title");
+  if (gapTitleEl) gapTitleEl.textContent = L.gapTitle;
+  const mtsCard = document.getElementById("res-mts-metrics");
+  const mtsTitleEl = mtsCard?.querySelector(".metric-panel-title");
+  const mtsLeadEl = mtsCard?.querySelector(".muted.small");
+  if (mtsTitleEl) mtsTitleEl.textContent = L.mtsTitle;
+  if (mtsLeadEl) mtsLeadEl.textContent = L.mtsLead;
+  const insCard = document.getElementById("res-quad-insights");
+  const insLead = insCard?.querySelector(".muted.small");
+  if (insLead) insLead.textContent = L.insightsLead;
+  const stCard = document.getElementById("res-stages");
+  const stTitle = stCard?.querySelector("h2");
+  if (stTitle) stTitle.textContent = L.stagesTitle;
+  return L;
+}
+
+function renderGap(gap, res) {
   const head = document.getElementById("gap-headline");
   if (head) head.textContent = gap.headline;
   renderSegmentedGauge(document.getElementById("gap-segmented-host"), gap.overall_hp);
@@ -2867,8 +2973,9 @@ function renderGap(gap) {
   }
   const closeEl = document.getElementById("gap-closing");
   if (closeEl) {
+    const prefix = analysisPanelLabels(res || window.lastAnalysis).gapClosingPrefix;
     closeEl.textContent = gap.closing_skills.length
-      ? "В фокусе: " + gap.closing_skills.join(", ")
+      ? prefix + " " + gap.closing_skills.join(", ")
       : "";
   }
 }
@@ -2884,10 +2991,12 @@ function unlockChatUi() {
 
 function seedChatIfNeeded() {
   if (!window.lastAnalysis || chatMessages.length > 0) return;
+  const school = isSchoolAnalysis(window.lastAnalysis);
   chatMessages.push({
     role: "assistant",
-    content:
-      "Привет! Я вижу ваш разбор после теста. Спросите про стажировки, страх перед резюме или отказом, подачу достижений, города и узкие навыки — отвечу с опорой на профиль. Напомню: я не заменяю живого профориентолога или карьерного консультанта по резюме, но могу структурировать шаги.",
+    content: school
+      ? "Привет! Вижу школьный разбор: варианты куда учиться (A/B/C), предметы и подготовку. Спросите про колледж после 9 класса, профильные предметы, ЕГЭ или как выбрать между маршрутами — отвечу с опорой на ваш профиль."
+      : "Привет! Я вижу ваш разбор после теста. Спросите про стажировки, страх перед резюме или отказом, подачу достижений, города и узкие навыки — отвечу с опорой на профиль. Напомню: я не заменяю живого профориентолога или карьерного консультанта по резюме, но могу структурировать шаги.",
   });
   renderChatMessages();
 }
@@ -2938,7 +3047,8 @@ function renderResults(res) {
     tsLine.textContent = `Разбор: ${new Date().toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" })}`;
   }
 
-  if (res.gap_analysis) renderGap(res.gap_analysis);
+  const panelLabels = applyAnalysisPanelLabels(res);
+  if (res.gap_analysis) renderGap(res.gap_analysis, res);
 
   const radarHost = document.getElementById("style-radar-host");
   const radarLeg = document.getElementById("style-fit-legend");
@@ -2947,7 +3057,7 @@ function renderResults(res) {
   }
 
   const mtsMet = document.getElementById("mts-metrics-block");
-  if (mtsMet) renderMtsMetrics(mtsMet, res.mts_matrix);
+  if (mtsMet) renderMtsMetrics(mtsMet, res.mts_matrix, res);
 
   renderInsightTilesFromResult(res);
 
@@ -2971,7 +3081,7 @@ function renderResults(res) {
   const adviceRoot = document.getElementById("advice-block");
   if (adviceRoot) renderAdviceBlock(adviceRoot, res);
 
-  renderGradePlan(res.grade_plan || []);
+  renderGradePlan(res.grade_plan || [], res);
 
   const stagesHost = document.getElementById("stages-block");
   if (stagesHost) {

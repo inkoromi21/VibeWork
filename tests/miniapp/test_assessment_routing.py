@@ -47,11 +47,18 @@ def test_bundle_counts() -> None:
         {"education_detail": "school_8_11", "course_grade": "10 класс"},
         "it_dev",
     )
-    assert school["orientation_count"] > 0
-    assert school["technical_count"] == 10
-    assert school["personality_count"] == 5
-    assert school["total_count"] == school["orientation_count"] + 15
+    orient_n = school["orientation_count"]
+    career_n = school["personality_count"]
+    assert school["technical_count"] == 0
+    assert school["test_grade"] == "school"
+    assert school["total_count"] == orient_n + career_n
+    assert len(school["questions"]) == school["total_count"]
+    assert len(school["weights_matrix"]) == school["total_count"]
+    assert school["technical"] == []
+    mods = school.get("modules") or []
+    assert not any(m.get("id") == "sphere" for m in mods)
 
     uni = get_assessment_bundle({"education_detail": "univ_bachelor", "course_grade": "1 курс"}, "it_dev")
     assert uni["track_id"] == TRACK_UNIVERSITY
+    assert uni["technical_count"] == 10
     assert len(uni["questions"]) == uni["total_count"]

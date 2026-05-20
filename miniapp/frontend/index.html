@@ -2253,6 +2253,7 @@
     let profileFetchDone = false;
     let quizState = {
         interest: '',
+        technicalCount: 0,
         technical: [],
         personality: [],
         questions: [],
@@ -3867,6 +3868,8 @@
         quizState.modules = Array.isArray(data.modules) ? data.modules : [];
         quizState.technical = data.technical || [];
         quizState.personality = data.personality || [];
+        quizState.technicalCount =
+            typeof data.technical_count === 'number' ? data.technical_count : quizState.technical.length;
         quizState.questions =
             data.questions && data.questions.length
                 ? data.questions
@@ -3898,14 +3901,18 @@
             }
             await loadQuiz(testSphereSelection);
             const qs = quizState.questions;
-            const techQs = quizState.technical.length
-                ? quizState.technical
-                : qs.filter(function (q) {
-                      return q.id >= 1 && q.id <= 10;
-                  });
+            const techQs =
+                quizState.technical.length > 0
+                    ? quizState.technical
+                    : quizState.technicalCount === 0
+                      ? []
+                      : qs.filter(function (q) {
+                            return q.id >= 1 && q.id <= 10;
+                        });
             const persQs = quizState.personality.length
                 ? quizState.personality
                 : qs.filter(function (q) {
+                      if (quizState.technicalCount === 0) return true;
                       return q.id >= 11;
                   });
             const spheres = schema.interest_spheres || [];
@@ -4055,7 +4062,6 @@
                 return out + renderQuizQuestions(persQs);
             }
 
-            html += renderQuizBlock('Тест 1 — задачи в вашей сфере', techQs);
             html += renderTest2Blocks();
             html += '<button type="button" class="btn-primary" id="btnSubmitQuiz">Отправить ответы и получить разбор</button>';
             el.innerHTML = html;
@@ -4074,11 +4080,9 @@
                         a +
                         ' из ' +
                         qs.length +
-                        ' (техника до ' +
-                        techQs.length +
-                        ', личность ' +
-                        persQs.length +
-                        ')';
+                        (quizState.technicalCount === 0
+                            ? ' (без задач по сфере — только профориентация)'
+                            : ' (техника до ' + techQs.length + ', личность ' + persQs.length + ')');
                 }
             }
             el.querySelectorAll('.quiz-opt').forEach(function (b) {
@@ -4260,8 +4264,13 @@
     }
 
     function buildAnalysisTabHtml(d) {
+            const schoolMode = d.analysis_mode === 'school';
             const axes = (d.style_radar && d.style_radar.axes) || [];
             let html = '<h2>Автоматический разбор</h2>';
+            if (schoolMode) {
+                html +=
+                    '<p class="muted" style="font-size:.88rem;margin:0 0 12px">Школьный разбор: <strong>куда идти учиться</strong> и что подтянуть по предметам. Без карьерных треков и вакансий.</p>';
+            }
             html += '<p class="analysis-ts">Разбор: ' + esc(d.analyzed_at || '') + '</p>';
             html += '<div class="dash-grid-2">';
             html += '<div class="dash-card">' + renderReadinessGauge(d.readiness, { axes: axes, gap: d.gap_analysis, scenarios: d.scenarios, preparation_level: (cachedProfile && cachedProfile.preparation_level) || '' }) + '</div>';
@@ -4280,7 +4289,9 @@
             if (gap && gap.bars && gap.bars.length) {
                 html += '<div class="dash-card" style="margin-bottom:16px">';
                 html +=
-                    '<h3>Разрыв навыков</h3><p class="muted" style="font-size:.85rem;margin:0 0 10px">' +
+                    '<h3>' +
+                    (schoolMode ? 'Что подтянуть (предметы)' : 'Разрыв навыков') +
+                    '</h3><p class="muted" style="font-size:.85rem;margin:0 0 10px">' +
                     esc(gap.headline || '') +
                     (gap.overall_hp != null ? ' · близость к цели ~' + esc(String(gap.overall_hp)) + '%' : '') +
                     '</p>';
@@ -4348,12 +4359,13 @@
             if (plans.length) {
                 const bestPct = sc.best_avg_percent != null ? sc.best_avg_percent : plans[0].score_percent;
                 const bestName = sc.best_plan_name || '';
-                const cap = sc.caption || 'средний показатель по лучшему сценарию';
+                const cap = sc.caption || (schoolMode ? 'согласованность с маршрутами обучения' : 'средний показатель по лучшему сценарию');
                 html += '<div class="dash-card" style="margin-bottom:16px">';
+                html += '<h3 style="margin:0 0 8px;font-size:1rem">' + (schoolMode ? 'Куда идти учиться (A/B/C)' : 'Сценарии развития в сфере') + '</h3>';
                 html += '<div class="scenario-hero">';
                 html += '<div class="big-pct">' + esc(String(bestPct)) + '%</div>';
                 html += '<div class="sub">' + esc(cap) + '</div>';
-                                if ((d.inferred_profession || sc.inferred_profession || {}).label) {
+                                if (!schoolMode && (d.inferred_profession || sc.inferred_profession || {}).label) {
                     var infLbl = (d.inferred_profession || sc.inferred_profession).label;
                     html +=
                         '<p class="muted" style="margin:10px 0 0;font-size:.88rem">Специализация по тесту: <strong style="color:var(--text)">' +
@@ -4378,11 +4390,17 @@
             const mts = (d.mts_matrix && d.mts_matrix.rows) || [];
             if (mts.length) {
                 const mtsTrackLbl = (d.inferred_profession || sc.inferred_profession || {}).label;
-                const mtsTitle = mtsTrackLbl
-                    ? 'Роли по вашему треку'
-                    : 'Роли (матрица направлений)';
+                const mtsSchool = (d.mts_matrix && d.mts_matrix.school_mode) || schoolMode;
+                const mtsTitle = mtsSchool
+                    ? 'Куда идти учиться'
+                    : mtsTrackLbl
+                      ? 'Роли по вашему треку'
+                      : 'Роли (матрица направлений)';
                 html += '<div class="dash-card" style="margin-bottom:16px"><h3>' + esc(mtsTitle) + '</h3>';
-                if (mtsTrackLbl) {
+                if (mtsSchool) {
+                    html +=
+                        '<p class="muted" style="margin:0 0 12px;font-size:.82rem">Варианты поступления и обучения, не вакансии на рынке труда.</p>';
+                } else if (mtsTrackLbl) {
                     html +=
                         '<p class="muted" style="margin:0 0 12px;font-size:.82rem">Ранжирование по ответам теста и сфере «' +
                         esc(String(mtsTrackLbl)) +
@@ -4390,7 +4408,7 @@
                 }
                 for (let i = 0; i < mts.length; i++) {
                     const row = mts[i];
-                    const pct = row.percent != null ? row.percent : 0;
+                    const pct = row.match_percent != null ? row.match_percent : row.percent != null ? row.percent : 0;
                     const rank = row.rank != null ? row.rank : i;
                     html +=
                         '<div class="mts-row"><div class="mts-name">' +
@@ -4953,7 +4971,8 @@
             } catch (e) {}
             const profileOk = schema ? isProfileComplete(schema, profile) : false;
             const li1 = profileOk ? '✓ Анкета заполнена' : '○ Заполните анкету (обязательные поля)';
-            const li2 = '○ Пройдите тест: 10 вопросов по сфере + 5 профориентационных';
+            const li2 =
+                '○ Пройдите тест на вкладке «Тест» (школьники — профориентация без задач по сфере; колледж/вуз — с блоком по сфере)';
             const li3 = '○ Получите автоматический разбор';
             el.innerHTML =
                 '<h2>Чат с ИИ</h2>' +

@@ -2061,6 +2061,15 @@ async def match_jobs(req: JobMatchRequest) -> list[VacancyEnriched]:
 
 
 async def build_analysis(payload: DiagnosisPayload) -> AnalysisResult:
+    try:
+        from app.analysis_bridge import build_analysis_unified
+
+        return await build_analysis_unified(payload)
+    except ValueError:
+        raise
+    except Exception:
+        logger.exception("analysis_bridge: fallback на legacy build_analysis")
+
     ts = _combined_ts(payload)
     primary_interest = payload.interests[0]
     prof_pack = resolve_profession_pack(primary_interest)

@@ -89,8 +89,9 @@ class DiagnosisPayload(BaseModel):
     interests: list[Interest] = Field(min_length=1, max_length=6)
     education: Education
     test_answers: list[TestAnswer] = Field(
-        min_length=TEST_QUESTION_COUNT,
+        default_factory=list,
         max_length=TEST_QUESTION_COUNT,
+        description="Тест 1 по сфере; для школьников — пустой список",
     )
     personality_test_answers: list[PersonalityTestAnswer] = Field(
         min_length=PERSONALITY_TEST_MIN,
@@ -114,6 +115,12 @@ class DiagnosisPayload(BaseModel):
     @field_validator("test_answers")
     @classmethod
     def unique_questions(cls, v: list[TestAnswer]) -> list[TestAnswer]:
+        if not v:
+            return v
+        if len(v) != TEST_QUESTION_COUNT:
+            raise ValueError(
+                f"Укажите все {TEST_QUESTION_COUNT} ответов теста 1 или передайте пустой test_answers (школа)"
+            )
         ids = [a.question_id for a in v]
         if len(ids) != len(set(ids)):
             raise ValueError("Каждый вопрос теста должен отвечаться один раз")
@@ -400,6 +407,10 @@ class AnalysisResult(BaseModel):
     preparation_branch: PreparationBranch
     employer_feedback: EmployerFeedbackHint
     ai_pipeline: list[AiPipelineStep]
+    analysis_mode: Literal["school", "career"] | None = Field(
+        None,
+        description="school — маршруты обучения; career — роли и развитие в сфере",
+    )
 
 
 class SimulatorChoice(BaseModel):
