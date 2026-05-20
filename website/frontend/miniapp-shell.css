@@ -602,9 +602,32 @@ html[data-theme="dark"] #app .vw-wave-strip g {
   max-width: 100%;
 }
 
+#app .layout--auth .auth-hh-agree {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 #app .layout--auth .auth-hh-agree-text {
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+#app .layout--auth .auth-hh-agree input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  flex: 0 0 18px;
+  margin: 2px 0 0;
+  padding: 0;
+  min-height: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  -webkit-appearance: checkbox;
+  appearance: auto;
 }
 
 #app .layout--auth .auth-card h2 {

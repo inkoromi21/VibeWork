@@ -341,12 +341,19 @@
 
     function resolveProfileSchema(schema, audienceOrProfile) {
         if (!schema) return { sections: [], completion: {} };
-        var audience =
-            typeof audienceOrProfile === 'string'
-                ? audienceOrProfile
-                : questionnaireAudience(
-                      (audienceOrProfile && audienceOrProfile.education_detail) || ''
-                  );
+        var audience;
+        if (typeof audienceOrProfile === 'string') {
+            var s = audienceOrProfile.trim();
+            if (s === 'school' || s === 'career') {
+                audience = s;
+            } else {
+                audience = questionnaireAudience(s);
+            }
+        } else {
+            audience = questionnaireAudience(
+                (audienceOrProfile && audienceOrProfile.education_detail) || ''
+            );
+        }
         var completions = schema.completions || {};
         var comp = completions[audience] || schema.completion || {};
         var sectionsOut = [];

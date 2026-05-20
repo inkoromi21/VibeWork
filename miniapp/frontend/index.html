@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <meta name="vibework-build" content="20260521-mobile-ui-fix">
+    <meta name="vibework-build" content="20260521-auth-layout-fix">
     <script>
     (function () {
-        var BUILD = '20260521-mobile-ui-fix';
+        var BUILD = '20260521-auth-layout-fix';
         var key = 'vw_miniapp_build';
         try {
             var prev = localStorage.getItem(key);
@@ -41,7 +41,7 @@
     })();
     </script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/static/vw_shared_ui.js?v=20260521-mobile-ui-fix"></script>
+    <script src="/static/vw_shared_ui.js?v=20260521-profile-schema-fix"></script>
     <script>
     (function () {
         try {
@@ -97,7 +97,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=20260521-mobile-ui-fix">
+    <link rel="stylesheet" href="/static/style.css?v=20260521-auth-layout-fix">
     <style>
         /* Токены страницы — из /static/style.css; здесь только алиасы legacy-миниаппа */
         html[data-miniapp] {
@@ -903,7 +903,9 @@
             border-color: var(--btn-primary-border);
             box-shadow: none;
         }
-        input:not([type="range"]), textarea, select {
+        input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+        textarea,
+        select {
             width: 100%;
             padding: 10px 12px;
             min-height: 35px;
@@ -940,7 +942,9 @@
         input::placeholder, textarea::placeholder {
             color: var(--placeholder-color);
         }
-        input:not([type="range"]):focus, textarea:focus, select:focus {
+        input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):focus,
+        textarea:focus,
+        select:focus {
             border-color: var(--btn-anketa-border-strong);
             box-shadow: none;
         }
@@ -1686,31 +1690,43 @@
         .auth-forgot a { color: var(--accent-dark); font-weight: 600; text-decoration: none; }
         .auth-forgot a:hover { text-decoration: underline; }
         .auth-hh-agree {
-            margin-top: 8px;
-            padding: 8px 10px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            width: 100%;
+            box-sizing: border-box;
+            margin: 10px 0 0;
+            padding: 10px 12px;
             border: 1px solid var(--border);
             border-radius: 8px;
             background: rgba(0, 0, 0, 0.02);
-        }
-        .auth-hh-agree label {
-            display: flex;
-            gap: 8px;
-            align-items: flex-start;
-            margin: 0;
             cursor: pointer;
             user-select: none;
         }
         .auth-hh-agree input[type="checkbox"] {
-            width: 15px;
-            height: 15px;
+            width: 18px;
+            height: 18px;
+            min-width: 18px;
+            flex: 0 0 18px;
             margin: 2px 0 0;
-            flex-shrink: 0;
+            padding: 0;
+            min-height: 0;
+            border: none;
+            border-radius: 4px;
+            background: transparent;
+            box-shadow: none;
             accent-color: var(--accent);
+            -webkit-appearance: checkbox;
+            appearance: auto;
         }
         .auth-hh-agree-text {
+            flex: 1 1 0;
+            min-width: 0;
             font-size: 0.78rem;
-            line-height: 1.3;
+            line-height: 1.35;
             color: var(--text-muted);
+            overflow-wrap: break-word;
+            word-break: normal;
         }
         .auth-hh-agree-text a {
             color: var(--accent-dark);
@@ -2337,12 +2353,12 @@
             box-sizing: border-box;
             overflow: hidden;
         }
-        html[data-miniapp] #app .auth-hh-agree label {
+        html[data-miniapp] #app .auth-hh-agree {
             max-width: 100%;
         }
         html[data-miniapp] #app .auth-hh-agree-text {
-            overflow-wrap: anywhere;
-            word-break: break-word;
+            flex: 1 1 0;
+            min-width: 0;
         }
         html[data-miniapp] #app .profile-card label,
         html[data-miniapp] #app .profile-card input,
@@ -2376,7 +2392,7 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="/static/miniapp-shell.css?v=20260521-mobile-ui-fix">
+    <link rel="stylesheet" href="/static/miniapp-shell.css?v=20260521-auth-layout-fix">
     <script src="/static/auth-password-toggle.js?v=20260521-mobile-ui-fix"></script>
 </head>
 <body>
@@ -2470,7 +2486,7 @@
 
     const HOME_TAB = { id: 'home', label: 'Разделы', ico: '☰' };
     const ACCOUNT_TAB = { id: 'account', label: 'Аккаунт', ico: '✦' };
-    const VW_BUILD = '20260521-mobile-ui-fix';
+    const VW_BUILD = '20260521-auth-layout-fix';
     const SECTION_TABS = [
         { id: 'profile', label: 'Профиль', short: 'Анкета', snIco: '◇', ico: '📋' },
         { id: 'test', label: 'Тестирование', short: 'Тест', snIco: '☑', ico: '🎯' },
@@ -3276,17 +3292,16 @@
             ) +
             (isReg ? '<label for="authPass2">Пароль ещё раз</label>' + authPwdFieldHtml('authPass2', '', 'new-password') : '') +
             (isReg
-                ? '<div class="auth-hh-agree">' +
-                  '<label for="hhAgree">' +
+                ? '<label for="hhAgree" class="auth-hh-agree">' +
                   '<input type="checkbox" id="hhAgree">' +
                   '<span class="auth-hh-agree-text">' +
                   'Регистрируясь, я принимаю условия ' +
                   '<a href="https://hh.ru/account/agreement" target="_blank" rel="noopener noreferrer">оферты hh.ru о содействии в трудоустройстве</a>.</span>' +
-                  '</label></div>'
+                  '</label>'
                 : '') +
             '<button type="button" class="btn-primary" style="width:100%;margin-top:4px" onclick="window.__vw.submitAuth()">' + (isReg ? 'Зарегистрироваться' : 'Войти') + '</button>' +
             (!isReg
-                ? '<p class="auth-forgot"><a href="/reset-password">Забыли пароль?</a></p>'
+                ? '<p class="auth-forgot"><a href="/reset-password?from=miniapp">Забыли пароль?</a></p>'
                 : '') +
             '<p class="auth-switch">' +
             (isReg
@@ -3990,10 +4005,13 @@
     function effectiveProfileSchema(schema, profileOrEdu) {
         const sh = vwShared();
         if (!sh || !sh.resolveProfileSchema) return schema;
-        let edu = profileOrEdu;
-        if (edu && typeof edu === 'object') edu = edu.education_detail;
-        if (!edu) edu = profileDraft.education_detail || '';
-        return sh.resolveProfileSchema(schema, edu);
+        if (profileOrEdu && typeof profileOrEdu === 'object') {
+            return sh.resolveProfileSchema(schema, profileOrEdu);
+        }
+        const draft = profileOrEdu
+            ? Object.assign({}, profileDraft || {}, { education_detail: String(profileOrEdu) })
+            : profileDraft || {};
+        return sh.resolveProfileSchema(schema, draft);
     }
 
     function wizardProfileSections(schema, profile) {
@@ -4301,9 +4319,23 @@
                 return;
             }
             const sections = wizardProfileSections(schema, profileDraft);
+            if (!sections.length) {
+                el.innerHTML =
+                    '<h2>Анкета</h2>' +
+                    '<p class="muted">Не удалось загрузить шаги анкеты. Обновите страницу или выберите уровень образования заново.</p>' +
+                    '<button type="button" class="btn-primary" id="btnProfileWizardRetry">Повторить</button>';
+                const retry = document.getElementById('btnProfileWizardRetry');
+                if (retry) retry.onclick = function () { profileWizardStep = 0; renderProfileTab(); };
+                return;
+            }
             if (profileWizardStep < 0) profileWizardStep = 0;
             if (profileWizardStep >= sections.length) profileWizardStep = Math.max(0, sections.length - 1);
             const sec = sections[profileWizardStep];
+            if (!sec) {
+                profileWizardStep = 0;
+                renderProfileTab();
+                return;
+            }
             const stepNum = profileWizardStep + 1;
             const stepTotal = sections.length;
             let html =
@@ -4403,7 +4435,13 @@
             }
             wireProfileForm(schema);
         } catch (e) {
-            el.innerHTML = '<p class="muted">' + esc(e.message) + '</p><p class="muted">Запустите сервер и откройте <code>http://127.0.0.1:8000/</code> или <code>/miniapp/</code></p>';
+            el.innerHTML =
+                '<h2>Анкета</h2>' +
+                '<p class="muted">' + esc(e.message || e) + '</p>' +
+                '<p class="muted">Проверьте интернет и обновите мини-приложение. Если ошибка повторяется — напишите в поддержку.</p>' +
+                '<button type="button" class="btn-primary" id="btnProfileLoadRetry">Повторить</button>';
+            const retry = document.getElementById('btnProfileLoadRetry');
+            if (retry) retry.onclick = function () { renderProfileTab(); };
         }
     }
 
@@ -7007,6 +7045,17 @@
 
     (async function bootstrap() {
         try {
+            var bootParams = new URLSearchParams(window.location.search);
+            if (bootParams.get('auth') === 'login') {
+                clearAuth();
+                try {
+                    var cleanUrl = new URL(window.location.href);
+                    cleanUrl.searchParams.delete('auth');
+                    window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+                } catch (urlErr) { /* */ }
+                showAuthScreen();
+                return;
+            }
             if (await tryTelegramWebAppAuth()) {
                 await renderShell();
                 return;
