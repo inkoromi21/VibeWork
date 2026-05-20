@@ -64,8 +64,14 @@ def _looks_like_ollama_model(name: str) -> bool:
     )
 
 
+def _is_ollama_cloud_url(url: str) -> bool:
+    return "ollama.com" in (url or "").lower()
+
+
 def _cloud_url_for_provider(provider: str, key: str) -> str:
     p = (provider or "").strip().lower()
+    if p in ("ollama", "ollama_cloud", "ollama-cloud"):
+        return "https://ollama.com/v1/chat/completions"
     if p == "groq":
         return "https://api.groq.com/openai/v1/chat/completions"
     if p in ("openai", "gpt"):
@@ -76,6 +82,10 @@ def _cloud_url_for_provider(provider: str, key: str) -> str:
         return "https://api.groq.com/openai/v1/chat/completions"
     if key.startswith("sk-or-"):
         return "https://api.openai.com/v1/chat/completions"
+    if os.getenv("OLLAMA_API_KEY", "").strip() or os.getenv("CHAT_API_KEY", "").strip():
+        # Ключ Ollama Cloud (часто с точкой) — не отправлять на Z.AI по умолчанию.
+        if p == "" and (os.getenv("CHAT_MODEL", "") or "").strip().endswith("-cloud"):
+            return "https://ollama.com/v1/chat/completions"
     if "." in key and not key.startswith("sk-"):
         return "https://api.z.ai/api/paas/v4/chat/completions"
     return "https://api.deepseek.com/v1/chat/completions"
@@ -83,6 +93,8 @@ def _cloud_url_for_provider(provider: str, key: str) -> str:
 
 def _default_model_for_url(url: str) -> str:
     u = url.lower()
+    if "ollama.com" in u:
+        return "gpt-oss:120b-cloud"
     if "groq.com" in u:
         return "llama-3.1-8b-instant"
     if "api.openai.com" in u:
@@ -110,7 +122,7 @@ def _resolve_chat_model(url: str, explicit_model: str) -> str:
         or os.getenv("DEEPSEEK_MODEL", "").strip()
         or os.getenv("OPENAI_MODEL", "").strip()
     )
-    if _is_local_llm_url(url):
+    if _is_local_llm_url(url) or _is_ollama_cloud_url(url):
         return model or _default_model_for_url(url)
     if not model or _looks_like_ollama_model(model):
         return _default_model_for_url(url)
@@ -131,7 +143,10 @@ def get_llm_settings() -> Optional[Tuple[str, str, str]]:
     Локально (бесплатно): CHAT_API_URL=http://127.0.0.1:11434/... и/или USE_OLLAMA=1.
     CHAT_API_KEY для Ollama не нужен. Облако: USE_OLLAMA=0 и облачный URL + ключ (Groq и т.д.).
     """
-    chat_key = os.getenv("CHAT_API_KEY", "").strip()
+    chat_key = (
+        os.getenv("CHAT_API_KEY", "").strip()
+        or os.getenv("OLLAMA_API_KEY", "").strip()
+    )
     ds_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
     oa_key = os.getenv("OPENAI_API_KEY", "").strip()
     key = chat_key or ds_key or oa_key
@@ -163,6 +178,15 @@ def llm_configured() -> bool:
 def _is_local_llm_url(url: str) -> bool:
     u = url.lower()
     return "127.0.0.1" in u or "localhost" in u
+
+
+def _extract_assistant_text(message: dict) -> str:
+    """content; для reasoning-моделей (gpt-oss) — fallback на reasoning."""
+    content = str(message.get("content") or "").strip()
+    if content:
+        return content
+    reasoning = str(message.get("reasoning") or "").strip()
+    return reasoning
 
 
 def _http_timeout_seconds(url: str) -> float:
@@ -201,12 +225,10 @@ def fetch_llm_completion(
         r = _http_session().post(url, headers=headers, json=body, timeout=timeout)
         r.raise_for_status()
         data = r.json()
-        raw = data["choices"][0]["message"].get("content")
-        if raw is None:
-            logger.warning("LLM пустой content: %s", str(data)[:400])
-            return None, "Модель вернула пустой ответ. Попробуйте ещё раз."
-        text = str(raw).strip()
+        msg = data["choices"][0]["message"]
+        text = _extract_assistant_text(msg)
         if not text:
+            logger.warning("LLM пустой ответ: %s", str(data)[:400])
             return None, "Модель вернула пустой ответ. Попробуйте ещё раз."
         return text, None
     except requests.HTTPError as e:

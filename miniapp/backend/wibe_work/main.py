@@ -246,52 +246,9 @@ async def health_email():
 @app.get("/api/health/llm")
 async def health_llm():
     """Проверка LLM: переменные в .env и пробный запрос (без секретов в ответе)."""
-    from wibe_work.services.llm_client import (
-        _is_local_llm_url,
-        fetch_llm_completion,
-        get_llm_settings,
-    )
+    from wibe_work.services.llm_health import build_llm_health_payload
 
-    raw_url = (os.getenv("CHAT_API_URL", "").strip())
-    cfg = get_llm_settings()
-    use_ollama = (os.getenv("USE_OLLAMA", "").strip().lower() in ("1", "true", "yes", "on")) or (
-        bool(raw_url) and _is_local_llm_url(raw_url)
-    )
-    out: dict = {
-        "llm_configured": cfg is not None,
-        "ok": False,
-        "use_ollama": use_ollama,
-        "chat_api_url_env": raw_url or None,
-    }
-    if not cfg:
-        out["hint"] = (
-            "Задайте CHAT_API_KEY в корневом .env (Groq: gsk_… + CHAT_PROVIDER=groq "
-            "или CHAT_API_URL=https://api.groq.com/openai/v1/chat/completions). "
-            "При USE_OLLAMA=0 не указывайте localhost. Перезапустите API."
-        )
-        return out
-    url, _, model = cfg
-    out["model"] = model
-    out["resolved_url"] = url.split("?")[0]
-    local = "127.0.0.1" in url or "localhost" in url
-    out["endpoint_local"] = local
-    use_ollama_env = (os.getenv("USE_OLLAMA", "").strip().lower() in ("0", "false", "no", "off"))
-    if local and use_ollama_env and raw_url and _is_local_llm_url(raw_url):
-        out["config_warning"] = (
-            "CHAT_API_URL указывает на Ollama (localhost) — используется локальная модель. "
-            "Для облака уберите 127.0.0.1 из URL и задайте USE_OLLAMA=0."
-        )
-    if local:
-        out["hint"] = (
-            "Локальный LLM: запустите Ollama (ollama serve) и модель из CHAT_MODEL."
-        )
-    text, notice = fetch_llm_completion("Ответь одним словом: ок", max_tokens=8, temperature=0)
-    out["ok"] = bool(text)
-    if notice:
-        out["notice"] = notice
-    elif not text:
-        out["notice"] = "Модель не ответила; см. лог API."
-    return out
+    return build_llm_health_payload()
 
 
 @app.get("/api/health/hh")

@@ -6014,7 +6014,12 @@
         try {
             const res = await fetchJson('/api/health/llm');
             const data = await res.json();
-            if (data.ok) {
+            if (data.ok === true) {
+                box.style.display = 'none';
+                box.textContent = '';
+                return;
+            }
+            if (data.ok === undefined && data.llm_configured === true) {
                 box.style.display = 'none';
                 box.textContent = '';
                 return;

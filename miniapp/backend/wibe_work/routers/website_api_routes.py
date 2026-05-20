@@ -69,8 +69,9 @@ async def profile_schema():
 
 @router.get("/api/health/llm")
 async def health_llm():
-    _ensure_imports()
-    return {"llm_configured": llm_configured()}
+    from wibe_work.services.llm_health import build_llm_health_payload
+
+    return build_llm_health_payload()
 
 
 @router.get("/api/mts/tracks")
