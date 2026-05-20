@@ -21,7 +21,8 @@ def test_quiz_web_bundle_matches_track() -> None:
     profile = {"education_detail": "school_8_11", "course_grade": "9 класс", "main_sphere": "it_dev"}
     pack = quiz_bundle_for_web(profile, "IT")
     assert pack.get("track_id") == "school_grade9"
-    assert len(pack.get("questions") or []) == 10
+    # Школа 9 класс: без технического блока по сфере, только профориентация + карьера
+    assert len(pack.get("questions") or []) == 0
     assert len(pack.get("personality_questions") or []) >= 4
     assert pack.get("modules")
 
