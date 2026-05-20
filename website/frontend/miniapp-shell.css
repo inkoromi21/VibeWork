@@ -209,7 +209,7 @@ html[data-theme="dark"] #app .vw-wave-strip g {
     padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
   }
 
-  #app input:not([type="range"]),
+  #app input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
   #app textarea,
   #app select {
     font-size: 16px;
@@ -471,7 +471,7 @@ html[data-theme="dark"] #app .vw-wave-strip g {
 }
 
 /* Поля ввода как на сайте */
-#app input:not([type="range"]),
+#app input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
 #app textarea,
 #app select {
   width: 100%;
@@ -486,7 +486,7 @@ html[data-theme="dark"] #app .vw-wave-strip g {
   box-shadow: none;
 }
 
-#app input:not([type="range"]):focus,
+#app input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):focus,
 #app textarea:focus,
 #app select:focus {
   border-color: var(--green-border);

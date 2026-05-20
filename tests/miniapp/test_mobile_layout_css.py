@@ -27,6 +27,14 @@ def test_miniapp_shell_flex_option_rules():
     assert "min-width: 0" in text
     assert "label:not(.radio-opt):not(.auth-hh-agree)" in text
     assert "#app .quiz-opt" in text
+    assert ':not([type="checkbox"]):not([type="radio"])' in text
+
+
+def test_miniapp_anydo_step_checkbox_not_full_width():
+    html = MINIAPP_HTML.read_text(encoding="utf-8")
+    assert ".anydo-step__check" in html
+    assert "width: 22px !important" in html
+    assert "flex: 1 1 auto" in html
 
 
 def test_reset_password_miniapp_back_link():

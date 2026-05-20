@@ -2248,11 +2248,27 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            width: 100%;
+            max-width: 100%;
+        }
+        .anydo-steps > li {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
         }
         .anydo-step {
             display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
             gap: 10px;
             align-items: flex-start;
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
             padding: 12px;
             border-radius: 12px;
             border: 1px solid var(--border);
@@ -2272,25 +2288,39 @@
             pointer-events: none;
         }
         .anydo-step__check {
+            flex: 0 0 22px;
             flex-shrink: 0;
-            width: 22px;
+            width: 22px !important;
+            min-width: 22px !important;
+            max-width: 22px !important;
             height: 22px;
-            margin-top: 2px;
+            min-height: 22px;
+            margin: 2px 0 0;
+            padding: 0 !important;
+            box-sizing: border-box;
             accent-color: var(--accent);
             cursor: pointer;
+            -webkit-appearance: checkbox;
+            appearance: auto;
         }
         .anydo-step.is-locked .anydo-step__check {
             cursor: not-allowed;
         }
         .anydo-step__body {
-            flex: 1;
+            flex: 1 1 auto;
             min-width: 0;
+            width: auto;
+            max-width: 100%;
+            overflow-wrap: break-word;
+            word-break: normal;
         }
         .anydo-step__title {
             font-size: 0.92rem;
             font-weight: 600;
             margin: 0 0 4px;
             line-height: 1.35;
+            overflow-wrap: break-word;
+            word-break: normal;
         }
         .anydo-step__meta {
             font-size: 0.75rem;
@@ -6062,86 +6092,13 @@
             const schoolMode = d.analysis_mode === 'school';
             const axes = (d.style_radar && d.style_radar.axes) || [];
             const prepLevel = (cachedProfile && cachedProfile.preparation_level) || '';
+            const sc = d.scenarios || {};
             let html = '';
             if (schoolMode) {
                 html +=
                     '<p class="muted" style="font-size:.88rem;margin:0 0 12px">Школьный разбор: <strong>куда идти учиться</strong> и что подтянуть по предметам. Без карьерных треков и вакансий.</p>';
             }
-            let summaryInner = '';
-            if (d.readiness) {
-                const rv = d.readiness.value_percent != null ? d.readiness.value_percent : 0;
-                summaryInner += analysisBlock(
-                    analysisSummaryTitle('Готовность к цели трека', rv + '%'),
-                    renderReadinessGauge(d.readiness, {
-                        axes: axes,
-                        gap: d.gap_analysis,
-                        scenarios: d.scenarios,
-                        preparation_level: prepLevel
-                    }),
-                    { nested: true, neverSpoiler: true }
-                );
-            }
-            if (axes.length) {
-                summaryInner += analysisBlock(
-                    analysisSummaryTitle('Оси методики', '4 показателя'),
-                    '<div class="radar-svg-wrap">' + buildRadarSvg(axes) + radarLegendChips(axes) + '</div>',
-                    { nested: true, neverSpoiler: true }
-                );
-            }
-            if (summaryInner) {
-                html += analysisBlock(analysisSummaryTitle('Сводка', 'готовность и оси'), summaryInner, {
-                    root: true,
-                    neverSpoiler: countAnalysisSpoilersInHtml(summaryInner) === 0
-                });
-            }
 
-            if (d.behavioral_hint) {
-                html += analysisBlock(
-                    analysisSummaryTitle('Поведенческая подсказка', truncHint(d.behavioral_hint, 40)),
-                    '<p class="muted" style="font-size:.9rem;line-height:1.5;margin:0">' + esc(d.behavioral_hint) + '</p>',
-                    { root: true, neverSpoiler: true }
-                );
-            }
-            const gap = d.gap_analysis;
-            if (gap && gap.bars && gap.bars.length) {
-                const gapTitle = schoolMode ? 'Что подтянуть (предметы)' : 'Разрыв навыков';
-                let gapBody = '';
-                if (gap.headline || gap.overall_hp != null) {
-                    gapBody +=
-                        '<p class="muted" style="font-size:.85rem;margin:0 0 10px">' +
-                        esc(gap.headline || '') +
-                        (gap.overall_hp != null ? ' · близость к цели ~' + esc(String(gap.overall_hp)) + '%' : '') +
-                        '</p>';
-                }
-                for (let gi = 0; gi < gap.bars.length; gi++) {
-                    const bar = gap.bars[gi];
-                    const userPct = bar.user_percent != null ? bar.user_percent : 0;
-                    const targetPct = bar.target_percent != null ? bar.target_percent : 0;
-                    gapBody += analysisBlock(
-                        analysisSummaryTitle(bar.label || 'Навык', userPct + '% → ' + targetPct + '%'),
-                        '<div class="plan-bar-outer"><div class="plan-bar-inner" style="width:' +
-                            Math.min(100, userPct) +
-                            '%"></div></div>',
-                        { nested: true, neverSpoiler: true }
-                    );
-                }
-                if (gap.closing_skills && gap.closing_skills.length) {
-                    gapBody += analysisBlock(
-                        analysisSummaryTitle('Закрыть в первую очередь', gap.closing_skills.length + ' навыка'),
-                        '<p class="muted" style="font-size:.82rem;margin:0">' + esc(gap.closing_skills.join(', ')) + '</p>',
-                        { nested: true, neverSpoiler: gap.closing_skills.length <= 3 }
-                    );
-                }
-                html += analysisBlock(analysisSummaryTitle(gapTitle, gap.bars.length + ' показателя'), gapBody, { root: true });
-            }
-            if (d.ai_narrative) {
-                html += analysisBlock(
-                    analysisSummaryTitle('Краткий вывод', truncHint(d.ai_narrative, 44)),
-                    '<p class="analysis-narrative" style="font-size:.9rem;line-height:1.6;margin:0">' + esc(d.ai_narrative) + '</p>',
-                    { root: true, neverSpoiler: stripHtmlTextLen(d.ai_narrative) <= 420 }
-                );
-            }
-            const sc = d.scenarios || {};
             const plans = sc.plans || [];
             if (plans.length) {
                 const bestPct = sc.best_avg_percent != null ? sc.best_avg_percent : plans[0].score_percent;
@@ -6218,6 +6175,81 @@
                     root: true,
                     neverSpoiler: mts.length <= 5
                 });
+            }
+
+            let summaryInner = '';
+            if (d.readiness) {
+                const rv = d.readiness.value_percent != null ? d.readiness.value_percent : 0;
+                summaryInner += analysisBlock(
+                    analysisSummaryTitle('Готовность к цели трека', rv + '%'),
+                    renderReadinessGauge(d.readiness, {
+                        axes: axes,
+                        gap: d.gap_analysis,
+                        scenarios: d.scenarios,
+                        preparation_level: prepLevel
+                    }),
+                    { nested: true, neverSpoiler: true }
+                );
+            }
+            if (axes.length) {
+                summaryInner += analysisBlock(
+                    analysisSummaryTitle('Оси методики', '4 показателя'),
+                    '<div class="radar-svg-wrap">' + buildRadarSvg(axes) + radarLegendChips(axes) + '</div>',
+                    { nested: true, neverSpoiler: true }
+                );
+            }
+            if (summaryInner) {
+                html += analysisBlock(analysisSummaryTitle('Сводка', 'готовность и оси'), summaryInner, {
+                    root: true,
+                    neverSpoiler: countAnalysisSpoilersInHtml(summaryInner) === 0
+                });
+            }
+
+            if (d.behavioral_hint) {
+                html += analysisBlock(
+                    analysisSummaryTitle('Поведенческая подсказка', truncHint(d.behavioral_hint, 40)),
+                    '<p class="muted" style="font-size:.9rem;line-height:1.5;margin:0">' + esc(d.behavioral_hint) + '</p>',
+                    { root: true, neverSpoiler: true }
+                );
+            }
+            const gap = d.gap_analysis;
+            if (gap && gap.bars && gap.bars.length) {
+                const gapTitle = schoolMode ? 'Что подтянуть (предметы)' : 'Разрыв навыков';
+                let gapBody = '';
+                if (gap.headline || gap.overall_hp != null) {
+                    gapBody +=
+                        '<p class="muted" style="font-size:.85rem;margin:0 0 10px">' +
+                        esc(gap.headline || '') +
+                        (gap.overall_hp != null ? ' · близость к цели ~' + esc(String(gap.overall_hp)) + '%' : '') +
+                        '</p>';
+                }
+                for (let gi = 0; gi < gap.bars.length; gi++) {
+                    const bar = gap.bars[gi];
+                    const userPct = bar.user_percent != null ? bar.user_percent : 0;
+                    const targetPct = bar.target_percent != null ? bar.target_percent : 0;
+                    gapBody += analysisBlock(
+                        analysisSummaryTitle(bar.label || 'Навык', userPct + '% → ' + targetPct + '%'),
+                        '<div class="plan-bar-outer"><div class="plan-bar-inner" style="width:' +
+                            Math.min(100, userPct) +
+                            '%"></div></div>',
+                        { nested: true, neverSpoiler: true }
+                    );
+                }
+                if (gap.closing_skills && gap.closing_skills.length) {
+                    gapBody += analysisBlock(
+                        analysisSummaryTitle('Закрыть в первую очередь', gap.closing_skills.length + ' навыка'),
+                        '<p class="muted" style="font-size:.82rem;margin:0">' + esc(gap.closing_skills.join(', ')) + '</p>',
+                        { nested: true, neverSpoiler: gap.closing_skills.length <= 3 }
+                    );
+                }
+                html += analysisBlock(analysisSummaryTitle(gapTitle, gap.bars.length + ' показателя'), gapBody, { root: true });
+            }
+            if (d.ai_narrative) {
+                html += analysisBlock(
+                    analysisSummaryTitle('Краткий вывод', truncHint(d.ai_narrative, 44)),
+                    '<p class="analysis-narrative" style="font-size:.9rem;line-height:1.6;margin:0">' + esc(d.ai_narrative) + '</p>',
+                    { root: true, neverSpoiler: stripHtmlTextLen(d.ai_narrative) <= 420 }
+                );
             }
             if (!html) {
                 html += '<p class="muted" style="font-size:.9rem;line-height:1.5">Метрики появятся после подтверждения направления.</p>';
