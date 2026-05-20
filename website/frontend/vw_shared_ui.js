@@ -166,6 +166,84 @@
         });
     }
 
+    function choiceLabelForQuestion(q, choice) {
+        if (!q || choice == null || choice === '') return '—';
+        var c = String(choice);
+        var opts = q.options || [];
+        for (var i = 0; i < opts.length; i++) {
+            var o = opts[i];
+            var id = o.id != null ? String(o.id) : o.k != null ? String(o.k) : '';
+            if (id === c) {
+                var lbl = o.label != null ? o.label : o.t != null ? o.t : '';
+                return String(lbl || c);
+            }
+        }
+        return c;
+    }
+
+    /**
+     * @param {Array<{title?: string, questions: object[]}>} blocks
+     * @param {object} answersMap question_id -> choice
+     * @param {function} esc
+     * @param {{ lead?: string }} opts
+     */
+    function buildQuizSummaryHtml(blocks, answersMap, esc, opts) {
+        opts = opts || {};
+        answersMap = answersMap || {};
+        var lead = opts.lead || 'Ваши ответы по всем вопросам теста.';
+        var sectionsHtml = '';
+        var userNum = 0;
+        for (var bi = 0; bi < (blocks || []).length; bi++) {
+            var block = blocks[bi];
+            var qs = block.questions || [];
+            if (!qs.length) continue;
+            var itemsHtml = '';
+            for (var qi = 0; qi < qs.length; qi++) {
+                var q = qs[qi];
+                var qid = q.id;
+                var picked = answersMap[qid];
+                if (picked == null || picked === '') continue;
+                userNum += 1;
+                var ansLbl = choiceLabelForQuestion(q, picked);
+                itemsHtml +=
+                    '<div class="profile-complete-item profile-complete-item--wide">' +
+                    '<span class="profile-complete-label">Вопрос ' +
+                    userNum +
+                    '</span>' +
+                    '<span class="profile-complete-value">' +
+                    esc(q.text || '') +
+                    '</span>' +
+                    '<span class="profile-complete-value muted" style="margin-top:0.35rem">' +
+                    esc(String(picked) + '. ' + ansLbl) +
+                    '</span></div>';
+            }
+            if (!itemsHtml) continue;
+            var title = String(block.title || '').trim();
+            sectionsHtml +=
+                '<section class="profile-complete-block">' +
+                (title
+                    ? '<h3 class="profile-complete-block-title">' + esc(title) + '</h3>'
+                    : '') +
+                '<div class="profile-complete-grid">' +
+                itemsHtml +
+                '</div></section>';
+        }
+        return (
+            '<p class="profile-complete-lead muted">' +
+            esc(lead) +
+            '</p>' +
+            (sectionsHtml || '<p class="muted">Нет сохранённых ответов.</p>')
+        );
+    }
+
+    function quizAnswersListToMap(list) {
+        var m = {};
+        (list || []).forEach(function (a) {
+            if (a && a.question_id != null) m[a.question_id] = a.choice;
+        });
+        return m;
+    }
+
     /**
      * @param {object} schema
      * @param {object} profile
@@ -255,6 +333,73 @@
         } catch (e) {}
     }
 
+    function questionnaireAudience(educationDetail) {
+        var d = String(educationDetail || '').trim().toLowerCase();
+        if (d === 'school_8_11' || d === 'school_9' || d === 'school_11') return 'school';
+        return 'career';
+    }
+
+    function resolveProfileSchema(schema, audienceOrProfile) {
+        if (!schema) return { sections: [], completion: {} };
+        var audience =
+            typeof audienceOrProfile === 'string'
+                ? audienceOrProfile
+                : questionnaireAudience(
+                      (audienceOrProfile && audienceOrProfile.education_detail) || ''
+                  );
+        var completions = schema.completions || {};
+        var comp = completions[audience] || schema.completion || {};
+        var sectionsOut = [];
+        var sections = schema.sections || [];
+        for (var si = 0; si < sections.length; si++) {
+            var sec = sections[si];
+            var secAud = sec.audience;
+            if (secAud) {
+                var secList = Array.isArray(secAud) ? secAud : [secAud];
+                if (secList.indexOf(audience) < 0) continue;
+            }
+            var fields = [];
+            var rawFields = sec.fields || [];
+            for (var fi = 0; fi < rawFields.length; fi++) {
+                var f = rawFields[fi];
+                var fAud = f.audience;
+                if (fAud) {
+                    var fList = Array.isArray(fAud) ? fAud : [fAud];
+                    if (fList.indexOf(audience) < 0) continue;
+                }
+                fields.push(f);
+            }
+            if (!fields.length) continue;
+            sectionsOut.push(Object.assign({}, sec, { fields: fields }));
+        }
+        return Object.assign({}, schema, {
+            audience: audience,
+            completion: comp,
+            sections: sectionsOut,
+        });
+    }
+
+    function parseFavoriteSubjects(profile) {
+        if (!profile) return [];
+        var raw = profile.favorite_subjects;
+        if (!raw) return [];
+        if (Array.isArray(raw)) return raw.filter(Boolean);
+        var s = String(raw).trim();
+        if (!s) return [];
+        if (s.charAt(0) === '[') {
+            try {
+                var arr = JSON.parse(s);
+                if (Array.isArray(arr)) return arr.map(String).filter(Boolean);
+            } catch (e) {}
+        }
+        return s
+            .split(',')
+            .map(function (x) {
+                return x.trim();
+            })
+            .filter(Boolean);
+    }
+
     function parseInterestSpheres(profile) {
         if (!profile) return [];
         const raw = profile.interest_spheres;
@@ -321,6 +466,9 @@
     function isProfileFieldFilled(profile, fieldId) {
         const p = normalizeProfileForCompletion(profile);
         if (!p) return false;
+        if (fieldId === 'favorite_subjects') {
+            return parseFavoriteSubjects(p).length > 0;
+        }
         if (fieldId === 'interest_spheres') {
             return parseInterestSpheres(p).length > 0;
         }
@@ -340,8 +488,9 @@
     }
 
     function isProfileCompleteCheck(schema, profile) {
+        const resolved = resolveProfileSchema(schema, profile);
         const p = normalizeProfileForCompletion(profile);
-        const comp = schema && schema.completion;
+        const comp = resolved && resolved.completion;
         if (comp && comp.required && comp.required.length) {
             for (let i = 0; i < comp.required.length; i++) {
                 if (!isProfileFieldFilled(p, comp.required[i])) return false;
@@ -357,8 +506,9 @@
     }
 
     function listIncompleteProfileFields(schema, profile) {
+        const resolved = resolveProfileSchema(schema, profile);
         const p = normalizeProfileForCompletion(profile);
-        const comp = schema && schema.completion;
+        const comp = resolved && resolved.completion;
         const missing = [];
         if (!comp || !comp.required) return missing;
         for (let i = 0; i < comp.required.length; i++) {
@@ -398,6 +548,9 @@
         syncCourseGradeField: syncCourseGradeField,
         wireEducationDetailForCourseGrade: wireEducationDetailForCourseGrade,
         buildProfileSummaryHtml: buildProfileSummaryHtml,
+        buildQuizSummaryHtml: buildQuizSummaryHtml,
+        quizAnswersListToMap: quizAnswersListToMap,
+        choiceLabelForQuestion: choiceLabelForQuestion,
         isNewAccountOnboarding: isNewAccountOnboarding,
         setNewAccountOnboardingFlag: setNewAccountOnboardingFlag,
         clearNewAccountOnboardingFlag: clearNewAccountOnboardingFlag,
@@ -406,5 +559,8 @@
         isProfileCompleteCheck: isProfileCompleteCheck,
         listIncompleteProfileFields: listIncompleteProfileFields,
         parseInterestSpheres: parseInterestSpheres,
+        parseFavoriteSubjects: parseFavoriteSubjects,
+        questionnaireAudience: questionnaireAudience,
+        resolveProfileSchema: resolveProfileSchema,
     };
 })(typeof window !== 'undefined' ? window : this);

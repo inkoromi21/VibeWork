@@ -345,7 +345,8 @@ function setTab(name) {
   if (name === "test") {
     ensureProfileSchemaRendered()
       .then(() => fetchAndRenderQuiz())
-      .catch(() => {});
+      .then(() => refreshTestPanelMode())
+      .catch(() => refreshTestPanelMode());
   }
   if (name === "analysis") {
     syncAnalysisTabView();
@@ -402,6 +403,10 @@ function profileForAssessmentApi() {
   };
   const age = parseInt(String(p.age ?? ""), 10);
   if (Number.isFinite(age)) out.age = age;
+  const wf = String(p.work_format_preference || p.work_format_pref || "").trim();
+  if (wf) out.work_format_preference = wf;
+  const prep = String(p.preparation_level || "").trim();
+  if (prep) out.preparation_level = prep;
   return out;
 }
 
@@ -521,6 +526,10 @@ async function fetchAndRenderQuiz() {
     if (prof.education_detail) url.searchParams.set("education_detail", prof.education_detail);
     if (prof.course_grade) url.searchParams.set("course_grade", prof.course_grade);
     if (prof.age != null) url.searchParams.set("age", String(prof.age));
+    if (prof.work_format_preference) {
+      url.searchParams.set("work_format_preference", prof.work_format_preference);
+    }
+    if (prof.preparation_level) url.searchParams.set("preparation_level", prof.preparation_level);
     const res = await fetch(url.toString());
     if (!res.ok) throw new Error("quiz");
     const data = await res.json();
@@ -567,6 +576,7 @@ async function fetchAndRenderQuiz() {
   syncReportToQuizState();
   updateQuizProgress();
   updateFlowUI();
+  refreshTestPanelMode();
 }
 
 function collectTimings() {
@@ -638,7 +648,16 @@ async function loadProfileSchema() {
 }
 
 function schemaSections() {
-  const s = PROFILE_SCHEMA?.sections;
+  const schema = PROFILE_SCHEMA;
+  if (!schema) return [];
+  const sh = window.VibeWorkShared;
+  const draft = profilePayloadForCompletion();
+  const eduEl = document.querySelector('[data-sheet-field="education_detail"]');
+  const liveEdu = eduEl && eduEl.value ? eduEl.value : draft.education_detail || "";
+  if (sh && sh.resolveProfileSchema) {
+    return sh.resolveProfileSchema(schema, liveEdu).sections || [];
+  }
+  const s = schema.sections;
   return Array.isArray(s) ? s : [];
 }
 
@@ -744,7 +763,12 @@ const PREP_LEVEL_RU = {
 
 const WIZARD_SECTION_THEMES = {
   pain: "Ваша ситуация",
+  pain_school: "Ваша ситуация",
   base: "Личные данные",
+  school_interests: "Интересы",
+  school_path: "Поступление",
+  school_prep: "Подготовка",
+  school_activities: "Опыт",
   interests: "Предпочтения",
   skills_hard: "Навыки",
   skills_soft: "Личные качества",
@@ -770,7 +794,7 @@ function sectionTheme(sec) {
 }
 
 function sectionWizardPrompt(sec) {
-  if (sec?.id === "pain") {
+  if (sec?.id === "pain" || sec?.id === "pain_school") {
     const t = String(sec?.title || "").trim();
     return t || PAIN_WIZARD_QUESTION;
   }
@@ -953,11 +977,20 @@ function wireSheetFieldListeners(root) {
 
   root.querySelectorAll('[data-sheet-field="education_detail"]').forEach((el) => {
     el.addEventListener("change", () => {
+      const prevAud =
+        window.VibeWorkShared?.questionnaireAudience?.(profilePayloadForCompletion().education_detail) ||
+        "career";
       syncEducationFromDetail();
       syncCourseGradeField();
       scheduleSaveProfileDraft();
       updateFlowUI();
       debouncedQuizReload();
+      const nextAud =
+        window.VibeWorkShared?.questionnaireAudience?.(el.value) || "career";
+      if (prevAud !== nextAud && !shouldShowProfileSummary()) {
+        profileWizardStep = 0;
+        renderSheetProfileFromSchema();
+      }
     });
   });
 
@@ -1387,6 +1420,9 @@ function normalizeProfilePayload(sheet) {
   if (Array.isArray(p.interest_spheres)) {
     p.interest_spheres = JSON.stringify(p.interest_spheres);
   }
+  if (Array.isArray(p.favorite_subjects)) {
+    p.favorite_subjects = JSON.stringify(p.favorite_subjects);
+  }
   if (p.age != null && p.age !== "") {
     const a = parseInt(String(p.age), 10);
     if (Number.isFinite(a)) p.age = a;
@@ -1502,6 +1538,17 @@ function profileFieldDisplay(field, profile) {
     if (!ids.length) return null;
     return { chips: ids.map((sid) => sphereLabelById(sid)) };
   }
+  if (id === "favorite_subjects") {
+    const sh = window.VibeWorkShared;
+    const ids = sh && sh.parseFavoriteSubjects ? sh.parseFavoriteSubjects(profile) : [];
+    if (!ids.length) return null;
+    const subs = PROFILE_SCHEMA?.school_subjects || [];
+    const labels = ids.map((sid) => {
+      const row = subs.find((x) => String(x.id) === String(sid));
+      return row ? row.label : sid;
+    });
+    return { chips: labels };
+  }
   let v = profile[id];
   if (v == null || v === "") {
     if (id === "course_grade" && profile.course_or_grade != null && profile.course_or_grade !== "") {
@@ -1595,6 +1642,97 @@ function wireProfileRetakeButton() {
     renderSheetProfileFromSchema();
     setProfileCardTitle("Этап 1 — профиль");
   });
+}
+
+let testForceWizard = false;
+
+function buildTestSummaryBlocks() {
+  const blocks = [];
+  if (QUIZ.length) {
+    blocks.push({ title: "Тест 1 — задачи в вашей сфере", questions: QUIZ });
+  }
+  const h2b = document.querySelector(".quiz-test-section--personality .quiz-test-heading");
+  const test2Title = h2b?.textContent?.trim() || "Тест 2 — профориентация";
+  if (ASSESSMENT_MODULES.length) {
+    for (const mod of ASSESSMENT_MODULES) {
+      const qs = mod.questions || [];
+      if (qs.length) blocks.push({ title: mod.title || mod.id, questions: qs });
+    }
+  } else if (PERSONALITY_QUIZ.length) {
+    blocks.push({ title: test2Title, questions: PERSONALITY_QUIZ });
+  }
+  return blocks;
+}
+
+function getTestAnswersMapForSummary() {
+  const m = {};
+  QUIZ.forEach((q) => {
+    const sel = document.querySelector(`input[name="q${q.id}"]:checked`);
+    if (sel) m[q.id] = sel.value;
+  });
+  PERSONALITY_QUIZ.forEach((q) => {
+    const sel = document.querySelector(`input[name="pq${q.id}"]:checked`);
+    if (sel) m[q.id] = sel.value;
+  });
+  return m;
+}
+
+function shouldShowTestSummary() {
+  return !!window.lastAnalysis && !testForceWizard;
+}
+
+function wireTestRetakeButton() {
+  const btn = document.getElementById("btn-test-retake");
+  if (!btn || btn.dataset.bound) return;
+  btn.dataset.bound = "1";
+  btn.addEventListener("click", () => {
+    testForceWizard = true;
+    refreshTestPanelMode();
+    const body = document.getElementById("test-panel-body");
+    body?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+function renderTestSummaryView() {
+  const root = document.getElementById("test-summary-root");
+  if (!root) return;
+  const sh = window.VibeWorkShared;
+  const blocks = buildTestSummaryBlocks();
+  const answersMap = getTestAnswersMapForSummary();
+  const summaryInner =
+    sh?.buildQuizSummaryHtml
+      ? sh.buildQuizSummaryHtml(blocks, answersMap, esc, {
+          lead: "Тест сохранён. Разбор — на вкладке «Разбор».",
+        })
+      : '<p class="muted">Тест пройден.</p>';
+  root.innerHTML = `
+    <div class="profile-complete">
+      ${summaryInner}
+      <div class="profile-complete-actions">
+        <button type="button" class="btn secondary" id="btn-test-open-analysis-summary">Открыть разбор</button>
+        <button type="button" class="btn secondary" id="btn-test-retake">Пройти заново</button>
+      </div>
+    </div>
+  `;
+  document.getElementById("btn-test-open-analysis-summary")?.addEventListener("click", () => setTab("analysis"));
+  wireTestRetakeButton();
+}
+
+function refreshTestPanelMode() {
+  const body = document.getElementById("test-panel-body");
+  const summary = document.getElementById("test-summary-root");
+  const cardHead = document.querySelector("#panel-test .card-head h1");
+  if (!body || !summary) return;
+  if (shouldShowTestSummary()) {
+    body.hidden = true;
+    summary.hidden = false;
+    if (cardHead) cardHead.textContent = "Тест пройден";
+    renderTestSummaryView();
+    return;
+  }
+  body.hidden = false;
+  summary.hidden = true;
+  updateTestPanelHeadings();
 }
 
 function renderProfileSummaryView() {
@@ -1786,6 +1924,7 @@ function restorePostTestUi(me, stored) {
     setAnalysisStaleHint(false);
     lastReportAnswerFingerprint = quizAnswerFingerprint();
   }
+  refreshTestPanelMode();
   return true;
 }
 
@@ -1904,7 +2043,7 @@ function updateAiChecklist() {
   const c2 = document.getElementById("chk-test");
   const c3 = document.getElementById("chk-report");
   if (c1) c1.classList.toggle("checklist-done", profileBasicsOk());
-  if (c2) c2.classList.toggle("checklist-done", quizComplete());
+  if (c2) c2.classList.toggle("checklist-done", quizComplete() || !!window.lastAnalysis);
   if (c3) c3.classList.toggle("checklist-done", !!window.lastAnalysis);
 }
 
@@ -2419,6 +2558,7 @@ function resetClientStateForNewAccount() {
     localStorage.setItem("vibework_profile_wizard_step", "0");
   } catch (_) {}
   window.lastAnalysis = null;
+  testForceWizard = false;
   chatMessages = [];
   const form = document.getElementById("diag-form");
   if (form) {
@@ -3483,6 +3623,7 @@ function renderResults(res, { requireQuiz = true } = {}) {
     return;
   }
   window.lastAnalysis = res;
+  testForceWizard = false;
   lastReportAnswerFingerprint = quizAnswerFingerprint();
   updateAvatarBubble();
   const av = document.getElementById("avatar-bubble");
@@ -3563,6 +3704,7 @@ function renderResults(res, { requireQuiz = true } = {}) {
     }
   }
 
+  refreshTestPanelMode();
 }
 
 function showError(msg) {

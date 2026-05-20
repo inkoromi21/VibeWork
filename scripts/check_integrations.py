@@ -22,6 +22,7 @@ from wibe_work.services.learning import get_integration_status
 from wibe_work.services.learning.adapters import github_search_repos
 from wibe_work.services.learning.vk_video import vk_video_search
 from wibe_work.services.hh_client import _resolve_bearer, suggest_area_id
+from wibe_work.services.llm_client import fetch_llm_completion, get_llm_settings, llm_configured
 
 
 def _ok(label: str, ok: bool, detail: str = "") -> None:
@@ -41,6 +42,17 @@ def main() -> int:
         "HH_APP_ACCESS_TOKEN или client_id+secret",
     )
     _ok("HH_USER_AGENT", bool(cfg.HH_USER_AGENT and "@" in cfg.HH_USER_AGENT or "localhost" not in cfg.HH_USER_AGENT))
+
+    llm_cfg = get_llm_settings()
+    _ok("LLM configured", llm_configured())
+    if llm_cfg:
+        url, _, model = llm_cfg
+        local = "127.0.0.1" in url or "localhost" in url
+        _ok("LLM endpoint", True, f"model={model}, local={local}")
+        text, notice = fetch_llm_completion("ok", max_tokens=8, temperature=0)
+        _ok("LLM chat probe", bool(text), notice or (text[:40] if text else "пустой ответ"))
+    else:
+        _ok("LLM endpoint", False, "CHAT_API_KEY + CHAT_API_URL в .env")
 
     print("\nLearning status:")
     st = get_integration_status()

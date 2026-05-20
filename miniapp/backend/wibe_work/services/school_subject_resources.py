@@ -267,12 +267,15 @@ def _interest_key(interest: str) -> str:
 
 def pick_school_subject_ids(profile: Dict[str, Any], interest: str, gap: Dict[str, Any]) -> Set[str]:
     """Какие предметные блоки ссылок показать (ключи SUBJECT_LINKS)."""
+    from wibe_work.questionnaire_fields import parse_favorite_subjects
+
     from_gap = _subjects_from_gap(gap)
     from_gap.discard("_generic_subjects_hint")
 
     ints = INTEREST_DEFAULT_SUBJECTS.get(_interest_key(interest), set())
+    from_profile = set(parse_favorite_subjects(profile))
 
-    merged = from_gap | ints
+    merged = from_gap | ints | from_profile
     if not merged:
         merged = {"math", "russian", "informatics", "english"}
     return merged

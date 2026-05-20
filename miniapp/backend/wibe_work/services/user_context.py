@@ -95,9 +95,6 @@ def coach_profile_snippet(profile: Dict[str, Any]) -> str:
     cg = (profile.get("course_grade") or profile.get("course_or_grade") or "")
     if str(cg).strip():
         lines.append(f"Курс/класс: {cg}")
-    sf = (profile.get("study_form") or "").strip()
-    if sf:
-        lines.append(f"Форма обучения: {sf}")
     edu = (profile.get("education_detail") or profile.get("education_level") or "").strip()
     if edu:
         lines.append(f"Образование: {edu}")
@@ -110,22 +107,27 @@ def coach_profile_snippet(profile: Dict[str, Any]) -> str:
     prep_prof = (profile.get("preparation_level") or "").strip()
     if prep_prof:
         lines.append(f"Подготовка: {prep_prof}")
-    wf_raw = (profile.get("work_format_preference") or profile.get("work_format_pref") or "")
-    wf = str(wf_raw).strip()
-    if wf:
-        lines.append(f"Формат работы: {_WORK_FORMAT_RU.get(wf, wf)}")
-    ws = (profile.get("work_schedule") or "").strip()
-    if ws:
-        lines.append(f"График: {ws}")
-    sal = profile.get("target_salary")
-    if sal is not None and str(sal).strip() != "":
-        lines.append(f"Целевая зарплата: {sal} ₽/мес")
     pr = (profile.get("career_priority") or "").strip().lower()
     if pr:
         lines.append(f"Приоритет сейчас: {_PRIORITY_RU.get(pr, pr)}")
     pain = (profile.get("primary_pain") or "").strip()
     if pain:
         lines.append(f"Главная сложность: {_PAIN_LABELS.get(pain, pain)}")
+    from wibe_work.questionnaire_fields import (
+        AUDIENCE_CAREER,
+        AUDIENCE_SCHOOL,
+        questionnaire_audience,
+    )
+    from wibe_work.services.profile_analysis_context import (
+        career_questionnaire_lines,
+        school_questionnaire_lines,
+    )
+
+    aud = questionnaire_audience(profile=profile)
+    if aud == AUDIENCE_SCHOOL:
+        lines.extend(school_questionnaire_lines(profile))
+    else:
+        lines.extend(career_questionnaire_lines(profile))
     return "\n".join(lines)
 
 

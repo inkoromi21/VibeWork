@@ -97,6 +97,10 @@ _PROFILE_EXTRA_COLS = [
     ("weekly_progress_note", "TEXT"),
     ("primary_pain", "TEXT"),
     ("course_grade", "TEXT"),
+    ("favorite_subjects", "TEXT"),
+    ("post_school_goal", "TEXT"),
+    ("exam_focus", "TEXT"),
+    ("admission_target", "TEXT"),
 ]
 
 _JOB_EXTRA_COLS = [

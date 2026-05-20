@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 # Сферы для мультивыбора (до 5) — id совпадают с тестом и hh-подбором
 # id сферы анкеты → значение Interest в веб-API (тест, разбор, вакансии)
@@ -48,22 +48,136 @@ INTEREST_SPHERES: List[Dict[str, str]] = [
     {"id": "mgmt", "label": "Менеджмент и проекты"},
 ]
 
-# Минимум для «анкета заполнена» (чип в шапке, тест, вакансии)
-COMPLETION_REQUIRED: List[str] = [
-    "age",
-    "city",
-    "education_detail",
-    "course_grade",
-    "study_form",
-    "like_to_do",
-    "work_format_preference",
-    "work_schedule",
-    "target_salary",
-    "hours_per_week",
+AUDIENCE_SCHOOL = "school"
+AUDIENCE_CAREER = "career"
+
+_SCHOOL_EDUCATION_IDS = frozenset({"school_8_11", "school_9", "school_11"})
+
+# Школьные предметы (id совпадают с school_subject_resources.SUBJECT_LINKS)
+SCHOOL_SUBJECT_OPTIONS: List[Dict[str, str]] = [
+    {"id": "math", "label": "Математика"},
+    {"id": "russian", "label": "Русский язык"},
+    {"id": "literature", "label": "Литература"},
+    {"id": "physics", "label": "Физика"},
+    {"id": "chemistry", "label": "Химия"},
+    {"id": "biology", "label": "Биология"},
+    {"id": "informatics", "label": "Информатика"},
+    {"id": "history", "label": "История"},
+    {"id": "social", "label": "Обществознание"},
+    {"id": "geography", "label": "География"},
+    {"id": "english", "label": "Английский"},
+    {"id": "art", "label": "Искусство / МХК"},
+    {"id": "other", "label": "Другое"},
 ]
 
-# Хотя бы одно: interest_spheres (JSON) или legacy main_sphere
 COMPLETION_ANY_OF: List[List[str]] = [["interest_spheres", "main_sphere"]]
+
+COMPLETION_BY_AUDIENCE: Dict[str, Dict[str, Any]] = {
+    AUDIENCE_SCHOOL: {
+        "required": [
+            "age",
+            "city",
+            "education_detail",
+            "course_grade",
+            "favorite_subjects",
+            "like_to_do",
+            "post_school_goal",
+            "exam_focus",
+            "hours_per_week",
+        ],
+        "any_of": list(COMPLETION_ANY_OF),
+    },
+    AUDIENCE_CAREER: {
+        "required": [
+            "age",
+            "city",
+            "education_detail",
+            "course_grade",
+            "study_form",
+            "like_to_do",
+            "work_format_preference",
+            "work_schedule",
+            "target_salary",
+            "hours_per_week",
+        ],
+        "any_of": list(COMPLETION_ANY_OF),
+    },
+}
+
+# Обратная совместимость
+COMPLETION_REQUIRED: List[str] = COMPLETION_BY_AUDIENCE[AUDIENCE_CAREER]["required"]
+
+
+def questionnaire_audience(
+    education_detail: Any = None, profile: Optional[Dict[str, Any]] = None
+) -> str:
+    """Школьная анкета — только для школьников; вуз и СПО — карьерная."""
+    detail = education_detail
+    if detail is None and profile:
+        detail = profile.get("education_detail") or profile.get("education_level")
+    d = str(detail or "").strip().lower()
+    if d in _SCHOOL_EDUCATION_IDS:
+        return AUDIENCE_SCHOOL
+    return AUDIENCE_CAREER
+
+
+def _normalize_audience_list(audience: Any) -> List[str]:
+    if audience is None:
+        return [AUDIENCE_SCHOOL, AUDIENCE_CAREER]
+    if isinstance(audience, str):
+        return [audience]
+    return list(audience)
+
+
+def _field_visible_for_audience(field: Dict[str, Any], audience: str) -> bool:
+    return audience in _normalize_audience_list(field.get("audience"))
+
+
+def _section_visible_for_audience(section: Dict[str, Any], audience: str) -> bool:
+    return audience in _normalize_audience_list(section.get("audience"))
+
+
+def resolve_profile_schema(schema: Dict[str, Any], audience: str) -> Dict[str, Any]:
+    """Схема анкеты для выбранного уровня образования (секции + правила completion)."""
+    completions = schema.get("completions") or {}
+    comp = completions.get(audience) or schema.get("completion") or {}
+    sections_out: List[Dict[str, Any]] = []
+    for sec in schema.get("sections") or []:
+        if not _section_visible_for_audience(sec, audience):
+            continue
+        fields = [f for f in (sec.get("fields") or []) if _field_visible_for_audience(f, audience)]
+        if not fields:
+            continue
+        sections_out.append({**sec, "fields": fields})
+    return {
+        **schema,
+        "audience": audience,
+        "completion": comp,
+        "sections": sections_out,
+    }
+
+
+def parse_favorite_subjects(profile: Dict[str, Any]) -> List[str]:
+    if not profile:
+        return []
+    raw = profile.get("favorite_subjects")
+    if raw is None or raw == "":
+        return []
+    if isinstance(raw, list):
+        return [str(x).strip() for x in raw if str(x).strip()]
+    s = str(raw).strip()
+    if not s:
+        return []
+    if s.startswith("["):
+        import json
+
+        try:
+            arr = json.loads(s)
+            if isinstance(arr, list):
+                return [str(x).strip() for x in arr if str(x).strip()]
+        except json.JSONDecodeError:
+            pass
+    return [p.strip() for p in s.split(",") if p.strip()]
 
 
 def normalize_profile_for_completion(profile: Dict[str, Any]) -> Dict[str, Any]:
@@ -115,6 +229,8 @@ def profile_field_filled(profile: Dict[str, Any], field_id: str) -> bool:
 
     if not profile:
         return False
+    if field_id == "favorite_subjects":
+        return bool(parse_favorite_subjects(profile))
     if field_id == "interest_spheres":
         return bool(parse_interest_spheres(profile) or (profile.get("main_sphere") or "").strip())
     if field_id == "course_grade":
@@ -130,98 +246,156 @@ def profile_field_filled(profile: Dict[str, Any], field_id: str) -> bool:
 
 def is_profile_complete(profile: Dict[str, Any]) -> bool:
     p = normalize_profile_for_completion(profile)
-    for fid in COMPLETION_REQUIRED:
+    aud = questionnaire_audience(profile=p)
+    comp = COMPLETION_BY_AUDIENCE.get(aud, COMPLETION_BY_AUDIENCE[AUDIENCE_CAREER])
+    for fid in comp.get("required") or []:
         if not profile_field_filled(p, fid):
             return False
-    for group in COMPLETION_ANY_OF:
+    for group in comp.get("any_of") or []:
         if not any(profile_field_filled(p, fid) for fid in group):
             return False
     return True
 
 
+def _base_section_fields(sphere_opts: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+    return [
+        {
+            "id": "age",
+            "type": "number",
+            "label": "Возраст",
+            "placeholder": "17",
+            "min": 14,
+            "max": 30,
+            "required": True,
+            "audience": [AUDIENCE_SCHOOL, AUDIENCE_CAREER],
+        },
+        {
+            "id": "city",
+            "type": "text",
+            "label": "Город",
+            "placeholder": "Москва, Казань…",
+            "required": True,
+            "audience": [AUDIENCE_SCHOOL, AUDIENCE_CAREER],
+        },
+        {
+            "id": "education_detail",
+            "type": "select",
+            "label": "Уровень образования",
+            "required": True,
+            "audience": [AUDIENCE_SCHOOL, AUDIENCE_CAREER],
+            "options": [
+                {
+                    "id": "school_8_11",
+                    "label": "Школьник (8–11 кл.)",
+                    "maps_education": "школа",
+                },
+                {"id": "spo", "label": "Студент СПО", "maps_education": "колледж"},
+                {
+                    "id": "univ_bachelor",
+                    "label": "Студент вуза (бакалавр)",
+                    "maps_education": "вуз",
+                },
+                {
+                    "id": "univ_master",
+                    "label": "Студент вуза (магистр)",
+                    "maps_education": "вуз",
+                },
+                {"id": "graduate", "label": "Выпускник", "maps_education": "вуз"},
+            ],
+        },
+        {
+            "id": "course_grade",
+            "type": "text",
+            "label": "Класс / курс",
+            "placeholder": "10 класс, 2 курс…",
+            "required": True,
+            "audience": [AUDIENCE_SCHOOL, AUDIENCE_CAREER],
+        },
+        {
+            "id": "study_form",
+            "type": "select",
+            "label": "Форма обучения",
+            "required": True,
+            "audience": [AUDIENCE_CAREER],
+            "options": [
+                {"id": "fulltime", "label": "Очная"},
+                {"id": "parttime", "label": "Заочная"},
+                {"id": "evening", "label": "Вечерняя"},
+                {"id": "online", "label": "Онлайн"},
+            ],
+        },
+        {
+            "id": "education_level",
+            "type": "hidden",
+            "label": "",
+            "sync_from": "education_detail",
+            "audience": [AUDIENCE_SCHOOL, AUDIENCE_CAREER],
+        },
+    ]
+
+
 def get_profile_schema() -> Dict[str, Any]:
     sphere_opts = [{"id": s["id"], "label": s["label"]} for s in INTEREST_SPHERES]
+    subject_opts = [{"id": s["id"], "label": s["label"]} for s in SCHOOL_SUBJECT_OPTIONS]
 
     return {
-        "version": 2,
+        "version": 3,
         "wizard": True,
         "interest_spheres": INTEREST_SPHERES,
+        "school_subjects": SCHOOL_SUBJECT_OPTIONS,
         "sphere_to_web_interest": dict(SPHERE_TO_WEB_INTEREST),
-        "completion": {
-            "required": list(COMPLETION_REQUIRED),
-            "any_of": list(COMPLETION_ANY_OF),
-        },
+        "completions": {k: dict(v) for k, v in COMPLETION_BY_AUDIENCE.items()},
+        "completion": dict(COMPLETION_BY_AUDIENCE[AUDIENCE_CAREER]),
         "sections": [
             {
                 "id": "base",
                 "theme": "Личные данные",
                 "title": "Базовые данные",
+                "audience": [AUDIENCE_SCHOOL, AUDIENCE_CAREER],
+                "fields": _base_section_fields(sphere_opts),
+            },
+            {
+                "id": "pain_school",
+                "theme": "Ваша ситуация",
+                "title": "Что сейчас больше всего мешает?",
+                "optional": True,
+                "audience": [AUDIENCE_SCHOOL],
                 "fields": [
                     {
-                        "id": "age",
-                        "type": "number",
-                        "label": "Возраст",
-                        "placeholder": "17",
-                        "min": 14,
-                        "max": 30,
-                        "required": True,
-                    },
-                    {
-                        "id": "city",
-                        "type": "text",
-                        "label": "Город",
-                        "placeholder": "Москва, Казань…",
-                        "required": True,
-                    },
-                    {
-                        "id": "education_detail",
-                        "type": "select",
-                        "label": "Уровень образования",
-                        "required": True,
-                        "options": [
-                            {
-                                "id": "school_8_11",
-                                "label": "Школьник (8–11 кл.)",
-                                "maps_education": "школа",
-                            },
-                            {"id": "spo", "label": "Студент СПО", "maps_education": "колледж"},
-                            {
-                                "id": "univ_bachelor",
-                                "label": "Студент вуза (бакалавр)",
-                                "maps_education": "вуз",
-                            },
-                            {
-                                "id": "univ_master",
-                                "label": "Студент вуза (магистр)",
-                                "maps_education": "вуз",
-                            },
-                            {"id": "graduate", "label": "Выпускник", "maps_education": "вуз"},
-                        ],
-                    },
-                    {
-                        "id": "course_grade",
-                        "type": "text",
-                        "label": "Курс / класс",
-                        "placeholder": "10 класс, 2 курс…",
-                        "required": True,
-                    },
-                    {
-                        "id": "study_form",
-                        "type": "select",
-                        "label": "Форма обучения",
-                        "required": True,
-                        "options": [
-                            {"id": "fulltime", "label": "Очная"},
-                            {"id": "parttime", "label": "Заочная"},
-                            {"id": "evening", "label": "Вечерняя"},
-                            {"id": "online", "label": "Онлайн"},
-                        ],
-                    },
-                    {
-                        "id": "education_level",
-                        "type": "hidden",
+                        "id": "primary_pain",
+                        "type": "radio",
                         "label": "",
-                        "sync_from": "education_detail",
+                        "required": False,
+                        "options": [
+                            {
+                                "id": "pain_school_direction",
+                                "label": "Не знаю, куда поступать после школы",
+                            },
+                            {
+                                "id": "pain_school_subjects",
+                                "label": "Сложно выбрать профильные предметы",
+                            },
+                            {
+                                "id": "pain_school_exams",
+                                "label": "Тревожусь из-за ОГЭ / ЕГЭ",
+                            },
+                            {
+                                "id": "pain_school_grades",
+                                "label": "Не хватает баллов или слабые оценки",
+                            },
+                            {
+                                "id": "pain_school_overload",
+                                "label": "Слишком много советов и курсов",
+                            },
+                            {
+                                "id": "pain_school_parents",
+                                "label": "Давление родителей / не совпадаем в выборе",
+                            },
+                            {
+                                "id": "pain_school_confidence",
+                                "label": "Кажется, что я хуже одноклассников",
+                            },
+                        ],
                     },
                 ],
             },
@@ -230,6 +404,7 @@ def get_profile_schema() -> Dict[str, Any]:
                 "theme": "Ваша ситуация",
                 "title": "Что сейчас больше всего мешает?",
                 "optional": True,
+                "audience": [AUDIENCE_CAREER],
                 "fields": [
                     {
                         "id": "primary_pain",
@@ -250,9 +425,162 @@ def get_profile_schema() -> Dict[str, Any]:
                 ],
             },
             {
+                "id": "school_interests",
+                "theme": "Интересы",
+                "title": "Интересы и любимые предметы",
+                "audience": [AUDIENCE_SCHOOL],
+                "fields": [
+                    {
+                        "id": "interest_spheres",
+                        "type": "multiselect",
+                        "label": "Сферы, которые вам близки (до 5)",
+                        "max_select": 5,
+                        "required": True,
+                        "options": sphere_opts,
+                    },
+                    {
+                        "id": "favorite_subjects",
+                        "type": "multiselect",
+                        "label": "Любимые школьные предметы (до 6)",
+                        "max_select": 6,
+                        "required": True,
+                        "options": subject_opts,
+                        "help": "Поможет подобрать профиль, ОГЭ/ЕГЭ и направления поступления.",
+                    },
+                    {
+                        "id": "like_to_do",
+                        "type": "textarea",
+                        "label": "Чем нравится заниматься вне уроков",
+                        "placeholder": "Робототехника, рисование, спорт, волонтёрство…",
+                        "required": True,
+                    },
+                    {
+                        "id": "dislike_to_do",
+                        "type": "textarea",
+                        "label": "Что в школе даётся тяжелее всего",
+                        "placeholder": "Например: публичные выступления, химия…",
+                    },
+                ],
+            },
+            {
+                "id": "school_path",
+                "theme": "Поступление",
+                "title": "Планы после школы",
+                "audience": [AUDIENCE_SCHOOL],
+                "fields": [
+                    {
+                        "id": "post_school_goal",
+                        "type": "select",
+                        "label": "Главный план после 9 или 11 класса",
+                        "required": True,
+                        "options": [
+                            {
+                                "id": "after_9_college",
+                                "label": "После 9 класса — в колледж (СПО)",
+                            },
+                            {
+                                "id": "after_9_school",
+                                "label": "После 9 класса — остаться в 10–11 классе",
+                            },
+                            {
+                                "id": "after_11_university",
+                                "label": "После 11 класса — в вуз",
+                            },
+                            {
+                                "id": "after_11_college",
+                                "label": "После 11 класса — в колледж (СПО)",
+                            },
+                            {"id": "undecided", "label": "Пока не решил(а)"},
+                        ],
+                    },
+                    {
+                        "id": "admission_target",
+                        "type": "text",
+                        "label": "Куда мечтаете поступить (необязательно)",
+                        "placeholder": "Например: МГТУ, колледж дизайна, медицинский…",
+                    },
+                    {
+                        "id": "exam_focus",
+                        "type": "select",
+                        "label": "Что готовите сейчас",
+                        "required": True,
+                        "options": [
+                            {"id": "oge_9", "label": "ОГЭ (9 класс)"},
+                            {"id": "ege_11", "label": "ЕГЭ (11 класс)"},
+                            {"id": "both", "label": "И ОГЭ, и ЕГЭ впереди"},
+                            {
+                                "id": "profile_only",
+                                "label": "Пока без экзаменов — выбираю профиль",
+                            },
+                            {"id": "none", "label": "Не готовлюсь к экзаменам сейчас"},
+                        ],
+                    },
+                ],
+            },
+            {
+                "id": "school_prep",
+                "theme": "Подготовка",
+                "title": "Подготовка к поступлению",
+                "audience": [AUDIENCE_SCHOOL],
+                "fields": [
+                    {
+                        "id": "hours_per_week",
+                        "type": "number",
+                        "label": "Часов в неделю на подготовку (уроки, репетитор, кружки)",
+                        "placeholder": "5, 10, 15",
+                        "min": 0,
+                        "max": 60,
+                        "required": True,
+                    },
+                    {
+                        "id": "preparation_level",
+                        "type": "select",
+                        "label": "Как оцениваете готовность к поступлению",
+                        "options": [
+                            {"id": "weak", "label": "Слабая — только начинаю"},
+                            {"id": "medium", "label": "Средняя — есть база"},
+                            {"id": "strong", "label": "Сильная — уверенно"},
+                        ],
+                    },
+                    {
+                        "id": "extra_education",
+                        "type": "textarea",
+                        "label": "Кружки, олимпиады, курсы",
+                        "placeholder": "Фокус на информатику, олимпиада по математике…",
+                    },
+                ],
+            },
+            {
+                "id": "school_activities",
+                "theme": "Опыт",
+                "title": "Проекты и достижения",
+                "optional": True,
+                "audience": [AUDIENCE_SCHOOL],
+                "fields": [
+                    {
+                        "id": "experience_projects",
+                        "type": "textarea",
+                        "label": "Проекты и хобби",
+                        "placeholder": "Сайт, канал, хакатон, свой магазин…",
+                    },
+                    {
+                        "id": "achievements",
+                        "type": "textarea",
+                        "label": "Достижения",
+                        "placeholder": "Олимпиады, грамоты, сертификаты…",
+                    },
+                    {
+                        "id": "experience_volunteer",
+                        "type": "textarea",
+                        "label": "Волонтёрство и активности",
+                    },
+                ],
+            },
+            {
                 "id": "interests",
                 "theme": "Предпочтения",
                 "title": "Интересы и склонности",
+                "audience": [AUDIENCE_CAREER],
                 "fields": [
                     {
                         "id": "interest_spheres",
@@ -316,6 +644,7 @@ def get_profile_schema() -> Dict[str, Any]:
                 "theme": "Навыки",
                 "title": "Навыки (профессиональные)",
                 "optional": True,
+                "audience": [AUDIENCE_CAREER],
                 "fields": [
                     {
                         "id": "software_skills",
@@ -354,6 +683,7 @@ def get_profile_schema() -> Dict[str, Any]:
                 "theme": "Личные качества",
                 "title": "Личные качества (1–5)",
                 "optional": True,
+                "audience": [AUDIENCE_CAREER],
                 "fields": [
                     {
                         "id": "soft_communication",
@@ -410,6 +740,7 @@ def get_profile_schema() -> Dict[str, Any]:
                 "theme": "Опыт",
                 "title": "Опыт",
                 "optional": True,
+                "audience": [AUDIENCE_CAREER],
                 "fields": [
                     {
                         "id": "experience_official",
@@ -446,6 +777,7 @@ def get_profile_schema() -> Dict[str, Any]:
                 "id": "goals",
                 "theme": "Цели",
                 "title": "Цели и работа",
+                "audience": [AUDIENCE_CAREER],
                 "fields": [
                     {
                         "id": "target_salary",
@@ -507,6 +839,7 @@ def get_profile_schema() -> Dict[str, Any]:
                 "theme": "Дополнительно",
                 "title": "Дополнительно",
                 "optional": True,
+                "audience": [AUDIENCE_CAREER],
                 "fields": [
                     {
                         "id": "preparation_level",

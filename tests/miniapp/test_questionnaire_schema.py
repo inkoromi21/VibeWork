@@ -27,8 +27,13 @@ def _collect_field_ids(schema: dict) -> set[str]:
 
 def test_profile_schema_version_and_completion() -> None:
     schema = get_profile_schema()
-    assert schema.get("version") == 2
+    assert schema.get("version") == 3
     assert schema.get("wizard") is True
+    completions = schema.get("completions") or {}
+    assert "school" in completions
+    assert "career" in completions
+    assert "favorite_subjects" in completions["school"]["required"]
+    assert "study_form" in completions["career"]["required"]
     comp = schema.get("completion") or {}
     assert "age" in comp.get("required", [])
     assert comp.get("any_of")
@@ -51,7 +56,19 @@ def test_schema_exports_sphere_map() -> None:
 def test_schema_has_product_blocks() -> None:
     schema = get_profile_schema()
     section_ids = {s["id"] for s in schema.get("sections") or []}
-    for sid in ("pain", "base", "interests", "skills_hard", "skills_soft", "experience", "goals", "extra"):
+    for sid in (
+        "pain",
+        "pain_school",
+        "base",
+        "school_interests",
+        "school_path",
+        "interests",
+        "skills_hard",
+        "skills_soft",
+        "experience",
+        "goals",
+        "extra",
+    ):
         assert sid in section_ids, sid
     assert schema["sections"][0]["id"] == "base"
 

@@ -15,6 +15,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import Response
 
 from wibe_work.sqlite_db import init_db
 from wibe_work import config as cfg
@@ -60,9 +61,22 @@ app.add_middleware(
 
 _WEBSITE_FRONTEND_DIR = PROJECT_ROOT / "website" / "frontend"
 _FAVICON_PNG = _WEBSITE_FRONTEND_DIR / "favicon.png"
+
+
+class _StaticNoCache(StaticFiles):
+    """CSS/JS без долгого кэша — иначе Telegram WebView держит старый интерфейс."""
+
+    async def get_response(self, path: str, scope) -> Response:
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+        return response
+
+
 if _WEBSITE_FRONTEND_DIR.is_dir():
     # Веб-сайт: style.css, script.js, favicon (корень «/» — website/frontend/index.html)
-    app.mount("/static", StaticFiles(directory=str(_WEBSITE_FRONTEND_DIR)), name="website_static")
+    app.mount("/static", _StaticNoCache(directory=str(_WEBSITE_FRONTEND_DIR)), name="website_static")
 
 
 app.include_router(account_link_routes.router)
@@ -231,13 +245,32 @@ async def health_email():
 
 @app.get("/api/health/llm")
 async def health_llm():
-    """Проверка LLM: облачный или локальный OpenAI-совместимый эндпоинт."""
+    """Проверка LLM: переменные в .env и пробный запрос (без секретов в ответе)."""
+    from wibe_work.services.llm_client import fetch_llm_completion, get_llm_settings
+
     cfg = get_llm_settings()
-    out: dict = {
-        "llm_configured": cfg is not None,
-    }
-    if cfg:
-        out["model"] = cfg[2]
+    out: dict = {"llm_configured": cfg is not None, "ok": False}
+    if not cfg:
+        out["hint"] = (
+            "Задайте CHAT_API_KEY и CHAT_API_URL в корневом .env (или локальный URL без ключа). "
+            "Перезапустите API."
+        )
+        return out
+    url, _, model = cfg
+    out["model"] = model
+    local = "127.0.0.1" in url or "localhost" in url
+    out["endpoint_local"] = local
+    if local:
+        out["hint"] = (
+            "CHAT_API_URL указывает на localhost — на VPS нужен облачный URL "
+            "(Groq, DeepSeek, …). Локально запустите Ollama: ollama serve && ollama pull <model>."
+        )
+    text, notice = fetch_llm_completion("Ответь одним словом: ок", max_tokens=8, temperature=0)
+    out["ok"] = bool(text)
+    if notice:
+        out["notice"] = notice
+    elif not text:
+        out["notice"] = "Модель не ответила; см. лог API."
     return out
 
 

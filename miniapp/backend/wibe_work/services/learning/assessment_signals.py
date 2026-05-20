@@ -148,6 +148,13 @@ def build_assessment_signals(
 
     meta = track_meta(profile)
     prep = preparation_level if preparation_level in ("weak", "medium", "strong") else "medium"
+    from wibe_work.services.profile_analysis_context import (
+        analysis_mode_for_profile,
+        education_grade,
+    )
+
+    grade = education_grade(profile)
+    mode = analysis_mode_for_profile(profile)
 
     return {
         "sphere": sphere,
@@ -159,7 +166,9 @@ def build_assessment_signals(
         "best_plan_name": best,
         "assessment_track": meta.get("track_id"),
         "uses_job_search": uses_job_search_assessment(profile),
-        "catalog_min_score": 8,
+        "education_grade": grade,
+        "analysis_mode": mode,
+        "catalog_min_score": 6 if mode == "school" else 8,
     }
 
 
@@ -212,5 +221,10 @@ def resource_match_score(
 
 
 def resource_allowed(resource: Dict[str, Any], signals: Dict[str, Any]) -> bool:
+    from wibe_work.services.profile_analysis_context import career_resource_blocked_for_school
+
+    if signals.get("analysis_mode") == "school":
+        if career_resource_blocked_for_school(resource):
+            return False
     min_score = int(signals.get("catalog_min_score") or 8)
     return resource_match_score(resource, signals) >= min_score

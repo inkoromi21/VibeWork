@@ -10,9 +10,21 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/style.css" />
+  <meta name="vibework-build" content="20260521-responsive-touch" />
+  <link rel="stylesheet" href="/static/style.css?v=20260521-responsive-touch" />
   <script>
     (function () {
+      var BUILD = "20260521-responsive-touch";
+      var key = "vw_web_build";
+      try {
+        var prev = localStorage.getItem(key);
+        if (prev && prev !== BUILD) {
+          localStorage.setItem(key, BUILD);
+          location.reload();
+          return;
+        }
+        localStorage.setItem(key, BUILD);
+      } catch (e) {}
       try {
         if (localStorage.getItem("vibework_theme") === "dark") document.documentElement.setAttribute("data-theme", "dark");
       } catch (e) {}
@@ -61,7 +73,21 @@
       <h1 id="auth-gate-title" class="auth-gate-title">Вход в профиль</h1>
       <p class="auth-gate-sub muted">Профиль, тесты и разбор — после входа в аккаунт VibeWork.</p>
       <input type="email" id="auth-email" class="auth-field auth-gate-field" placeholder="Email" autocomplete="username" />
-      <input type="password" id="auth-password" class="auth-field auth-gate-field" placeholder="Пароль (не короче 8 символов)" autocomplete="current-password" />
+      <div class="auth-pwd-field">
+        <input type="password" id="auth-password" class="auth-field auth-gate-field" placeholder="Пароль (не короче 8 символов)" autocomplete="current-password" />
+        <button type="button" class="auth-pwd-toggle" data-pwd-toggle-for="auth-password" aria-label="Показать пароль" aria-pressed="false">
+          <svg class="auth-pwd-toggle-icon auth-pwd-toggle-icon--show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          <svg class="auth-pwd-toggle-icon auth-pwd-toggle-icon--hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+            <path d="M1 1l22 22"></path>
+            <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"></path>
+          </svg>
+        </button>
+      </div>
       <p id="auth-gate-error" class="auth-gate-error hidden" role="alert"></p>
       <div class="auth-gate-actions auth-gate-actions--single">
         <button type="button" class="btn-auth-gate btn-auth-gate-primary" id="btn-auth-login">Войти</button>
@@ -155,6 +181,7 @@
         <div class="card-head">
           <h1>Этап 2 — тест</h1>
         </div>
+        <div id="test-panel-body">
         <p class="banner-warn" id="test-blocked-banner" hidden>Сначала заполните этап 1 — обязательные поля анкеты (база, интересы, цели).</p>
         <div class="quiz-metrics-wrap" id="quiz-metrics-wrap" hidden>
           <div class="progress-wrap">
@@ -189,6 +216,8 @@
           <p class="muted small" style="margin:0 0 0.75rem">Тест отправлен. Метрики, графики и сценарии — на вкладке <strong>«Разбор»</strong>.</p>
           <button type="button" class="btn primary" id="btn-test-to-analysis">Перейти к разбору →</button>
         </div>
+        </div>
+        <div id="test-summary-root" class="profile-complete test-summary-root" hidden></div>
       </div>
     </section>
 
@@ -442,8 +471,9 @@
 
   <div id="app-toast" class="app-toast" role="status" aria-live="polite" hidden></div>
 
+  <script src="/static/auth-password-toggle.js"></script>
   <script src="/static/auth-email.js"></script>
-  <script src="/static/vw_shared_ui.js"></script>
-  <script src="/static/script.js"></script>
+  <script src="/static/vw_shared_ui.js?v=20260521-responsive-touch"></script>
+  <script src="/static/script.js?v=20260521-responsive-touch"></script>
 </body>
 </html>

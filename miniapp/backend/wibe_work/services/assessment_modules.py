@@ -282,6 +282,7 @@ _HOLLAND: List[Dict[str, Any]] = [
             {"id": "B", "label": "Гибкий график и свобода формата"},
         ],
         "weights": [(2, 0, 3, 1), (2, 0, 1, 3)],
+        "skip_if_profile_field": "work_format_preference",
     },
     {
         "text": "Выберите более близкий вариант:",
@@ -482,6 +483,7 @@ _READINESS: List[Dict[str, Any]] = [
         ],
         "weights": [(3, 0, 0, 1), (2, 2, 1, 0), (2, 0, 2, 1), (2, 0, 3, 1)],
         "audience": "school",
+        "skip_if_profile_field": "post_school_goal",
     },
     {
         "text": "Обсуждали ли вы планы с психологом, классным или карьерным консультантом?",

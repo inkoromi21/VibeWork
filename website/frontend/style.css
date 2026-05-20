@@ -476,6 +476,64 @@ body.auth-standalone .auth-gate {
   color: var(--green);
 }
 
+.auth-pwd-field {
+  position: relative;
+  margin-top: 0.85rem;
+}
+
+.auth-pwd-field .auth-gate-field,
+.auth-pwd-field .auth-field {
+  margin-top: 0;
+  padding-right: 2.85rem;
+}
+
+.auth-pwd-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.auth-pwd-toggle:hover,
+.auth-pwd-toggle:focus-visible {
+  color: var(--green-dark);
+  background: var(--green-soft);
+  outline: none;
+}
+
+.auth-pwd-toggle--visible {
+  color: var(--green-dark);
+}
+
+.auth-pwd-toggle-icon {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.auth-pwd-toggle-icon--hide {
+  display: none;
+}
+
+.auth-pwd-toggle--visible .auth-pwd-toggle-icon--show {
+  display: none;
+}
+
+.auth-pwd-toggle--visible .auth-pwd-toggle-icon--hide {
+  display: block;
+}
+
 .auth-hh-agree {
   display: flex;
   gap: 10px;
@@ -915,6 +973,10 @@ html[data-theme="dark"] .profile-tagline {
   font-size: 0.82rem;
   background: var(--accent-soft, rgba(99, 102, 241, 0.12));
   color: var(--text);
+}
+
+.test-summary-root {
+  margin-top: 0.25rem;
 }
 
 .profile-complete-actions {
@@ -2955,47 +3017,6 @@ html[data-theme="dark"] .quiz-options input:checked + span {
 .app-toast.show {
   transform: translateX(-50%) translateY(0);
   opacity: 1;
-}
-
-/* Responsive */
-@media (max-width: 860px) {
-  .app-layout {
-    flex-direction: column;
-  }
-
-  .sidebar {
-    width: 100%;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .sidebar-brand {
-    padding: 0.25rem 0.5rem 0.5rem 0;
-    flex: 1;
-  }
-
-  .sidebar-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    width: 100%;
-    gap: 0.35rem;
-  }
-
-  .side-nav-item {
-    flex: 1 1 auto;
-    min-width: 120px;
-    justify-content: center;
-    font-size: 0.8rem;
-    padding: 0.5rem;
-  }
-
-  .sidebar-sep {
-    display: none;
-  }
 }
 
 .tab-toggle {

@@ -28,18 +28,18 @@ def test_complete_v2_profile():
     assert is_profile_complete(p)
 
 
-def test_legacy_course_or_grade_counts():
+def test_legacy_course_or_grade_counts_school():
     p = {
         "age": 17,
         "city": "Москва",
         "education_detail": "school_8_11",
         "course_or_grade": 10,
-        "study_form": "fulltime",
         "main_sphere": "it_dev",
+        "interest_spheres": '["it_dev"]',
+        "favorite_subjects": '["math"]',
         "like_to_do": "игры",
-        "work_format_pref": "remote",
-        "work_schedule": "weekends",
-        "target_salary": 25000,
+        "post_school_goal": "undecided",
+        "exam_focus": "profile_only",
         "hours_per_week": 8,
     }
     assert profile_field_filled(p, "course_grade")

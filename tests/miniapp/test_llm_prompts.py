@@ -66,6 +66,6 @@ def test_build_user_prompt_includes_blocks() -> None:
 
 
 def test_system_prompt_joins_addenda() -> None:
-    sys_p = build_chat_system_prompt(["ДОПОЛНИТЕЛЬНО (тест)"])
-    assert "карьерный консультант" in sys_p.lower()
+    sys_p = build_chat_system_prompt(["ДОПОЛНИТЕЛЬНО (тест)"], education_grade="university")
+    assert "карьерный консультант" in sys_p.lower() or "вуз" in sys_p.lower()
     assert "ДОПОЛНИТЕЛЬНО (тест)" in sys_p

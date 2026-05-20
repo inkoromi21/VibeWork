@@ -9,9 +9,8 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from wibe_work.miniapp_paths import data_file
 from wibe_work.services.llm_client import fetch_llm_completion, llm_configured
 from wibe_work.services.llm_prompts import (
-    ANALYSIS_NARRATIVE_SCHOOL_SYSTEM,
-    ANALYSIS_NARRATIVE_SYSTEM,
     build_analysis_user_prompt,
+    narrative_system_for_grade,
 )
 from wibe_work.services.aptitude_quiz import get_pro_weights_matrix_for_interest, letter_to_index
 from wibe_work.questionnaire_fields import INTEREST_SPHERES
@@ -25,8 +24,11 @@ from wibe_work.services.user_context import (
 )
 from wibe_work.services.user_pain_mapping import align_pains
 from wibe_work.services.learning_pack import build_learning_extras
-from wibe_work.services.career_analysis_school import (
+from wibe_work.services.profile_analysis_context import (
     analysis_mode_for_profile,
+    build_profile_summary_for_analysis,
+)
+from wibe_work.services.career_analysis_school import (
     build_school_gap_analysis,
     mock_school_narrative,
     pick_school_path_plans,
@@ -989,6 +991,7 @@ def _analysis_narrative_llm(
     readiness_percent: int,
     answers_count: int,
     analysis_mode: str = "career",
+    education_grade: str = "university",
 ) -> Tuple[str, str, Optional[str]]:
     """(текст, источник llm|mock, notice)."""
     plans = scenarios.get("plans") or []
@@ -1013,12 +1016,9 @@ def _analysis_narrative_llm(
         answers_count=answers_count,
         short_quiz_caveat=caveat,
         analysis_mode=analysis_mode,
+        education_grade=education_grade,
     )
-    system = (
-        ANALYSIS_NARRATIVE_SCHOOL_SYSTEM
-        if analysis_mode == "school"
-        else ANALYSIS_NARRATIVE_SYSTEM
-    )
+    system = narrative_system_for_grade(analysis_mode, education_grade)
     if not llm_configured():
         return "", "mock", None
     text, notice = fetch_llm_completion(
@@ -1039,18 +1039,13 @@ def _profile_summary_rich(
     education: str,
     preparation_level: str,
 ) -> str:
-    """Текст для LLM и чата: анкета + параметры теста."""
-    snippet = coach_profile_snippet(profile)
-    city = profile.get("city") or profile_extra.get("city") or ""
-    age = profile.get("age") or profile_extra.get("age")
-    tail = (
-        f"Сфера теста: {interest}; возраст: {age or '—'}; "
-        f"образование (сводка): {education}; город: {city or 'не указан'}; "
-        f"подготовка: {preparation_level}."
+    """Текст для LLM и чата: анкета по уровню образования + параметры теста."""
+    return build_profile_summary_for_analysis(
+        profile,
+        interest,
+        preparation_level,
+        profile_extra=profile_extra,
     )
-    if snippet:
-        return snippet + "\n" + tail
-    return tail
 
 
 def _resolve_profession_pack(interest: str) -> Any:
@@ -1867,6 +1862,8 @@ def build_analysis_result(
         f"{p['id']}: {p.get('name', '')} (~{p['score_percent']}%)"
         for p in scenarios.get("plans", [])
     )
+    from wibe_work.services.profile_analysis_context import education_grade as profile_education_grade
+
     llm_text, narr_src, narr_notice = _analysis_narrative_llm(
         profile_summary,
         scenarios,
@@ -1874,6 +1871,7 @@ def build_analysis_result(
         readiness_percent=readiness,
         answers_count=len(answers),
         analysis_mode=mode,
+        education_grade=profile_education_grade(profile),
     )
     if llm_text.strip():
         narrative = llm_text.strip()

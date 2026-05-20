@@ -154,3 +154,78 @@ def test_merge_learning_progress_updates_status() -> None:
     steps = merged["learning_path"]["steps"]
     assert steps[0]["status"] == "done"
     assert merged["learning_path"]["metrics"]["completed_steps"] == 1
+
+
+def test_quiz_saved_answers_endpoint(client: TestClient) -> None:
+    uid, token = _register_user(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    r0 = client.get(f"/vibework/quiz/saved/{uid}", headers=headers)
+    assert r0.status_code == 200
+    assert r0.json() == {"exists": False, "answers": [], "interest": None}
+
+    answers = [{"question_id": 1, "choice": "A"}, {"question_id": 2, "choice": "B"}]
+    _save_snapshot(
+        uid,
+        {
+            "_quiz_answers": answers,
+            "_analysis_interest": "it_dev",
+            "readiness": {"score": 40},
+        },
+    )
+    r1 = client.get(f"/vibework/quiz/saved/{uid}", headers=headers)
+    assert r1.status_code == 200
+    body = r1.json()
+    assert body["exists"] is True
+    assert body["answers"] == answers
+    assert body["interest"] == "it_dev"
+
+
+def test_quiz_analyze_accepts_extra_stale_question_ids(client: TestClient) -> None:
+    """После фильтрации вопросов по анкете лишние id (старый тест) не блокируют разбор."""
+    from wibe_work.services.assessment_bundle import expected_question_ids, get_assessment_bundle
+
+    uid, token = _register_user(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    profile = {
+        "education_detail": "univ_bachelor",
+        "course_grade": "2 курс",
+        "work_format_preference": "remote",
+        "preparation_level": "medium",
+        "age": 20,
+        "city": "Москва",
+        "like_to_do": "код",
+        "interest_spheres": '["it_dev"]',
+        "work_schedule": "full_day",
+        "target_salary": 80000,
+        "hours_per_week": 20,
+        "study_form": "full_time",
+    }
+    from wibe_work.sqlite_db import get_db
+
+    with get_db() as conn:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(user_profiles)").fetchall()}
+        payload = {k: v for k, v in profile.items() if k in cols}
+        payload["user_id"] = uid
+        conn.execute("DELETE FROM user_profiles WHERE user_id = ?", (uid,))
+        keys = list(payload.keys())
+        conn.execute(
+            f"INSERT INTO user_profiles ({', '.join(keys)}) VALUES ({', '.join('?' * len(keys))})",
+            [payload[k] for k in keys],
+        )
+        conn.commit()
+
+    expected = expected_question_ids(profile, "it_dev")
+    assert len(expected) == 13
+
+    answers = [{"question_id": qid, "choice": "A"} for qid in expected]
+    answers.append({"question_id": 14, "choice": "B"})
+    answers.append({"question_id": 15, "choice": "C"})
+
+    r = client.post(
+        f"/vibework/quiz/analyze/{uid}",
+        headers=headers,
+        json={"answers": answers, "interest": "it_dev"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json().get("readiness") is not None

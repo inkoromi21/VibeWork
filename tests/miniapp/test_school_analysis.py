@@ -9,8 +9,8 @@ _REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO / "miniapp" / "backend"))
 
 from wibe_work.services.assessment_bundle import get_assessment_bundle
+from wibe_work.services.profile_analysis_context import analysis_mode_for_profile
 from wibe_work.services.career_analysis_school import (
-    analysis_mode_for_profile,
     build_school_gap_analysis,
     pick_school_path_plans,
     school_education_hints,

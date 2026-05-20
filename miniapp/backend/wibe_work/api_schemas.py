@@ -50,6 +50,10 @@ class ProfileData(BaseModel):
     weekly_progress_note: Optional[str] = None
     primary_pain: Optional[str] = None
     course_grade: Optional[str] = None
+    favorite_subjects: Optional[str] = None
+    post_school_goal: Optional[str] = None
+    exam_focus: Optional[str] = None
+    admission_target: Optional[str] = None
 
     @field_validator("nickname", mode="before")
     @classmethod

@@ -42,6 +42,21 @@ def test_university_uses_job_search_not_proforientation() -> None:
     assert bundle["total_count"] == 15
 
 
+def test_university_career_skips_fields_already_in_profile() -> None:
+    profile = {
+        "education_detail": "univ_bachelor",
+        "course_grade": "3 курс",
+        "work_format_preference": "remote",
+        "preparation_level": "medium",
+    }
+    bundle = get_assessment_bundle(profile, "it_dev")
+    texts = [str(q.get("text") or "").lower() for q in bundle.get("career") or []]
+    assert not any("формат работы" in t for t in texts)
+    assert not any("уровень позиции" in t for t in texts)
+    assert bundle["career_count"] == 3
+    assert len(bundle["weights_matrix"]) == bundle["total_count"]
+
+
 def test_university_career_block_about_role_not_field() -> None:
     bundle = get_assessment_bundle(
         {"education_detail": "univ_bachelor", "course_grade": "3 курс"},
@@ -74,3 +89,29 @@ def test_school_track_keeps_proforientation() -> None:
     assert bundle["orientation_count"] > 0
     text = _orientation_texts(bundle)
     assert "класс" in text or "одноклассник" in text or "школьн" in text
+
+
+def test_school_filled_profile_skips_post_school_and_profil() -> None:
+    profile = {
+        "education_detail": "school_8_11",
+        "course_grade": "11 класс",
+        "favorite_subjects": '["math"]',
+        "post_school_goal": "after_11_university",
+        "interest_spheres": '["it_dev"]',
+    }
+    bundle = get_assessment_bundle(profile, "it_dev")
+    texts = [str(q.get("text") or "").lower() for q in bundle["questions"]]
+    assert not any("после 9 или 11" in t for t in texts)
+    assert not any("математик" in t and "информатик" in t for t in texts)
+
+
+def test_spo_filled_profile_skips_work_format_in_holland() -> None:
+    profile = {
+        "education_detail": "spo",
+        "course_grade": "2 курс",
+        "work_format_preference": "remote",
+        "interest_spheres": '["sales"]',
+    }
+    bundle = get_assessment_bundle(profile, "sales")
+    texts = [str(q.get("text") or "").lower() for q in bundle["questions"]]
+    assert not any("гибкий график и свобода формата" in t for t in texts)

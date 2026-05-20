@@ -5,8 +5,12 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from wibe_work.questionnaire_fields import INTEREST_SPHERES
-from wibe_work.services.aptitude_quiz_grading import compute_quiz_grade
+from wibe_work.questionnaire_fields import INTEREST_SPHERES, parse_favorite_subjects
+from wibe_work.services.profile_analysis_context import (
+    SUBJECT_GAP_LABELS,
+    analysis_mode_for_profile,
+    favorite_subjects_labels,
+)
 from wibe_work.services.assessment_routing import parse_course_grade, resolve_assessment_track
 from wibe_work.services.user_context import parse_interest_spheres
 
@@ -98,6 +102,12 @@ _SCHOOL_GAP_BY_INTEREST: Dict[str, List[Tuple[str, str]]] = {
 }
 
 _SCHOOL_PAIN_STEPS: Dict[str, str] = {
+    "pain_school_direction": "Запишите 3 варианта «куда идти» из сценариев A/B/C и обсудите с родителями или классным — один шаг на 2 недели.",
+    "pain_school_subjects": "Сопоставьте любимые предметы из анкеты с требованиями колледжа/вуза мечты — выберите один предмет для углубления на месяц.",
+    "pain_school_exams": "Один предмет из блока «Обучение» и 2 короткие тренировки в неделю — без попытки закрыть всё сразу.",
+    "pain_school_grades": "Начните с предмета, где уже есть интерес (из любимых) — репетитор или бесплатный курс из подборки.",
+    "pain_school_parents": "Покажите родителям сценарии A/B/C из разбора — зафиксируйте один компромиссный вариант на пробу.",
+    "pain_school_confidence": "Список из 5 дел из школы и хобби, где вы справились — это ваши сильные стороны.",
     "pain_career": "Запишите 3 варианта «куда идти» из сценариев A/B/C и обсудите с родителями или классным — один шаг на 2 недели.",
     "pain_no_exp": "Опыт для школьника — это проекты, кружки, олимпиады: оформите один кейс в 5 строк (что делали → результат).",
     "pain_region": "Смотрите колледжи и вузы в своём городе и соседних — плюс дистанционные программы по вашей сфере.",
@@ -107,10 +117,6 @@ _SCHOOL_PAIN_STEPS: Dict[str, str] = {
     "pain_low_confidence": "Список из 5 дел из школы и хобби, где вы справились — это ваши сильные стороны, не сравнение с взрослыми.",
     "pain_gap_skills": "Сопоставьте «разрыв предметов» с требованиями колледжа мечты — начните с одного предмета на месяц.",
 }
-
-
-def analysis_mode_for_profile(profile: Dict[str, Any]) -> str:
-    return "school" if compute_quiz_grade(profile) == "school" else "career"
 
 
 def _interest_key(interest: str) -> str:
@@ -139,6 +145,21 @@ def _score_path(name: str, dom: str, fp: int, idx: int) -> int:
     return base
 
 
+_GOAL_PATH_KEYWORDS: Dict[str, Tuple[str, ...]] = {
+    "after_9_college": ("колледж", "спо", "9 класса"),
+    "after_9_school": ("10–11", "11 класс", "профильн"),
+    "after_11_university": ("вуз", "11 класс", "егэ"),
+    "after_11_college": ("колледж", "спо", "11"),
+    "undecided": ("профор", "уточнить"),
+}
+
+
+def _boost_score_for_post_school_goal(name: str, goal: str) -> int:
+    kws = _GOAL_PATH_KEYWORDS.get((goal or "").strip(), ())
+    low = name.lower()
+    return 10 if any(k in low for k in kws) else 0
+
+
 def pick_school_path_plans(
     profile: Dict[str, Any],
     interest: str,
@@ -154,6 +175,7 @@ def pick_school_path_plans(
             "После 9 класса: колледж (СПО) по сфере",
             "После 9 класса: 10–11 класс с профильными предметами",
         ]
+    goal = str(profile.get("post_school_goal") or "").strip()
     dom = _dominant_radar_key(axes)
     seen: Set[str] = set()
     uniq: List[str] = []
@@ -161,7 +183,10 @@ def pick_school_path_plans(
         if p not in seen:
             seen.add(p)
             uniq.append(p)
-    scored = [(n, _score_path(n, dom, fp, i)) for i, n in enumerate(uniq)]
+    scored = [
+        (n, _score_path(n, dom, fp, i) + _boost_score_for_post_school_goal(n, goal))
+        for i, n in enumerate(uniq)
+    ]
     scored.sort(key=lambda x: -x[1])
     codes = ["A", "B", "C"]
     plans = []
@@ -202,6 +227,19 @@ def build_school_gap_analysis(
     """«Разрыв» по предметам и подготовке, не по навыкам вакансии."""
     dk = _interest_key(interest)
     subjects = list(_SCHOOL_GAP_BY_INTEREST.get(dk, _SCHOOL_GAP_BY_INTEREST["default"]))
+    existing_labels = {lab for _, lab in subjects}
+    for sid in parse_favorite_subjects(profile):
+        label = SUBJECT_GAP_LABELS.get(sid)
+        if label and label not in existing_labels:
+            subjects.insert(0, (sid, label))
+            existing_labels.add(label)
+    exam = str(profile.get("exam_focus") or "").strip()
+    if exam in ("oge_9", "both") and "Подготовка к ОГЭ" not in existing_labels:
+        subjects.append(("exams_oge", "Подготовка к ОГЭ"))
+        existing_labels.add("Подготовка к ОГЭ")
+    if exam in ("ege_11", "both") and "Подготовка к ЕГЭ" not in existing_labels:
+        subjects.append(("exams_ege", "Подготовка к ЕГЭ"))
+        existing_labels.add("Подготовка к ЕГЭ")
     dom = _dominant_radar_key(axes)
     bars: List[Dict[str, Any]] = []
     closeness: List[int] = []
@@ -213,6 +251,9 @@ def build_school_gap_analysis(
             base += 10
         if dom == "self_insight" and _sk == "career_choice":
             base += 8
+        fav_ids = set(parse_favorite_subjects(profile))
+        if _sk in fav_ids or label in favorite_subjects_labels(profile):
+            base += 14
         user_pct = max(28, min(88, base - (i * 2)))
         target_pct = min(100, user_pct + 18 + (i % 3) * 5)
         gap_pct = max(0, target_pct - user_pct)
@@ -276,11 +317,24 @@ def school_weekly_roadmap(
     track = resolve_assessment_track(profile)
     w1_learn = "Сверьте требования к предметам у 2–3 колледжей или вузов по вашей сфере."
     w1_practice = "Запишите, какие предметы в школе даются легче всего — это опора для профиля."
+    goal = str(profile.get("post_school_goal") or "").strip()
+    exam = str(profile.get("exam_focus") or "").strip()
+    fav = favorite_subjects_labels(profile)
     if track == "school_grade9":
         w1_learn = "Разберите: остаться в 10–11 классе или идти в колледж после 9 — плюсы и минусы для вашей сферы."
         w1_practice = "Поговорите с классным или профориентологом: один вариант из сценариев A/B/C."
+    elif goal == "after_11_university":
+        w1_learn = "Сверьте предметы ЕГЭ для вашей сферы с требованиями 2–3 вузов."
+        w1_practice = "Откройте ФИПИ по выбранным предметам — один раздел кодификатора."
+    elif goal == "after_9_college":
+        w1_learn = "Найдите 2 колледжа по сфере и список вступительных предметов."
+        w1_practice = "Запишите плюсы/минусы колледжа vs 10–11 класс для себя."
+    if fav:
+        w1_practice = (w1_practice + " ").strip() + f"Опора на любимые предметы: {', '.join(fav[:3])}."
     w2_learn = f"Откройте день открытых дверей или сайт программы по маршруту «{path[:50]}»."
     w2_practice = "Один мини-шаг: кружок, олимпиада, проект или пробный курс — 3–5 часов в неделю."
+    if exam in ("oge_9", "ege_11", "both"):
+        w2_learn += " Закрепите один предмет из анкеты в тренажёре ОГЭ/ЕГЭ."
     return [
         {
             "period": "Недели 1–2",
@@ -331,6 +385,26 @@ def mock_school_narrative(
         intro += f" Сейчас: {course}."
     if city:
         intro += f" Город: {city}."
+    fav = favorite_subjects_labels(profile)
+    if fav:
+        intro += f" Сильные предметы в анкете: {', '.join(fav[:4])}."
+    goal = str(profile.get("post_school_goal") or "").strip()
+    if goal:
+        from wibe_work.services.profile_analysis_context import (
+            _EXAM_FOCUS_RU,
+            _POST_SCHOOL_GOAL_RU,
+            _label,
+        )
+
+        intro += f" План: {_label(_POST_SCHOOL_GOAL_RU, goal)}."
+    exam = str(profile.get("exam_focus") or "").strip()
+    if exam:
+        from wibe_work.services.profile_analysis_context import _EXAM_FOCUS_RU, _label
+
+        intro += f" Готовит: {_label(_EXAM_FOCUS_RU, exam)}."
+    adm = (profile.get("admission_target") or "").strip()
+    if adm:
+        intro += f" Цель поступления: {adm[:80]}."
     intro += " Сейчас важнее не «кем работать», а куда идти учиться и что сдавать/подтягивать."
 
     mid = f"Индекс готовности к выбору около {readiness_percent}% — это про ясность маршрута, не про рынок труда."
@@ -388,10 +462,17 @@ def school_learning_extras(
         str(scenarios.get("best_plan_name") or ""),
         flags=re.IGNORECASE,
     )
+    fav_txt = ", ".join(favorite_subjects_labels(profile)[:4])
+    exam = str(profile.get("exam_focus") or "").strip()
+    exam_note = ""
+    if exam in ("oge_9", "ege_11", "both"):
+        exam_note = " Начните с материалов ОГЭ/ЕГЭ из блока «Обучение»."
     advice = augment_school_advice_with_links(
-        f"Школьный фокус: сравните маршрут «{best[:70]}» с требованиями к предметам. "
-        "В блоке «Обучение» ниже — официальные источники (ФИПИ) и тренажёры по предметам из вашего разрыва; "
-        "добавьте один вводный курс по сфере на 2–3 недели без спешки."
+        f"Школьный фокус: сравните маршрут «{best[:70]}» с требованиями к предметам."
+        + (f" Опирайтесь на любимые предметы ({fav_txt})." if fav_txt else "")
+        + " В блоке «Обучение» — ФИПИ и тренажёры по разрыву из разбора;"
+        + exam_note
+        + " Добавьте один вводный курс/кружок по сфере на 2–3 недели."
     )
     curated_cards = build_school_curated_learning_cards(profile, eff_interest or interest, gap)
     catalog_cards = pack.get("learning") or []

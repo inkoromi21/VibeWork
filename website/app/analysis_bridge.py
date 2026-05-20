@@ -8,7 +8,7 @@ from typing import Any
 
 from wibe_work.services.assessment_bundle import get_assessment_bundle
 from wibe_work.services.career_analysis import build_analysis_result
-from wibe_work.services.career_analysis_school import analysis_mode_for_profile
+from wibe_work.services.profile_analysis_context import analysis_mode_for_profile
 from wibe_work.services.learning_pack import normalize_preparation_level
 from wibe_work.services.quiz_web_bundle import quiz_bundle_for_web, sphere_id_for_profile
 

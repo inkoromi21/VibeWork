@@ -175,20 +175,20 @@ async def quiz_analyze(user_id: str, request: Request, body: AnalyzeRequest):
 
     expected = set(expected_question_ids(profile, interest))
     qids = {int(a.question_id) for a in body.answers}
-    if qids != expected:
+    if not expected <= qids:
         missing = sorted(expected - qids)
-        extra = sorted(qids - expected)
         detail = f"Нужны ответы на все {len(expected)} вопросов опроса."
         if missing:
             detail += f" Не хватает id: {missing[:12]}{'…' if len(missing) > 12 else ''}."
-        if extra:
-            detail += f" Лишние id: {extra[:8]}."
         raise HTTPException(status_code=400, detail=detail)
+    # Лишние id (старый набор вопросов) не мешают — берём только актуальные
+    answers_dicts = [
+        {"question_id": a.question_id, "choice": a.choice.strip()}
+        for a in body.answers
+        if int(a.question_id) in expected
+    ]
     preparation = _prep_for_user(profile, body.preparation_level)
     education = (profile.get("education_level") or "не указано").strip()
-    answers_dicts = [
-        {"question_id": a.question_id, "choice": a.choice.strip()} for a in body.answers
-    ]
     profile_extra = {
         "city": profile.get("city"),
         "age": profile.get("age"),
@@ -213,6 +213,24 @@ async def analysis_exists(user_id: str, request: Request):
     """Быстрая проверка наличия разбора без пересборки learning path."""
     require_bearer_matches_user(request, user_id)
     return {"exists": bool(_load_analysis_snapshot(user_id))}
+
+
+@miniapp_prefixed_router.get("/quiz/saved/{user_id}")
+async def get_saved_quiz_answers(user_id: str, request: Request):
+    """Сохранённые ответы теста (как анкета) — для сводки и повторного прохождения."""
+    require_bearer_matches_user(request, user_id)
+    snap = _load_analysis_snapshot(user_id)
+    if not snap:
+        return {"exists": False, "answers": [], "interest": None}
+    answers = list(snap.get("_quiz_answers") or [])
+    interest = snap.get("_analysis_interest")
+    if interest is not None:
+        interest = str(interest).strip() or None
+    return {
+        "exists": bool(answers),
+        "answers": answers,
+        "interest": interest,
+    }
 
 
 @miniapp_prefixed_router.get("/analysis/{user_id}")

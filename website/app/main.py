@@ -153,6 +153,8 @@ async def quiz_questions(
     education_detail: str | None = Query(None, description="id уровня образования из анкеты"),
     course_grade: str | None = Query(None, description="Класс или курс"),
     age: int | None = Query(None, ge=10, le=80),
+    work_format_preference: str | None = Query(None, description="Формат работы из анкеты"),
+    preparation_level: str | None = Query(None, description="Уровень подготовки из анкеты"),
 ):
     """Вопросы теста под интерес, образование и класс/курс."""
     profile: dict = {}
@@ -162,7 +164,11 @@ async def quiz_questions(
         profile["course_grade"] = course_grade
     if age is not None:
         profile["age"] = age
-    use_profile = bool(education_detail or course_grade is not None or age is not None)
+    if work_format_preference:
+        profile["work_format_preference"] = work_format_preference
+    if preparation_level:
+        profile["preparation_level"] = preparation_level
+    use_profile = bool(profile)
     return quiz_questions_bundle(
         interest, target_mts_role_id, profile=profile if use_profile else None
     )

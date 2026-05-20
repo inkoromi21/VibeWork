@@ -16,9 +16,10 @@ from wibe_work.services.learning.catalog import resource_to_card, resources_by_i
 from wibe_work.services.learning.engine import build_learning_path_payload
 from wibe_work.services.llm_client import fetch_llm_completion, llm_configured
 from wibe_work.services.llm_prompts import (
-    ADVICE_JSON_SYSTEM,
+    advice_json_system_for_grade,
     build_advice_user_prompt,
 )
+from wibe_work.services.profile_analysis_context import education_grade as profile_education_grade
 
 # Ключевые слова направления в названии плана → track для каталога
 _TRACK_HINTS: List[Tuple[str, Tuple[str, ...]]] = [
@@ -505,6 +506,7 @@ def build_individual_advice(
                 line += f" — {desc}"
             mat_lines.append(line)
         pain_hint = _PAIN_INTRO.get(pain_id, "") if pain_id else ""
+        grade = profile_education_grade(profile)
         prompt = build_advice_user_prompt(
             profile_summary=profile_summary,
             preparation_level=preparation_level,
@@ -512,12 +514,13 @@ def build_individual_advice(
             plans=plans,
             materials_list="\n".join(mat_lines) or "—",
             pain_hint=pain_hint,
+            education_grade=grade,
         )
         raw, _ = fetch_llm_completion(
             prompt,
             max_tokens=1200,
             temperature=0.45,
-            system_prompt=ADVICE_JSON_SYSTEM,
+            system_prompt=advice_json_system_for_grade(grade),
         )
         parsed = _parse_llm_advice_json(raw or "")
         if parsed:

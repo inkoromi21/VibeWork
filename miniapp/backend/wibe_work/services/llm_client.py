@@ -20,6 +20,7 @@ from wibe_work.services.llm_prompts import (
     build_chat_user_prompt,
     select_chat_addenda,
 )
+from wibe_work.services.profile_analysis_context import education_grade as profile_education_grade
 
 logger = logging.getLogger(__name__)
 
@@ -193,8 +194,13 @@ def career_coach_chat_reply(
         profile_snippet=profile_snippet,
         directions_hint=directions_hint or context_summary,
     )
-    addenda = select_chat_addenda(last_user, profile, analysis_snap)
-    system_prompt = build_chat_system_prompt(addenda, context_pack=context_pack)
+    grade = profile_education_grade(profile or {})
+    addenda = select_chat_addenda(
+        last_user, profile, analysis_snap, education_grade=grade
+    )
+    system_prompt = build_chat_system_prompt(
+        addenda, context_pack=context_pack, education_grade=grade
+    )
     user_prompt = build_chat_user_prompt(
         messages,
         profile_snippet="",  # анкета уже в context_pack (system)

@@ -15,6 +15,7 @@ from wibe_work.services.aptitude_quiz import (
 )
 from wibe_work.services.aptitude_quiz_grading import quiz_grade_hint, quiz_grade_label
 from wibe_work.services.assessment_modules import module_question_slice
+from wibe_work.services.assessment_questionnaire_overlap import filter_question_list
 from wibe_work.services.assessment_routing import (
     career_block_title,
     module_title,
@@ -35,7 +36,7 @@ def _format_question(
     block: str,
 ) -> Dict[str, Any]:
     opts = raw.get("options") or []
-    return {
+    out: Dict[str, Any] = {
         "id": qid,
         "text": str(raw.get("text") or ""),
         "options": [
@@ -45,6 +46,26 @@ def _format_question(
         "module": module_id,
         "methodology": module_id,
     }
+    for key in (
+        "only_interests",
+        "skip_interests",
+        "only_sphere_groups",
+        "skip_sphere_groups",
+        "audience",
+        "skip_if_profile_field",
+    ):
+        if raw.get(key) is not None:
+            out[key] = raw[key]
+    return out
+
+
+def _filter_expert_questions(
+    profile: Dict[str, Any],
+    expert: List[Dict[str, Any]],
+    expert_weights: List[WRow],
+) -> tuple[List[Dict[str, Any]], List[WRow]]:
+    """Не спрашивать в тесте то, что уже есть в анкете."""
+    return filter_question_list(profile, expert, expert_weights, module_id="career")
 
 
 def _build_orientation(
@@ -58,9 +79,14 @@ def _build_orientation(
     weights: List[List[tuple]] = []
     qid = start_id
     for mod_id in track_modules(track_id):
-        for raw in module_question_slice(mod_id, track_id, interest=interest):
+        slice_raw = module_question_slice(mod_id, track_id, interest=interest)
+        slice_weights = [list(r["weights"]) for r in slice_raw]
+        filtered_q, filtered_w = filter_question_list(
+            profile, slice_raw, slice_weights, module_id=mod_id
+        )
+        for raw, w in zip(filtered_q, filtered_w):
             questions.append(_format_question(qid, raw, module_id=mod_id, block="orientation"))
-            weights.append(list(raw["weights"]))
+            weights.append(w)
             qid += 1
     return questions, weights, qid
 
@@ -99,6 +125,9 @@ def get_assessment_bundle(profile: Dict[str, Any], interest: str) -> Dict[str, A
         next_id += len(technical)
 
     expert = copy.deepcopy(_personality_questions(interest, grade))
+    expert, expert_weights = _filter_expert_questions(
+        profile, expert, list(_EXPERT_WEIGHTS)
+    )
     for q in expert:
         q["id"] = next_id
         next_id += 1
@@ -140,7 +169,7 @@ def get_assessment_bundle(profile: Dict[str, Any], interest: str) -> Dict[str, A
     core_rows: List[WRow] = list(orient_weights)
     if include_technical:
         core_rows.extend(list(tech_w))
-    core_rows.extend(list(_EXPERT_WEIGHTS))
+    core_rows.extend(expert_weights)
     full_weights = core_rows
 
     return {

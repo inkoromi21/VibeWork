@@ -10,7 +10,9 @@ from typing import Any, Dict, List, Optional
 
 from wibe_work.sqlite_db import get_db
 from wibe_work.services.llm_client import fetch_llm_completion, llm_configured
-from wibe_work.services.llm_prompts import CHAT_SESSION_TITLE_SYSTEM
+from wibe_work.services.llm_prompts import chat_session_title_system_for_grade
+from wibe_work.services.profile_analysis_context import education_grade as profile_education_grade
+from wibe_work.services.user_context import load_profile
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +73,9 @@ def _build_dialog_excerpt(messages: List[Dict[str, Any]], *, max_msgs: int = 24,
     return "\n".join(lines)
 
 
-def _title_from_llm(messages: List[Dict[str, Any]]) -> Optional[str]:
+def _title_from_llm(
+    messages: List[Dict[str, Any]], *, education_grade: str = "university"
+) -> Optional[str]:
     if not llm_configured():
         return None
     excerpt = _build_dialog_excerpt(messages)
@@ -86,7 +90,7 @@ def _title_from_llm(messages: List[Dict[str, Any]]) -> Optional[str]:
         ),
         max_tokens=80,
         temperature=0.2,
-        system_prompt=CHAT_SESSION_TITLE_SYSTEM,
+        system_prompt=chat_session_title_system_for_grade(education_grade),
     )
     if err:
         logger.debug("Заголовок чата LLM: %s", err)
@@ -141,9 +145,11 @@ def _title_fallback(messages: List[Dict[str, Any]]) -> str:
 def compute_session_title(
     messages: List[Dict[str, Any]],
     previous_title: Optional[str],
+    *,
+    education_grade: str = "university",
 ) -> str:
     if _should_try_topic_title(messages):
-        generated = _title_from_llm(messages)
+        generated = _title_from_llm(messages, education_grade=education_grade)
         if generated:
             return generated
         if previous_title and previous_title.strip() not in ("", "Диалог", "Новый диалог"):
@@ -161,7 +167,9 @@ def upsert_session(user_id: str, session_id: str, messages: List[Dict[str, Any]]
         if row:
             previous_title = str(row["title"] or "").strip() or None
 
-    title = compute_session_title(messages, previous_title)
+    profile = load_profile(user_id) or {}
+    grade = profile_education_grade(profile)
+    title = compute_session_title(messages, previous_title, education_grade=grade)
     payload = json.dumps(messages, ensure_ascii=False)
     now = _now_ts()
     with get_db() as conn:

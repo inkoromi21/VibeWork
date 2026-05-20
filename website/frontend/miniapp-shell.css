@@ -584,3 +584,129 @@ html[data-theme="dark"] #app .vw-wave-strip g {
   background: var(--bg-card);
   border-radius: 999px;
 }
+
+/* Единая оболочка с сайтом: боковое меню на широком экране, нижние вкладки на телефоне */
+#app .layout--app {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  min-height: 100vh;
+  width: 100%;
+}
+
+#app .layout--app > .main-col {
+  flex: 1;
+  min-width: 0;
+}
+
+#app .vw-app-sidebar {
+  display: none;
+}
+
+#app .topbar-left--desktop {
+  display: none;
+}
+
+#app .topbar-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+#app .vw-topbar.main-topbar {
+  align-items: flex-start;
+}
+
+#app .vw-topbar .topbar-copy {
+  min-width: 0;
+}
+
+#app .vw-topbar .topbar-title {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+#app .vw-topbar .topbar-quote {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  font-style: italic;
+  color: color-mix(in srgb, var(--muted) 92%, var(--green-dark));
+  max-width: min(46ch, 100%);
+}
+
+/* «Десктоп» в мини-апп: только широкий экран + мышь (Telegram Desktop, браузер на ПК).
+   Телефоны и планшеты (pointer: coarse) всегда остаются на нижней панели. */
+@media (min-width: 861px) and (hover: hover) and (pointer: fine) {
+  #app .vw-app-sidebar {
+    display: flex;
+  }
+
+  #app .bottom-nav,
+  #app .vw-bottom-nav {
+    display: none !important;
+  }
+
+  #app .shell {
+    padding-bottom: 1.25rem;
+  }
+
+  #app .topbar-left--mobile {
+    display: none !important;
+  }
+
+  #app .topbar-left--desktop {
+    display: flex;
+    gap: 0.85rem;
+    align-items: flex-start;
+    min-width: 0;
+    flex: 1 1 200px;
+  }
+
+  #app .vw-scroll-top {
+    bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 860px) {
+  #app .vw-app-sidebar {
+    display: none !important;
+  }
+
+  #app .topbar-left--desktop {
+    display: none !important;
+  }
+}
+
+@media (pointer: coarse) {
+  #app .vw-app-sidebar {
+    display: none !important;
+  }
+
+  #app .bottom-nav,
+  #app .vw-bottom-nav {
+    display: flex !important;
+  }
+
+  #app .topbar-left--mobile {
+    display: flex !important;
+  }
+
+  #app .topbar-left--desktop {
+    display: none !important;
+  }
+
+  #app .shell,
+  #app .shell.shell--hub {
+    padding-bottom: calc(1.25rem + var(--vw-bottom-nav-h) + env(safe-area-inset-bottom, 0px));
+  }
+
+  #app .vw-scroll-top {
+    bottom: calc(max(14px, env(safe-area-inset-bottom, 0px)) + var(--vw-bottom-nav-h) + 8px);
+  }
+}

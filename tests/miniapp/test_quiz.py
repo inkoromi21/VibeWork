@@ -56,8 +56,9 @@ def test_personality_text_differs_by_grade() -> None:
 
 
 def test_personality_q12_varies_by_sphere_track() -> None:
-    tech = get_quiz_bundle("it_dev", "university")["personality"]
-    creative = get_quiz_bundle("design", "university")["personality"]
+    # На вузовском грейде блок career = job_search без подмены Q12 по сфере
+    tech = get_quiz_bundle("it_dev", "vocational")["personality"]
+    creative = get_quiz_bundle("design", "vocational")["personality"]
     q12_tech = next(q for q in tech if q["id"] == 12)
     q12_creative = next(q for q in creative if q["id"] == 12)
     assert q12_tech["text"] != q12_creative["text"]

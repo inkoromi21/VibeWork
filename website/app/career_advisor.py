@@ -21,9 +21,18 @@ try:
         ANALYSIS_NARRATIVE_SYSTEM,
         CAREER_COACH_CHAT_SYSTEM,
         DEFAULT_GENERIC_SYSTEM,
+        build_chat_system_prompt,
+        build_chat_user_prompt,
         build_chat_user_instruction_suffix,
+        coach_chat_system_for_grade,
+        narrative_system_for_grade,
+        select_chat_addenda,
     )
+    from wibe_work.services.profile_analysis_context import education_grade as profile_education_grade
+
+    _WIBE_LLM_PROMPTS = True
 except ImportError:
+    _WIBE_LLM_PROMPTS = False
     CAREER_COACH_CHAT_SYSTEM = (
         "Ты карьерный консультант для молодёжи в России. Только русский язык. "
         "Не работодатель. Опирайся на контекст разбора. 6–12 предложений. Без HTML."
@@ -35,6 +44,24 @@ except ImportError:
 
     def build_chat_user_instruction_suffix() -> str:
         return ""
+
+    def coach_chat_system_for_grade(education_grade: str) -> str:
+        return CAREER_COACH_CHAT_SYSTEM
+
+    def narrative_system_for_grade(analysis_mode: str, education_grade: str) -> str:
+        return ANALYSIS_NARRATIVE_SYSTEM
+
+    def build_chat_system_prompt(addenda=None, *, context_pack: str = "", education_grade: str = "university"):
+        return CAREER_COACH_CHAT_SYSTEM
+
+    def select_chat_addenda(last_user, profile, analysis_snap, *, education_grade: str = "university"):
+        return []
+
+    def build_chat_user_prompt(messages, **kwargs):
+        return ""
+
+    def profile_education_grade(profile):
+        return "university"
 
 from app.mts_tracks_catalog import load_mts_tracks
 from app.api_schemas import (
@@ -1704,6 +1731,15 @@ def _mock_career_chat_reply(last_user: str) -> str:
     )
 
 
+def _website_education_to_grade(edu_value: str) -> str:
+    e = (edu_value or "").strip().lower()
+    if "школ" in e:
+        return "school"
+    if "колледж" in e:
+        return "vocational"
+    return "university"
+
+
 async def career_chat(req: ChatRequest) -> tuple[str, Literal["llm", "mock"], str | None]:
     last_user = ""
     for m in reversed(req.messages):
@@ -1712,33 +1748,54 @@ async def career_chat(req: ChatRequest) -> tuple[str, Literal["llm", "mock"], st
             break
     if not last_user:
         last_user = req.messages[-1].content.strip()
-    parts: list[str] = []
-    if req.context_summary:
-        parts.append("Контекст разбора:\n" + req.context_summary[:1800])
-    if req.directions_hint:
-        parts.append("Направления:\n" + req.directions_hint[:500])
-    transcript = "\n".join(f"{m.role}: {m.content[:900]}" for m in req.messages[-10:])
-    user_tail = (
-        "\n\nПоследнее сообщение пользователя (ответь только на него, по правилам из system):\n"
-        f"«{last_user[:2000]}»"
-    )
-    user_prompt = "\n\n".join(
-        parts
-        + [f"История диалога:\n{transcript}", user_tail]
-    )
-    user_prompt += build_chat_user_instruction_suffix()
     mock = _mock_career_chat_reply(last_user)
     if not llm_configured():
         return (
             mock,
             "mock",
-            "Ключ API не задан. Добавьте DEEPSEEK_API_KEY в .env и перезапустите сервер.",
+            "Ключ API не задан. Добавьте CHAT_API_KEY в .env и перезапустите сервер.",
         )
+
+    if _WIBE_LLM_PROMPTS:
+        from wibe_work.services.llm_prompts import infer_education_grade_from_text
+
+        ctx_blob = (req.context_summary or "") + "\n" + (req.directions_hint or "")
+        grade = infer_education_grade_from_text(ctx_blob)
+        msgs = [{"role": m.role, "content": m.content} for m in req.messages]
+        addenda = select_chat_addenda(last_user, {}, None, education_grade=grade)
+        system_prompt = build_chat_system_prompt(
+            addenda,
+            context_pack=req.context_summary or "",
+            education_grade=grade,
+        )
+        user_prompt = build_chat_user_prompt(
+            msgs,
+            legacy_context_summary=req.context_summary or "",
+            directions_hint=req.directions_hint or "",
+        )
+    else:
+        parts: list[str] = []
+        if req.context_summary:
+            parts.append("Контекст разбора:\n" + req.context_summary[:1800])
+        if req.directions_hint:
+            parts.append("Направления:\n" + req.directions_hint[:500])
+        transcript = "\n".join(f"{m.role}: {m.content[:900]}" for m in req.messages[-10:])
+        user_tail = (
+            "\n\nПоследнее сообщение пользователя (ответь только на него, по правилам из system):\n"
+            f"«{last_user[:2000]}»"
+        )
+        user_prompt = "\n\n".join(
+            parts
+            + [f"История диалога:\n{transcript}", user_tail]
+        )
+        user_prompt += build_chat_user_instruction_suffix()
+        system_prompt = CAREER_COACH_CHAT_SYSTEM
+
     out, api_notice = await fetch_llm_completion(
         user_prompt,
         max_tokens=900,
         temperature=0.35,
-        system_prompt=CAREER_COACH_CHAT_SYSTEM,
+        system_prompt=system_prompt,
     )
     if out:
         return out, "llm", None
@@ -2175,11 +2232,18 @@ async def build_analysis(payload: DiagnosisPayload) -> AnalysisResult:
         "Фокус на ближайший квартал в указанной сфере; один риск выгорания или перегруза; избегай штампа «учи только программирование», "
         "если сфера не сводится к разработке."
     )
+    web_grade = _website_education_to_grade(payload.education.value)
+    web_mode = "school" if web_grade == "school" else "career"
+    narr_system = (
+        narrative_system_for_grade(web_mode, web_grade)
+        if _WIBE_LLM_PROMPTS
+        else ANALYSIS_NARRATIVE_SYSTEM
+    )
     ai_text, _ai_err = await fetch_llm_completion(
         narrative_prompt,
         max_tokens=560,
         temperature=0.42,
-        system_prompt=ANALYSIS_NARRATIVE_SYSTEM,
+        system_prompt=narr_system,
     )
     if not ai_text:
         ai_text = mock_ai_narrative(payload, directions)

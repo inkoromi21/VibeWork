@@ -3,9 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <meta name="vibework-build" content="20260520-miniapp-site-design">
+    <meta name="vibework-build" content="20260521-responsive-touch">
     <script>
     (function () {
+        var BUILD = '20260521-responsive-touch';
+        var key = 'vw_miniapp_build';
+        try {
+            var prev = localStorage.getItem(key);
+            if (prev && prev !== BUILD) {
+                localStorage.setItem(key, BUILD);
+                location.reload();
+                return;
+            }
+            localStorage.setItem(key, BUILD);
+        } catch (e) {}
         document.documentElement.setAttribute('data-miniapp', '1');
         /** Сброс inline --* с documentElement (их выставляет Telegram Mini App), иначе они сильнее CSS тёмной темы. */
         function vwClearInlineThemeOverrides() {
@@ -30,7 +41,7 @@
     })();
     </script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/static/vw_shared_ui.js"></script>
+    <script src="/static/vw_shared_ui.js?v=20260521-responsive-touch"></script>
     <script>
     (function () {
         try {
@@ -86,8 +97,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
-    <link rel="stylesheet" href="/static/miniapp-shell.css">
+    <link rel="stylesheet" href="/static/style.css?v=20260521-responsive-touch">
+    <link rel="stylesheet" href="/static/miniapp-shell.css?v=20260521-responsive-touch">
     <style>
         /* Токены страницы — из /static/style.css; здесь только алиасы legacy-миниаппа */
         html[data-miniapp] {
@@ -2405,12 +2416,13 @@
 
     const HOME_TAB = { id: 'home', label: 'Разделы', ico: '☰' };
     const ACCOUNT_TAB = { id: 'account', label: 'Аккаунт', ico: '✦' };
+    const VW_BUILD = '20260521-responsive-touch';
     const SECTION_TABS = [
-        { id: 'profile', label: 'Анкета', ico: '📋' },
-        { id: 'test', label: 'Тест', ico: '🎯' },
-        { id: 'analysis', label: 'Разбор', ico: '📊' },
-        { id: 'chat', label: 'ИИ-чат', ico: '🤖' },
-        { id: 'jobs', label: 'Вакансии', ico: '💼' },
+        { id: 'profile', label: 'Профиль', short: 'Анкета', snIco: '◇', ico: '📋' },
+        { id: 'test', label: 'Тестирование', short: 'Тест', snIco: '☑', ico: '🎯' },
+        { id: 'analysis', label: 'Разбор', short: 'Разбор', snIco: '📊', ico: '📊' },
+        { id: 'chat', label: 'Чат с ИИ', short: 'ИИ', snIco: '💬', ico: '🤖' },
+        { id: 'jobs', label: 'Вакансии', short: 'Вакансии', snIco: '▦', ico: '💼' },
     ];
 
     const TAB_ORDER = ['profile', 'test', 'analysis', 'chat', 'jobs'];
@@ -2430,6 +2442,7 @@
     let profileFetchDone = false;
     let quizState = {
         interest: '',
+        expectedQuestionIds: [],
         technicalCount: 0,
         technical: [],
         personality: [],
@@ -2484,6 +2497,9 @@
     let simulatorState = null;
     let simulatorRoleOptions = null;
     let testSphereSelection = null;
+    let testForceWizard = false;
+    let savedQuizAnswersMap = {};
+    let savedTestInterest = null;
     let hasSavedAnalysis = false;
     let analysisCheckDone = false;
     let cachedAnalysisPayload = null;
@@ -2688,15 +2704,75 @@
     }
 
     /** Короткая подпись для нижней панели (узкий экран / Mini App). */
-    function bottomNavShortLabel(tabId) {
-        const m = {
-            profile: 'Анкета',
-            test: 'Тест',
-            analysis: 'Разбор',
-            chat: 'ИИ',
-            jobs: 'Вакансии',
-        };
-        return m[tabId] || '—';
+    function bottomNavShortLabel(tab) {
+        if (tab && tab.short) return tab.short;
+        const t = typeof tab === 'string' ? getTabById(tab) : tab;
+        return (t && t.short) || (t && t.label) || '—';
+    }
+
+    function primarySphereLabelForAvatar() {
+        const schema = profileSchema;
+        const spheres = parseProfileSpheres(cachedProfile);
+        const sid = (spheres[0] || cachedProfile.main_sphere || '').trim();
+        if (!sid) return 'VW';
+        if (schema && schema.interest_spheres) {
+            for (let i = 0; i < schema.interest_spheres.length; i++) {
+                if (String(schema.interest_spheres[i].id) === String(sid)) {
+                    return schema.interest_spheres[i].label || sid;
+                }
+            }
+        }
+        return sid;
+    }
+
+    function updateAvatarBubbleMiniapp() {
+        const el = document.getElementById('vw-avatar-bubble');
+        if (!el) return;
+        const raw = primarySphereLabelForAvatar();
+        const initials = String(raw)
+            .split(/\s+/)
+            .map(function (w) { return w[0]; })
+            .join('')
+            .slice(0, 2)
+            .toUpperCase();
+        el.textContent = initials || 'VW';
+    }
+
+    function buildSidebarNavHtml() {
+        let h =
+            '<aside class="vw-app-sidebar sidebar" aria-label="Меню">' +
+            '<div class="sidebar-brand">' +
+            '<span class="brand-lockup brand-lockup--sidebar" translate="no">' +
+            '<span class="brand-brace" aria-hidden="true">{</span>' +
+            '<span class="brand-name">VibeWork</span>' +
+            '<span class="brand-brace" aria-hidden="true">}</span></span></div>' +
+            '<nav class="sidebar-nav" aria-label="Разделы">';
+        for (let i = 0; i < SECTION_TABS.length; i++) {
+            const t = SECTION_TABS[i];
+            const active = currentTab === t.id ? ' active' : '';
+            h +=
+                '<button type="button" class="nav-pill side-nav-item side-nav-item--mini' +
+                active +
+                '" data-vw-tab="' +
+                esc(t.id) +
+                '"' +
+                (currentTab === t.id ? ' aria-current="page"' : '') +
+                '>' +
+                '<span class="sn-ico" aria-hidden="true">' +
+                esc(t.snIco || '') +
+                '</span> ' +
+                esc(t.label) +
+                '</button>';
+        }
+        h +=
+            '<button type="button" class="nav-pill side-nav-item side-nav-item--mini' +
+            (currentTab === 'account' ? ' active' : '') +
+            '" data-vw-tab="account"' +
+            (currentTab === 'account' ? ' aria-current="page"' : '') +
+            '>' +
+            '<span class="sn-ico" aria-hidden="true">◎</span> Аккаунт</button>' +
+            '</nav></aside>';
+        return h;
     }
 
     const MINIAPP_BG_HTML =
@@ -2740,20 +2816,24 @@
                 '<span class="bt-ico" aria-hidden="true">' +
                 t.ico +
                 '</span><span class="bt-label">' +
-                esc(bottomNavShortLabel(t.id)) +
+                esc(bottomNavShortLabel(t)) +
                 '</span></button>';
         }
         h += '</nav>';
         return h;
     }
 
-    function wireBottomNavTabs() {
-        document.querySelectorAll('.bottom-tab[data-vw-tab], .vw-bottom-tab[data-vw-tab]').forEach(function (btn) {
-            btn.onclick = async function () {
-                currentTab = btn.getAttribute('data-vw-tab') || 'profile';
-                await renderShell();
-            };
-        });
+    function wireAppNavTabs() {
+        document
+            .querySelectorAll(
+                '.bottom-tab[data-vw-tab], .vw-bottom-tab[data-vw-tab], .side-nav-item[data-vw-tab]'
+            )
+            .forEach(function (btn) {
+                btn.onclick = async function () {
+                    currentTab = btn.getAttribute('data-vw-tab') || 'profile';
+                    await renderShell();
+                };
+            });
     }
 
     function tabTagline(tabId) {
@@ -3314,13 +3394,13 @@
         if (currentTab === 'home') currentTab = 'profile';
         const tabMeta = getTabById(currentTab);
         const isHome = currentTab === 'home';
-        const topLeft = isHome
-            ? '<div class="topbar-left">' +
+        const topLeftMobile = isHome
+            ? '<div class="topbar-left topbar-left--mobile">' +
               '<div class="topbar-titles">' +
               '<h1 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="brand-mono">{ VibeWork }</span></h1>' +
               '<p class="dynamic-tagline">VibeWork — карьерный навигатор</p>' +
               '</div></div>'
-            : '<div class="topbar-left">' +
+            : '<div class="topbar-left topbar-left--mobile">' +
               '<div class="topbar-titles">' +
               '<h1>' +
               esc(tabMeta.label) +
@@ -3328,6 +3408,13 @@
               '<p class="dynamic-tagline">' +
               esc(tabTagline(currentTab)) +
               '</p></div></div>';
+        const topLeftDesktop =
+            '<div class="topbar-left topbar-left--desktop">' +
+            '<div class="avatar-bubble sm" id="vw-avatar-bubble" title="Сфера из анкеты">VW</div>' +
+            '<div class="topbar-copy">' +
+            '<div class="topbar-heading-row"><p class="topbar-title">Карьерный трек</p></div>' +
+            '<p class="topbar-quote">«Дорогу осилит идущий — а траекторию строит каждый выбранный шаг.»</p>' +
+            '</div></div>';
         const showScrollTop = currentTab !== 'home' && currentTab !== 'account';
         const disp = displayUserPillText() || 'Аккаунт';
         const scrollTopBtnHtml = showScrollTop
@@ -3338,12 +3425,14 @@
             : '';
         document.getElementById('app').innerHTML =
             MINIAPP_BG_HTML +
-            '<div class="layout layout--full">' +
+            '<div class="layout layout--app">' +
+            buildSidebarNavHtml() +
             '<div class="main-col">' +
-            '<header class="topbar">' +
-            topLeft +
-            '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%">' +
-            '<button type="button" class="account-chip-btn' +
+            '<header class="topbar main-topbar vw-topbar">' +
+            topLeftMobile +
+            topLeftDesktop +
+            '<div class="topbar-tools">' +
+            '<button type="button" class="account-chip-btn account-hub-btn' +
             (currentTab === 'account' ? ' is-active' : '') +
             '" onclick="window.__vw.goTab(\'account\')" title="' +
             esc(pillHoverTitle()) +
@@ -3369,9 +3458,10 @@
             '</div></div>';
         refreshAnalysisFlag();
         renderTabContent();
+        updateAvatarBubbleMiniapp();
         wireScrollTopBtn();
         wireThemeToggleClicks();
-        wireBottomNavTabs();
+        wireAppNavTabs();
     }
 
     let scrollTopVisibilityHandler = null;
@@ -3466,6 +3556,20 @@
         if (id === 'interest_spheres') {
             const arr = parseProfileSpheres(profile);
             return arr.length ? { chips: arr.map(function (sid) { return labelMainSphere(schema, sid) || sid; }) } : null;
+        }
+        if (id === 'favorite_subjects') {
+            const sh = vwShared();
+            const arr = sh && sh.parseFavoriteSubjects ? sh.parseFavoriteSubjects(profile) : [];
+            if (!arr.length) return null;
+            const subs = schema.school_subjects || [];
+            return {
+                chips: arr.map(function (sid) {
+                    for (let i = 0; i < subs.length; i++) {
+                        if (String(subs[i].id) === String(sid)) return subs[i].label || sid;
+                    }
+                    return sid;
+                }),
+            };
         }
         let v = profile[id];
         if (v == null || v === '') {
@@ -3584,8 +3688,9 @@
 
     function buildProfileCompleteSummaryHtml(schema, profile) {
         const sh = vwShared();
+        const eff = effectiveProfileSchema(schema, profile);
         if (sh && sh.buildProfileSummaryHtml) {
-            return sh.buildProfileSummaryHtml(schema, profile, esc, {
+            return sh.buildProfileSummaryHtml(eff, profile, esc, {
                 profileFieldDisplay: profileFieldDisplayForAbout,
                 sectionTitle: function (sec) {
                     return sec.title || '';
@@ -3627,11 +3732,127 @@
         profileWizardStep = 0;
         profileForceWizard = false;
         testSphereSelection = null;
+        testForceWizard = false;
+        savedQuizAnswersMap = {};
+        savedTestInterest = null;
         quizState.answers = {};
         quizState.modules = [];
         quizState.trackLabel = '';
         quizState.trackHint = '';
         quizState.assessmentFocus = '';
+    }
+
+    async function fetchSavedQuizAnswers() {
+        if (!userId || !hasSavedAnalysis) {
+            savedQuizAnswersMap = {};
+            savedTestInterest = null;
+            return savedQuizAnswersMap;
+        }
+        try {
+            const res = await fetchJson('/vibework/quiz/saved/' + encodeURIComponent(userId));
+            if (!res.ok) {
+                savedQuizAnswersMap = {};
+                savedTestInterest = null;
+                return savedQuizAnswersMap;
+            }
+            const data = await res.json();
+            const sh = vwShared();
+            savedQuizAnswersMap =
+                sh && sh.quizAnswersListToMap
+                    ? sh.quizAnswersListToMap(data.answers || [])
+                    : {};
+            if (!Object.keys(savedQuizAnswersMap).length && Array.isArray(data.answers)) {
+                data.answers.forEach(function (a) {
+                    if (a && a.question_id != null) savedQuizAnswersMap[a.question_id] = a.choice;
+                });
+            }
+            savedTestInterest = data.interest || null;
+        } catch (e) {
+            savedQuizAnswersMap = {};
+            savedTestInterest = null;
+        }
+        return savedQuizAnswersMap;
+    }
+
+    function shouldShowTestSummary() {
+        return hasSavedAnalysis && !testForceWizard;
+    }
+
+    function buildTestSummaryBlocks(techQs, persQs, orientMods, careerQs, test2Heading) {
+        const blocks = [];
+        if (techQs && techQs.length) {
+            blocks.push({ title: 'Тест 1 — задачи в вашей сфере', questions: techQs });
+        }
+        const jobSearch = quizState.assessmentFocus === 'job_search';
+        if (orientMods && orientMods.length) {
+            for (let mi = 0; mi < orientMods.length; mi++) {
+                const mod = orientMods[mi];
+                blocks.push({
+                    title: mod.title || mod.id,
+                    questions: mod.questions || [],
+                });
+            }
+            if (careerQs && careerQs.length) {
+                blocks.push({
+                    title: quizState.careerModuleTitle || 'Карьерные ориентиры',
+                    questions: careerQs,
+                });
+            }
+        } else if (persQs && persQs.length) {
+            blocks.push({
+                title: test2Heading || (jobSearch ? 'Тест 2 — роль и вакансии' : 'Тест 2 — профориентация'),
+                questions: careerQs && careerQs.length ? careerQs : persQs,
+            });
+        }
+        return blocks;
+    }
+
+    function renderTestSummaryView(schema, profile, techQs, persQs, orientMods, careerQs, test2Heading, testTitle) {
+        const el = document.getElementById('tabContent');
+        if (!el) return;
+        const sh = vwShared();
+        const blocks = buildTestSummaryBlocks(techQs, persQs, orientMods, careerQs, test2Heading);
+        const summaryInner =
+            sh && sh.buildQuizSummaryHtml
+                ? sh.buildQuizSummaryHtml(blocks, savedQuizAnswersMap, esc, {
+                      lead: 'Тест сохранён. Разбор — на вкладке «Разбор».',
+                  })
+                : '<p class="muted">Тест пройден.</p>';
+        const spheres = schema.interest_spheres || [];
+        let sphereLabel = '';
+        if (savedTestInterest) {
+            for (let i = 0; i < spheres.length; i++) {
+                if (String(spheres[i].id) === String(savedTestInterest)) {
+                    sphereLabel = spheres[i].label || savedTestInterest;
+                    break;
+                }
+            }
+        }
+        el.innerHTML =
+            '<h2>' + esc(testTitle || 'Профориентационный тест') + '</h2>' +
+            (sphereLabel
+                ? '<p class="muted" style="margin:0 0 12px">Сфера теста: <strong>' + esc(sphereLabel) + '</strong></p>'
+                : '') +
+            '<div class="profile-shell"><div class="profile-card profile-complete">' +
+            summaryInner +
+            '<div class="profile-complete-actions">' +
+            '<button type="button" class="btn-secondary" id="btnTestOpenAnalysis">Открыть разбор</button>' +
+            '<button type="button" class="btn-secondary" id="btnTestRetake">Пройти заново</button>' +
+            '</div></div></div>';
+        document.getElementById('btnTestOpenAnalysis').onclick = async function () {
+            currentTab = 'analysis';
+            await renderShell();
+        };
+        const btnRetake = document.getElementById('btnTestRetake');
+        if (btnRetake && !btnRetake.dataset.bound) {
+            btnRetake.dataset.bound = '1';
+            btnRetake.onclick = async function () {
+                testForceWizard = true;
+                quizState.answers = Object.assign({}, savedQuizAnswersMap);
+                if (savedTestInterest) testSphereSelection = savedTestInterest;
+                await renderTestTab();
+            };
+        }
     }
 
     function startProfileOnboarding() {
@@ -3651,7 +3872,15 @@
                 profileDraft.course_grade = val;
             },
             onEducationChange: function (val) {
+                const prev =
+                    sh.questionnaireAudience &&
+                    sh.questionnaireAudience(profileDraft.education_detail);
                 profileDraft.education_detail = val;
+                const next = sh.questionnaireAudience && sh.questionnaireAudience(val);
+                if (prev && next && prev !== next) {
+                    profileWizardStep = 0;
+                    renderProfileTab();
+                }
             },
         });
         if (sh.wireEducationDetailForCourseGrade) {
@@ -3661,7 +3890,15 @@
                     profileDraft.course_grade = val;
                 },
                 onEducationChange: function (val) {
+                    const prev =
+                        sh.questionnaireAudience &&
+                        sh.questionnaireAudience(profileDraft.education_detail);
                     profileDraft.education_detail = val;
+                    const next = sh.questionnaireAudience && sh.questionnaireAudience(val);
+                    if (prev && next && prev !== next) {
+                        profileWizardStep = 0;
+                        renderProfileTab();
+                    }
                 },
             });
         }
@@ -3672,6 +3909,24 @@
         const res = await fetchJson('/api/profile/schema');
         profileSchema = await res.json();
         return profileSchema;
+    }
+
+    function effectiveProfileSchema(schema, profileOrEdu) {
+        const sh = vwShared();
+        if (!sh || !sh.resolveProfileSchema) return schema;
+        let edu = profileOrEdu;
+        if (edu && typeof edu === 'object') edu = edu.education_detail;
+        if (!edu) edu = profileDraft.education_detail || '';
+        return sh.resolveProfileSchema(schema, edu);
+    }
+
+    function wizardProfileSections(schema, profile) {
+        const eff = effectiveProfileSchema(schema, profile || profileDraft);
+        return (eff.sections || []).filter(function (sec) {
+            return (sec.fields || []).some(function (f) {
+                return f.type !== 'hidden';
+            });
+        });
     }
 
     function optionsFromSphere(schema, field) {
@@ -3710,13 +3965,13 @@
                 } else if (f.type === 'multiselect') {
                     const arr = Array.isArray(v) ? v : [];
                     if (arr.length) {
-                        if (f.id === 'interest_spheres') {
+                        if (f.id === 'interest_spheres' || f.id === 'favorite_subjects') {
                             try {
-                                out.interest_spheres = JSON.stringify(arr);
+                                out[f.id] = JSON.stringify(arr);
                             } catch (e) {
-                                out.interest_spheres = arr.join(',');
+                                out[f.id] = arr.join(',');
                             }
-                            out.main_sphere = arr[0];
+                            if (f.id === 'interest_spheres') out.main_sphere = arr[0];
                         } else {
                             out[f.id] = arr.join(',');
                         }
@@ -3837,7 +4092,7 @@
 
     function syncProfileDraftFromCurrentStep(schema, stepIdx) {
         const root = document.getElementById('profileFormRoot');
-        const sec = (schema.sections || [])[stepIdx];
+        const sec = wizardProfileSections(schema, profileDraft)[stepIdx];
         if (!root || !sec) return;
         const fields = sec.fields || [];
         for (let fi = 0; fi < fields.length; fi++) {
@@ -3871,7 +4126,7 @@
 
     function validateWizardStep(schema, stepIdx) {
         syncProfileDraftFromCurrentStep(schema, stepIdx);
-        const sec = (schema.sections || [])[stepIdx];
+        const sec = wizardProfileSections(schema, profileDraft)[stepIdx];
         if (!sec || sec.optional) return true;
         const fields = sec.fields || [];
         for (let fi = 0; fi < fields.length; fi++) {
@@ -3969,7 +4224,7 @@
                 renderProfileSummaryView(schema, profile);
                 return;
             }
-            const sections = schema.sections || [];
+            const sections = wizardProfileSections(schema, profileDraft);
             if (profileWizardStep < 0) profileWizardStep = 0;
             if (profileWizardStep >= sections.length) profileWizardStep = Math.max(0, sections.length - 1);
             const sec = sections[profileWizardStep];
@@ -3991,7 +4246,10 @@
                 if (f.type === 'hidden') continue;
                 let val = profileDraft[f.id];
                 if (f.id === 'interest_spheres') val = parseProfileSpheres(profileDraft);
-                else if (f.type === 'multiselect' && typeof val === 'string') {
+                else if (f.id === 'favorite_subjects') {
+                    const sh = vwShared();
+                    val = sh && sh.parseFavoriteSubjects ? sh.parseFavoriteSubjects(profileDraft) : [];
+                } else if (f.type === 'multiselect' && typeof val === 'string') {
                     val = val.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
                 }
                 html += renderFieldHtml(schema, f, val);
@@ -4094,13 +4352,29 @@
             data.questions && data.questions.length
                 ? data.questions
                 : quizState.technical.concat(quizState.personality);
-        quizState.answers = {};
+        const newExpected = Array.isArray(data.expected_question_ids)
+            ? data.expected_question_ids.map(function (id) { return parseInt(id, 10); })
+            : quizState.questions.map(function (q) { return q.id; });
+        const prevExpected = quizState.expectedQuestionIds || [];
+        const sameExpected =
+            prevExpected.length === newExpected.length &&
+            prevExpected.every(function (id, i) { return id === newExpected[i]; });
+        quizState.expectedQuestionIds = newExpected;
+        if (!sameExpected) {
+            const kept = {};
+            newExpected.forEach(function (qid) {
+                if (quizState.answers[qid] != null) kept[qid] = quizState.answers[qid];
+            });
+            quizState.answers = kept;
+        }
     }
 
     async function renderTestTab() {
         const el = document.getElementById('tabContent');
         el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
         try {
+            if (!analysisCheckDone) await refreshAnalysisFlag();
+            if (hasSavedAnalysis) await fetchSavedQuizAnswers();
             const schema = await ensureSchema();
             const pres = await fetchJson('/profile/' + encodeURIComponent(userId));
             let profile = normalizeProfileDraftFromServer(await pres.json(), schema);
@@ -4116,8 +4390,11 @@
             cachedProfile = Object.assign({}, profile);
             profileFetchDone = true;
             if (testSphereSelection == null) {
-                const sp = parseProfileSpheres(profile);
-                testSphereSelection = (sp[0] || profile.main_sphere || '').trim() || 'other';
+                if (savedTestInterest) testSphereSelection = savedTestInterest;
+                else {
+                    const sp = parseProfileSpheres(profile);
+                    testSphereSelection = (sp[0] || profile.main_sphere || '').trim() || 'other';
+                }
             }
             await loadQuiz(testSphereSelection);
             const qs = quizState.questions;
@@ -4170,7 +4447,18 @@
                 };
                 return;
             }
+            const orientMods = (quizState.modules || []).filter(function (m) {
+                return m && m.id && m.id !== 'sphere' && (m.questions || []).length;
+            });
+            const careerQs = persQs.filter(function (q) {
+                return q.module === 'career' || q.block === 'career';
+            });
             const jobSearch = quizState.assessmentFocus === 'job_search';
+            const test2Heading = jobSearch
+                ? 'Тест 2 — роль, должность и выход на работу'
+                : orientMods.length > 1
+                  ? 'Тест 2 — профориентация (несколько блоков)'
+                  : 'Тест 2 — интересы и тип среды';
             const testTitle = quizState.trackLabel
                 ? (jobSearch ? 'Тест: ' : 'Профориентационный тест (') +
                   quizState.trackLabel +
@@ -4181,14 +4469,22 @@
             const trackHintBanner = quizState.trackHint
                 ? '<p class="quiz-track-hint">' + esc(quizState.trackHint) + '</p>'
                 : '';
-            const orientMods = (quizState.modules || []).filter(function (m) {
-                return m && m.id && m.id !== 'sphere' && (m.questions || []).length;
-            });
-            const test2Heading = jobSearch
-                ? 'Тест 2 — роль, должность и выход на работу'
-                : orientMods.length > 1
-                  ? 'Тест 2 — профориентация (несколько блоков)'
-                  : 'Тест 2 — интересы и тип среды';
+            if (shouldShowTestSummary()) {
+                renderTestSummaryView(
+                    schema,
+                    profile,
+                    techQs,
+                    persQs,
+                    orientMods,
+                    careerQs,
+                    test2Heading,
+                    testTitle
+                );
+                return;
+            }
+            if (testForceWizard && Object.keys(savedQuizAnswersMap).length) {
+                quizState.answers = Object.assign({}, savedQuizAnswersMap);
+            }
             let html =
                 '<h2>' + esc(testTitle) + '</h2>' +
                 warnBanner +
@@ -4255,9 +4551,6 @@
                         '<div class="section-title" style="margin-top:20px">Тест 1 — задачи в вашей сфере</div>' +
                         renderQuizQuestions(techQs);
                 }
-                const careerQs = persQs.filter(function (q) {
-                    return q.module === 'career' || q.block === 'career';
-                });
                 const hasBlock2 = orientMods.length || careerQs.length || (!orientMods.length && persQs.length);
                 if (!hasBlock2) return out;
                 out +=
@@ -4304,11 +4597,15 @@
                 };
             });
             document.getElementById('btnSubmitQuiz').onclick = async function () {
+                const expectedIds =
+                    quizState.expectedQuestionIds && quizState.expectedQuestionIds.length
+                        ? quizState.expectedQuestionIds
+                        : qs.map(function (q) { return q.id; });
                 const answers = [];
-                for (let i = 0; i < qs.length; i++) {
-                    const qid = qs[i].id;
+                for (let i = 0; i < expectedIds.length; i++) {
+                    const qid = expectedIds[i];
                     if (!quizState.answers[qid]) {
-                        showAppAlert('Ответьте на все вопросы.', 'Тест');
+                        showAppAlert('Ответьте на все вопросы (' + expectedIds.length + ').', 'Тест');
                         return;
                     }
                     answers.push({ question_id: qid, choice: quizState.answers[qid] });
@@ -4335,10 +4632,14 @@
                     cachedAnalysisUserId = userId;
                     hasSavedAnalysis = true;
                     analysisCheckDone = true;
-                    showAppAlert('Разбор готов — откройте вкладку «Разбор».', 'Готово', async function () {
-                        currentTab = 'analysis';
-                        await renderShell();
+                    testForceWizard = false;
+                    savedQuizAnswersMap = {};
+                    answers.forEach(function (a) {
+                        savedQuizAnswersMap[a.question_id] = a.choice;
                     });
+                    savedTestInterest = quizState.interest || testSphereSelection || null;
+                    await renderTestTab();
+                    showAppAlert('Тест сохранён. Разбор — на вкладке «Разбор».', 'Готово');
                 } catch (e) {
                     showAppAlert(String(e.message || e), 'Ошибка');
                     await renderTestTab();
