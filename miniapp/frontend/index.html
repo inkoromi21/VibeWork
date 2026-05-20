@@ -3,22 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <meta name="vibework-build" content="20260520-miniapp-bottom-tabs">
+    <meta name="vibework-build" content="20260520-miniapp-site-design">
     <script>
     (function () {
+        document.documentElement.setAttribute('data-miniapp', '1');
         /** Сброс inline --* с documentElement (их выставляет Telegram Mini App), иначе они сильнее CSS тёмной темы. */
         function vwClearInlineThemeOverrides() {
             var root = document.documentElement;
             [
-                '--bg-page', '--card', '--text', '--text-muted', '--border',
-                '--btn-anketa-bg', '--btn-anketa-bg-hover', '--btn-anketa-bg-selected', '--accent-soft',
+                '--bg-page', '--bg-card', '--card', '--text', '--text-muted', '--muted', '--border',
+                '--green', '--green-soft', '--btn-anketa-bg', '--btn-anketa-bg-hover', '--btn-anketa-bg-selected', '--accent-soft',
             ].forEach(function (p) {
                 root.style.removeProperty(p);
             });
         }
         window.__vwClearTgLightInline = vwClearInlineThemeOverrides;
         try {
-            if (localStorage.getItem('vw_theme') === 'dark') {
+            var dark =
+                localStorage.getItem('vw_theme') === 'dark' ||
+                localStorage.getItem('vibework_theme') === 'dark';
+            if (dark) {
                 document.documentElement.setAttribute('data-theme', 'dark');
                 vwClearInlineThemeOverrides();
             }
@@ -45,6 +49,7 @@
                 try {
                     var wantDark =
                         localStorage.getItem('vw_theme') === 'dark' ||
+                        localStorage.getItem('vibework_theme') === 'dark' ||
                         document.documentElement.getAttribute('data-theme') === 'dark';
                     if (wantDark) {
                         if (window.__vwClearTgLightInline) window.__vwClearTgLightInline();
@@ -52,15 +57,19 @@
                     }
                 } catch (e) {}
                 var root = document.documentElement;
-                root.style.setProperty('--bg-page', '#ffffff');
+                root.style.setProperty('--bg-page', '#f0f2f5');
+                root.style.setProperty('--bg-card', '#ffffff');
                 root.style.setProperty('--card', '#ffffff');
-                root.style.setProperty('--text', '#000000');
-                root.style.setProperty('--text-muted', '#4a4a4a');
-                root.style.setProperty('--border', '#dbdada');
-                root.style.setProperty('--btn-anketa-bg', '#ecfdf5');
-                root.style.setProperty('--btn-anketa-bg-hover', '#d1fae5');
-                root.style.setProperty('--btn-anketa-bg-selected', '#d1fae5');
-                root.style.setProperty('--accent-soft', 'rgba(34, 197, 94, 0.14)');
+                root.style.setProperty('--text', '#1a1d21');
+                root.style.setProperty('--text-muted', '#5c6370');
+                root.style.setProperty('--muted', '#5c6370');
+                root.style.setProperty('--border', '#e2e5eb');
+                root.style.setProperty('--green', '#22a954');
+                root.style.setProperty('--green-soft', '#e8f7ed');
+                root.style.setProperty('--btn-anketa-bg', '#e8f7ed');
+                root.style.setProperty('--btn-anketa-bg-hover', '#d8f3e0');
+                root.style.setProperty('--btn-anketa-bg-selected', '#e8f7ed');
+                root.style.setProperty('--accent-soft', 'rgba(34, 169, 84, 0.14)');
             }
             window.__vwForceTgLightContent = forceLightMiniAppContentOnly;
             forceLightMiniAppContentOnly();
@@ -76,119 +85,68 @@
     <link rel="apple-touch-icon" href="/static/favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Roboto:wght@400;500&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/miniapp-shell.css">
     <style>
-        /* Акцент: яркий изумрудный зелёный — заметно, но не «радиоактивный» неон */
-        :root {
-            --neon: #22c55e;
-            --neon-deep: #16a34a;
-            --neon-rgb: 34, 197, 94;
-            --accent: #22c55e;
-            --accent-dark: #166534;
-            --accent-lime: #4ade80;
-            --accent-wave: #15803d;
-            --accent-soft: rgba(var(--neon-rgb), 0.14);
-            --accent-border: rgba(var(--neon-rgb), 0.42);
+        /* Токены страницы — из /static/style.css; здесь только алиасы legacy-миниаппа */
+        html[data-miniapp] {
+            --neon: var(--green);
+            --neon-deep: var(--green-dark);
+            --neon-rgb: 34, 169, 84;
+            --accent: var(--green);
+            --accent-dark: var(--green-dark);
+            --accent-lime: var(--green);
+            --accent-wave: var(--green-dark);
+            --accent-soft: var(--green-soft);
+            --accent-border: var(--green-border);
             --field-glow: none;
-            --field-outline: #22c55e;
-            --bg-page: #ffffff;
-            --card: #ffffff;
-            --text: #000000;
-            --text-muted: #4a4a4a;
-            --border: #dbdada;
-            --danger: #ac3e46;
-            --radius: 16px;
-            --radius-lg: 22px;
+            --field-outline: var(--green);
+            --card: var(--bg-card);
+            --text-muted: var(--muted);
             --radius-sm: 10px;
             --radius-field: 7px;
             --radius-cta: 40px;
-            --shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
-            --shadow-card: 0 2px 20px -4px rgba(0, 0, 0, 0.06), 0 4px 24px rgba(0, 0, 0, 0.05);
-            --font: "Open Sans", system-ui, sans-serif;
-            --font-input: "Roboto", system-ui, sans-serif;
-            --font-mono: "JetBrains Mono", ui-monospace, monospace;
+            --font-input: var(--font);
+            --font-mono: var(--mono);
             --sidebar-w: 240px;
-            /* Кнопки: без теней (как в финальных макетах) */
             --btn-glow: none;
             --btn-glow-hover: none;
             --btn-glow-soft: none;
             --btn-glow-selected: none;
-            /* Единый стиль как «Выйти»: мятный фон + зелёная обводка; без сплошной заливки */
-            --btn-anketa-bg: #ecfdf5;
-            --btn-anketa-bg-hover: #d1fae5;
-            /* Выбрано / активно — чуть насыщеннее мяты + тёмная обводка */
-            --btn-anketa-bg-selected: #d1fae5;
-            --btn-primary-border: #15803d;
-            --btn-anketa-border: rgba(var(--neon-rgb), 0.48);
-            --btn-anketa-border-strong: #22c55e;
+            --btn-anketa-bg: var(--green-soft);
+            --btn-anketa-bg-hover: color-mix(in srgb, var(--green-soft) 70%, var(--bg-card));
+            --btn-anketa-bg-selected: var(--green-soft);
+            --btn-primary-border: var(--green-dark);
+            --btn-anketa-border: var(--green-border);
+            --btn-anketa-border-strong: var(--green);
             --btn-anketa-radius: 999px;
-            --wave-strip-bg: #ffffff;
-            --chat-log-bg: #fafbfc;
-            --chip-pill-bg: #ecfdf5;
-            --plan-bar-bg: #eef0f4;
-            --account-chip-active-color: #064e3b;
-            --pill-fg: #133526;
-            --banner-warn-bg: #fff7ed;
-            --banner-warn-border: #fdba74;
-            --banner-warn-text: #9a3412;
+            --wave-strip-bg: var(--bg-page);
+            --chat-log-bg: var(--chat-thread-bg, var(--surface-muted));
+            --chip-pill-bg: var(--green-soft);
+            --plan-bar-bg: var(--progress-track);
+            --account-chip-active-color: var(--green-dark);
+            --pill-fg: var(--green-dark);
             --auth-error-bg: #fff1f2;
             --auth-error-border: #fecdd3;
-            --chat-history-frame-bg: #f0fdf4;
-            --chat-history-details-border: rgba(20, 82, 20, 0.35);
-            --chat-history-inner-bg: rgba(255, 255, 255, 0.88);
-            --chat-history-list-bg: rgba(255, 255, 255, 0.55);
-            --vw-overlay-bg: rgba(255, 255, 255, 0.94);
-            --placeholder-color: rgba(0, 0, 0, 0.45);
-            --vw-bottom-nav-h: 58px;
+            --chat-history-frame-bg: var(--green-soft);
+            --chat-history-details-border: var(--green-border);
+            --chat-history-inner-bg: color-mix(in srgb, var(--bg-card) 88%, transparent);
+            --chat-history-list-bg: color-mix(in srgb, var(--bg-card) 55%, transparent);
+            --vw-overlay-bg: color-mix(in srgb, var(--bg-card) 94%, transparent);
+            --placeholder-color: color-mix(in srgb, var(--muted) 65%, transparent);
+            --vw-bottom-nav-h: var(--bottom-nav-h, 64px);
         }
 
-        html[data-theme="dark"] {
-            color-scheme: dark;
-            --neon: #4ade80;
-            --neon-deep: #4ade80;
-            --accent-dark: #86efac;
-            --accent-lime: #bbf7d0;
-            --accent-wave: #22c55e;
-            --neon-rgb: 74, 222, 128;
-            --accent: #4ade80;
-            --field-outline: #4ade80;
-            --bg-page: #0f1419;
-            --card: #1a222d;
-            --text: #e8eaed;
-            --text-muted: #94a3b8;
-            --border: #2d3d52;
-            --danger: #f87171;
-            --shadow: 0 2px 20px rgba(0, 0, 0, 0.45);
-            --shadow-card: 0 4px 28px rgba(0, 0, 0, 0.5);
-            --accent-soft: rgba(74, 222, 128, 0.14);
-            --accent-border: rgba(74, 222, 128, 0.38);
-            --btn-anketa-bg: rgba(34, 197, 94, 0.12);
-            --btn-anketa-bg-hover: rgba(34, 197, 94, 0.22);
-            --btn-anketa-bg-selected: rgba(34, 197, 94, 0.26);
-            --btn-primary-border: #4ade80;
-            --btn-anketa-border: rgba(74, 222, 128, 0.45);
-            --btn-anketa-border-strong: #4ade80;
-            --wave-strip-bg: #1a222d;
-            --chat-log-bg: #121820;
-            --chip-pill-bg: rgba(34, 197, 94, 0.16);
-            --plan-bar-bg: #243044;
-            --account-chip-active-color: #bbf7d0;
-            --pill-fg: #dcfce7;
-            --banner-warn-bg: #3d2e1a;
-            --banner-warn-border: #d97706;
-            --banner-warn-text: #fcd34d;
+        html[data-miniapp][data-theme="dark"] {
+            --neon-rgb: 61, 216, 122;
             --auth-error-bg: #3d1a22;
             --auth-error-border: #fb7185;
-            --chat-history-frame-bg: rgba(34, 197, 94, 0.1);
-            --chat-history-details-border: rgba(74, 222, 128, 0.35);
-            --chat-history-inner-bg: rgba(26, 34, 45, 0.92);
-            --chat-history-list-bg: rgba(15, 20, 28, 0.75);
-            --vw-overlay-bg: rgba(15, 20, 25, 0.92);
-            --placeholder-color: rgba(232, 234, 237, 0.42);
+            --vw-overlay-bg: color-mix(in srgb, var(--bg-page) 92%, transparent);
         }
 
-        html[data-theme="dark"] body::before {
-            background: radial-gradient(ellipse 55% 42% at 100% 100%, rgba(74, 222, 128, 0.07), transparent 52%);
+        html[data-miniapp] body::before {
+            display: none;
         }
 
         html[data-theme="dark"] .topbar-profile-hint {
@@ -2213,12 +2171,14 @@
             root.setAttribute('data-theme', 'dark');
             try {
                 localStorage.setItem(THEME_STORAGE_KEY, 'dark');
+                localStorage.setItem('vibework_theme', 'dark');
             } catch (e) {}
             if (window.__vwClearTgLightInline) window.__vwClearTgLightInline();
         } else {
             root.removeAttribute('data-theme');
             try {
                 localStorage.setItem(THEME_STORAGE_KEY, 'light');
+                localStorage.removeItem('vibework_theme');
             } catch (e) {}
             if (window.__vwForceTgLightContent) window.__vwForceTgLightContent();
         }
@@ -2297,7 +2257,7 @@
 
     let userId = localStorage.getItem('userId');
     let authMode = 'login';
-    let currentTab = 'home';
+    let currentTab = 'profile';
     let profileSchema = null;
     let profileDraft = {};
     let profileWizardStep = 0;
@@ -2553,7 +2513,6 @@
     /** Короткая подпись для нижней панели (узкий экран / Mini App). */
     function bottomNavShortLabel(tabId) {
         const m = {
-            home: 'Меню',
             profile: 'Анкета',
             test: 'Тест',
             analysis: 'Разбор',
@@ -2564,15 +2523,36 @@
         return m[tabId] || '—';
     }
 
+    const MINIAPP_BG_HTML =
+        '<div class="miniapp-bg" aria-hidden="true"><div class="miniapp-bg-waves">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 720" preserveAspectRatio="xMidYMid slice" fill="none">' +
+        '<g stroke="#22a954" stroke-width="1.15" stroke-linecap="round">' +
+        '<path d="M-80 300c200-48 400 48 600 0s400-48 600 0 400 48 600 0"/>' +
+        '<path d="M-80 326c220 52 420-52 640 0s380 52 600 0 420-52 640 0"/>' +
+        '<path d="M-80 352c180-40 380 40 560 0s420-40 600 0 420 40 600 0"/>' +
+        '<path d="M-80 378c240 44 440-44 680 0s360 44 560 0 440-44 680 0"/>' +
+        '<path d="M-80 404c160-36 360 36 520 0s440-36 600 0 440 36 600 0"/>' +
+        '<path d="M-80 430c210 40 410-40 620 0s390 40 580 0 410-40 620 0"/>' +
+        '</g></svg></div></div>';
+
+    const MINIAPP_WAVE_STRIP_HTML =
+        '<div class="vw-wave-strip" aria-hidden="true"><div class="vw-wave-strip-inner">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 120" preserveAspectRatio="none" fill="none">' +
+        '<g stroke="#22a954" stroke-width="1.15" stroke-linecap="round" opacity="0.42">' +
+        '<path d="M-80 40c200-12 400 12 600 0s400-12 600 0 400 12 600 0"/>' +
+        '<path d="M-80 58c220 14 420-14 640 0s380 14 600 0 420-14 640 0"/>' +
+        '<path d="M-80 76c180-10 380 10 560 0s420-10 600 0 420 10 600 0"/>' +
+        '</g></svg></div></div>';
+
     function buildBottomNavHtml() {
-        const tabs = [HOME_TAB].concat(SECTION_TABS);
+        const tabs = SECTION_TABS;
         let h =
-            '<nav class="vw-bottom-nav" role="navigation" aria-label="Разделы приложения">';
+            '<nav class="bottom-nav" role="navigation" aria-label="Разделы приложения">';
         for (let i = 0; i < tabs.length; i++) {
             const t = tabs[i];
             const active = currentTab === t.id ? ' is-active' : '';
             h +=
-                '<button type="button" class="vw-bottom-tab' +
+                '<button type="button" class="bottom-tab' +
                 active +
                 '" data-vw-tab="' +
                 esc(t.id) +
@@ -2581,9 +2561,9 @@
                 ' aria-label="' +
                 esc(t.label) +
                 '">' +
-                '<span class="vw-bt-ico" aria-hidden="true">' +
+                '<span class="bt-ico" aria-hidden="true">' +
                 t.ico +
-                '</span><span class="vw-bt-label">' +
+                '</span><span class="bt-label">' +
                 esc(bottomNavShortLabel(t.id)) +
                 '</span></button>';
         }
@@ -2592,9 +2572,9 @@
     }
 
     function wireBottomNavTabs() {
-        document.querySelectorAll('.vw-bottom-tab[data-vw-tab]').forEach(function (btn) {
+        document.querySelectorAll('.bottom-tab[data-vw-tab], .vw-bottom-tab[data-vw-tab]').forEach(function (btn) {
             btn.onclick = async function () {
-                currentTab = btn.getAttribute('data-vw-tab') || 'home';
+                currentTab = btn.getAttribute('data-vw-tab') || 'profile';
                 await renderShell();
             };
         });
@@ -2975,6 +2955,7 @@
     function renderAuthForm() {
         const isReg = authMode === 'register';
         document.getElementById('app').innerHTML =
+            MINIAPP_BG_HTML +
             '<div class="layout layout--auth">' +
             themeToggleAuthHtml() +
             '<div style="text-align:center;margin-bottom:8px"><span class="brand-mono">{ VibeWork }</span></div>' +
@@ -3150,7 +3131,7 @@
             if (sh && sh.setNewAccountOnboardingFlag) sh.setNewAccountOnboardingFlag();
             startProfileOnboarding();
         } else {
-            currentTab = 'home';
+            currentTab = 'profile';
         }
         await renderShell();
     }
@@ -3192,7 +3173,7 @@
             cachedProfile = {};
             profileFetchDone = false;
         }
-        const disp = displayUserPillText();
+        if (currentTab === 'home') currentTab = 'profile';
         const tabMeta = getTabById(currentTab);
         const isHome = currentTab === 'home';
         const topLeft = isHome
@@ -3216,23 +3197,11 @@
               '<path fill="currentColor" d="M12 5.25l6.75 6.75H15v7H9v-7H5.25L12 5.25z"/>' +
               '</svg></button>'
             : '';
-        const vwWaveStrip =
-            '<div class="vw-wave-strip" aria-hidden="true"><div class="vw-wave-strip-inner">' +
-            '<svg class="vw-wave-svg" viewBox="0 0 393 151" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" focusable="false">' +
-            '<defs>' +
-            '<linearGradient id="vwWaveFill" x1="0" y1="0" x2="0" y2="151" gradientUnits="userSpaceOnUse">' +
-            '<stop offset="0%" stop-color="#22c55e"/>' +
-            '<stop offset="55%" stop-color="#4ade80"/>' +
-            '<stop offset="100%" stop-color="#6ee7b7"/>' +
-            '</linearGradient>' +
-            '</defs>' +
-            '<rect width="393" height="151" fill="var(--wave-strip-bg)"/>' +
-            '<path fill="url(#vwWaveFill)" fill-rule="evenodd" clip-rule="evenodd" d="M393 151L376.625 132.125C360.25 113.25 327.5 75.5 294.75 72.3542C262 69.2083 229.25 100.667 196.5 122.688C163.75 144.708 131 157.292 98.25 141.563C65.5 125.833 32.75 81.7917 16.375 59.7708L0 37.75V0H393V151Z"/>' +
-            '</svg></div></div>';
         document.getElementById('app').innerHTML =
+            MINIAPP_BG_HTML +
             '<div class="layout layout--full">' +
             '<div class="main-col">' +
-            vwWaveStrip +
+            MINIAPP_WAVE_STRIP_HTML +
             '<header class="topbar">' +
             topLeft +
             '<div class="topbar-chips">' +
@@ -6421,7 +6390,7 @@
             profileFetchDone = false;
             profileDraftSessionUser = null;
             if (vwShared() && vwShared().rememberActiveUserId) vwShared().rememberActiveUserId(data.user_id);
-            currentTab = 'home';
+            currentTab = 'profile';
             sessionCheckedThisPage = false;
             return true;
         } catch (e) {

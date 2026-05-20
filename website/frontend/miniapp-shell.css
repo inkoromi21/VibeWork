@@ -1,0 +1,506 @@
+/**
+ * Mini App (/miniapp/) — визуал как у сайта (website/frontend/style.css),
+ * плюс фиксированная волна сверху и нижняя панель вкладок.
+ */
+html[data-miniapp] {
+  --text-muted: var(--muted);
+  --card: var(--bg-card);
+  --accent: var(--green);
+  --accent-dark: var(--green-dark);
+  --accent-soft: var(--green-soft);
+  --accent-border: var(--green-border);
+  --neon: var(--green);
+  --neon-deep: var(--green-dark);
+  --neon-rgb: 34, 169, 84;
+  --wave-strip-bg: var(--bg-page);
+  --vw-bottom-nav-h: var(--bottom-nav-h, 64px);
+  --font: "Inter", system-ui, -apple-system, sans-serif;
+  --font-input: var(--font);
+  --font-mono: var(--mono);
+  --btn-anketa-bg: var(--green-soft);
+  --btn-anketa-bg-hover: color-mix(in srgb, var(--green-soft) 70%, var(--bg-card));
+  --btn-anketa-bg-selected: var(--green-soft);
+  --btn-anketa-border-strong: var(--green-border);
+  --btn-primary-border: var(--green-dark);
+  --chip-pill-bg: var(--green-soft);
+  --placeholder-color: color-mix(in srgb, var(--muted) 65%, transparent);
+}
+
+html[data-theme="dark"][data-miniapp] {
+  --neon-rgb: 61, 216, 122;
+}
+
+html[data-miniapp],
+html[data-miniapp] body {
+  font-family: var(--font);
+  background: var(--bg-page);
+  color: var(--text);
+}
+
+html[data-miniapp] body::before {
+  display: none;
+}
+
+/* Фоновые волны как на сайте */
+#app .miniapp-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+#app .miniapp-bg-waves {
+  position: absolute;
+  inset: -8% -12%;
+  mask-image: linear-gradient(to bottom, black 0%, black 38%, rgba(0, 0, 0, 0.5) 70%, transparent 96%);
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, black 38%, rgba(0, 0, 0, 0.5) 70%, transparent 96%);
+}
+
+#app .miniapp-bg-waves svg {
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  display: block;
+}
+
+#app .miniapp-bg-waves g {
+  opacity: 0.38;
+}
+
+#app .layout {
+  position: relative;
+  z-index: 1;
+}
+
+#app .layout--full {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+}
+
+#app .main-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Волна сверху (компактная, линии как на сайте) */
+#app .vw-wave-strip {
+  position: relative;
+  flex-shrink: 0;
+  height: 72px;
+  overflow: hidden;
+  background: var(--bg-page);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+}
+
+#app .vw-wave-strip-inner {
+  position: absolute;
+  inset: -20% -8%;
+}
+
+#app .vw-wave-strip svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#app .vw-wave-strip g {
+  stroke: var(--green);
+}
+
+html[data-theme="dark"] #app .vw-wave-strip g {
+  stroke: var(--green);
+  opacity: 0.45;
+}
+
+/* Шапка как main-topbar на сайте */
+#app header.topbar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.05rem 1.25rem 1.1rem;
+  background: color-mix(in srgb, var(--bg-card) 62%, transparent);
+  backdrop-filter: saturate(150%) blur(16px);
+  -webkit-backdrop-filter: saturate(150%) blur(16px);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  box-shadow:
+    0 4px 28px rgba(0, 0, 0, 0.06),
+    0 1px 0 color-mix(in srgb, var(--green) 12%, transparent) inset;
+}
+
+#app header.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--green) 45%, transparent) 22%,
+    color-mix(in srgb, var(--green) 25%, transparent) 50%,
+    color-mix(in srgb, var(--green) 45%, transparent) 78%,
+    transparent 100%
+  );
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+#app .topbar-left {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
+#app .topbar-titles {
+  padding-left: 0.75rem;
+  border-left: 2px solid color-mix(in srgb, var(--green) 50%, transparent);
+  min-width: 0;
+}
+
+#app .topbar-titles h1 {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+#app .topbar-titles .dynamic-tagline,
+#app .topbar-titles .tagline {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  font-style: italic;
+  color: color-mix(in srgb, var(--muted) 92%, var(--green-dark));
+  max-width: 46ch;
+}
+
+#app .brand-mono {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+#app .chip-pill {
+  font-size: 0.72rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--green-soft);
+  border: 1px solid var(--green-border);
+  color: var(--green-dark);
+  font-family: var(--mono);
+}
+
+#app .account-chip-btn {
+  border-radius: 999px;
+  border: 1px solid var(--green-border);
+  background: var(--green-soft);
+  color: var(--green-dark);
+  font-family: var(--font);
+}
+
+#app .account-chip-btn:hover,
+#app .account-chip-btn.is-active {
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--green-soft) 80%, var(--bg-card));
+}
+
+#app .btn-auth.btn-auth-ghost {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  border-radius: 10px;
+  margin-top: 0;
+}
+
+#app .btn-auth.btn-auth-ghost:hover {
+  border-color: var(--green-border);
+  color: var(--green-dark);
+  background: var(--green-soft);
+}
+
+/* Контент */
+#app .shell {
+  flex: 1;
+  padding: 1.25rem 1.25rem calc(1.25rem + var(--vw-bottom-nav-h) + env(safe-area-inset-bottom, 0px));
+  overflow-x: hidden;
+}
+
+#app .shell.shell--hub {
+  max-width: min(920px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Карточки как на сайте */
+#app .profile-card,
+#app .status,
+#app .chat-card,
+#app .job-card,
+#app .sim-card,
+#app .about-you-panel,
+#app .analysis-block,
+#app .vw-msg-shell {
+  background: var(--bg-card);
+  border: 1px solid var(--green-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+#app .profile-card {
+  padding: 1.35rem 1.25rem;
+}
+
+#app .section-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: left;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+}
+
+#app .section-title:first-child {
+  border-top: none;
+}
+
+/* Кнопки как .btn на сайте */
+#app button.btn-primary,
+#app .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 10px;
+  border: 1px solid var(--green);
+  background: var(--green);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+#app button.btn-primary:hover:not(:disabled),
+#app .btn-primary:hover:not(:disabled) {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  box-shadow: 0 6px 20px rgba(34, 169, 84, 0.35);
+  color: #fff;
+}
+
+#app .btn-secondary,
+#app a.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: none;
+}
+
+#app .btn-secondary:hover {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--text);
+}
+
+#app .hub-card {
+  border: 1px solid var(--green-border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+#app .hub-card:hover {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+
+/* Поля ввода как на сайте */
+#app input:not([type="range"]),
+#app textarea,
+#app select {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  margin: 0.35rem 0 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-elevated, var(--bg-card));
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  box-shadow: none;
+}
+
+#app input:not([type="range"]):focus,
+#app textarea:focus,
+#app select:focus {
+  border-color: var(--green-border);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 18%, transparent);
+}
+
+#app label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 0.65rem;
+}
+
+#app p.muted,
+#app .muted {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+#app .banner-warn {
+  background: var(--banner-warn-bg);
+  border: 1px solid var(--banner-warn-border);
+  color: var(--banner-warn-text);
+  border-radius: 12px;
+}
+
+#app .quiz-item,
+#app .quiz-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+}
+
+#app .radio-opt {
+  border-radius: 10px;
+}
+
+#app .radio-opt:has(input:checked) {
+  border-color: var(--green-border);
+  background: var(--green-soft);
+}
+
+/* Нижняя панель — всегда видна в мини-апп */
+#app .bottom-nav,
+#app .vw-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 55;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.5rem 0.55rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  background: color-mix(in srgb, var(--bg-card) 82%, transparent);
+  backdrop-filter: saturate(160%) blur(18px);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+  border-top: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.08);
+}
+
+#app .bottom-tab,
+#app .vw-bottom-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  border: none;
+  border-radius: 14px;
+  padding: 0.5rem 0.35rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.2s, color 0.2s;
+}
+
+#app .bottom-tab.is-active,
+#app .vw-bottom-tab.is-active {
+  color: var(--green-dark);
+  background: var(--green-soft);
+}
+
+#app .bt-ico,
+#app .vw-bt-ico {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+#app .vw-scroll-top {
+  bottom: calc(max(14px, env(safe-area-inset-bottom, 0px)) + var(--vw-bottom-nav-h) + 8px);
+  border: 1px solid var(--green-border);
+  background: var(--bg-card);
+  color: var(--green-dark);
+  box-shadow: var(--shadow-card);
+}
+
+/* Экран входа как auth-gate на сайте */
+#app .layout--auth {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1.5rem, env(safe-area-inset-bottom));
+  background: transparent;
+  align-items: center;
+  justify-content: center;
+}
+
+#app .layout--auth .auth-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 2rem 1.75rem;
+  border-radius: 28px;
+  background: var(--auth-card-bg, color-mix(in srgb, var(--bg-card) 88%, transparent));
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--auth-card-border, var(--border));
+  box-shadow: var(--shadow);
+}
+
+#app .layout--auth .auth-card h2 {
+  text-align: center;
+  font-size: 1.2rem;
+  letter-spacing: 0.04em;
+}
+
+#app .layout--auth button.btn-primary {
+  width: 100%;
+  margin-top: 0.75rem;
+  border-radius: 12px;
+}
+
+#app .theme-toggle {
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border-radius: 999px;
+}
