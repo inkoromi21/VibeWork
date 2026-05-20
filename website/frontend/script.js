@@ -540,10 +540,39 @@ function renderSheetField(f) {
 let profileWizardStep = 0;
 let profileWizardWired = false;
 
+const WIZARD_SECTION_THEMES = {
+  pain: "Ваша ситуация",
+  base: "Личные данные",
+  interests: "Предпочтения",
+  skills_hard: "Навыки",
+  skills_soft: "Личные качества",
+  experience: "Опыт",
+  goals: "Цели",
+  extra: "Дополнительно",
+};
+
+const PAIN_WIZARD_QUESTION = "Что сейчас больше всего мешает?";
+
 function wizardSectionItems() {
   return schemaSections()
     .map((sec, schemaIdx) => ({ sec, schemaIdx }))
     .filter(({ sec }) => (sec.fields || []).some((f) => f.type !== "hidden"));
+}
+
+function sectionTheme(sec) {
+  const id = sec?.id;
+  if (id && WIZARD_SECTION_THEMES[id]) {
+    return String(sec?.theme || WIZARD_SECTION_THEMES[id]).trim();
+  }
+  return String(sec?.theme || sec?.title || "").trim();
+}
+
+function sectionWizardPrompt(sec) {
+  if (sec?.id === "pain") {
+    const t = String(sec?.title || "").trim();
+    return t || PAIN_WIZARD_QUESTION;
+  }
+  return String(sec?.prompt || "").trim();
 }
 
 function renderSheetSectionHtml(sec, stepIndex) {
@@ -559,7 +588,7 @@ function renderSheetSectionHtml(sec, stepIndex) {
       ? `<p class="sheet-section-sub muted small">${esc(sec.subtitle)}</p>`
       : "";
   const hidden = stepIndex === 0 ? "" : " hidden";
-  return `<section class="sheet-section profile-wizard-step"${hidden} data-wizard-step="${stepIndex}" data-section="${esc(sec.id || "")}"><div class="sheet-section-head"><h3 class="sheet-section-title">${esc(sec.title)}</h3>${opt}</div>${sub}<div class="sheet-section-body">${fields}</div></section>`;
+  return `<section class="sheet-section profile-wizard-step"${hidden} data-wizard-step="${stepIndex}" data-section="${esc(sec.id || "")}" data-section-theme="${esc(sectionTheme(sec))}"><div class="sheet-section-head"><h3 class="sheet-section-title">${esc(sectionTheme(sec))}</h3>${opt}</div>${sub}<div class="sheet-section-body">${fields}</div></section>`;
 }
 
 function wireSheetFieldListeners(root) {
@@ -647,12 +676,29 @@ function showProfileWizardStep(step) {
   const prog = document.getElementById("profile-wizard-progress");
   const title = document.getElementById("profile-wizard-title");
   const item = wizardSectionItems()[profileWizardStep];
-  if (label) label.textContent = `Шаг ${profileWizardStep + 1} из ${total}`;
+  if (label) label.textContent = `Этап ${profileWizardStep + 1} из ${total}`;
   if (prog) {
     prog.max = total;
     prog.value = profileWizardStep + 1;
   }
-  if (title && item) title.textContent = item.sec.title || "";
+  const activeStep = steps[profileWizardStep];
+  const themeText =
+    activeStep?.dataset?.sectionTheme || (item ? sectionTheme(item.sec) : "");
+  if (title) {
+    title.hidden = false;
+    title.textContent = themeText;
+  }
+  const promptEl = document.getElementById("profile-wizard-prompt");
+  const promptText = item ? sectionWizardPrompt(item.sec) : "";
+  if (promptEl) {
+    if (promptText) {
+      promptEl.textContent = promptText;
+      promptEl.hidden = false;
+    } else {
+      promptEl.textContent = "";
+      promptEl.hidden = true;
+    }
+  }
   const prev = document.getElementById("btn-profile-prev");
   const next = document.getElementById("btn-profile-next");
   if (prev) prev.hidden = profileWizardStep === 0;
@@ -685,7 +731,7 @@ function wireProfileWizardNav() {
     }
     if (!profileBasicsOk()) {
       showProfileWizardErr(
-        "Проверьте обязательные поля во всех блоках (база, интересы, цели). Вернитесь к шагам «Назад»."
+        "Проверьте обязательные поля во всех блоках (база, интересы, цели). Вернитесь к этапам «Назад»."
       );
       return;
     }
@@ -709,11 +755,12 @@ function renderSheetProfileFromSchema() {
     <div class="profile-wizard">
       <div class="profile-wizard-bar">
         <div class="profile-wizard-bar-top">
-          <span id="profile-wizard-label">Шаг 1 из ${items.length}</span>
+          <span id="profile-wizard-label">Этап 1 из ${items.length}</span>
           <span id="profile-wizard-title" class="profile-wizard-title"></span>
         </div>
         <progress id="profile-wizard-progress" class="profile-wizard-progress" max="${items.length}" value="1"></progress>
       </div>
+      <p id="profile-wizard-prompt" class="wizard-step-question profile-wizard-prompt" hidden></p>
       <div class="profile-wizard-steps">${stepsHtml}</div>
       <div class="profile-wizard-nav">
         <button type="button" class="btn ghost" id="btn-profile-prev" hidden>Назад</button>

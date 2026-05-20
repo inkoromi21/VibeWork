@@ -138,30 +138,8 @@ def get_profile_schema() -> Dict[str, Any]:
         },
         "sections": [
             {
-                "id": "pain",
-                "title": "Что сейчас больше всего мешает?",
-                "optional": True,
-                "fields": [
-                    {
-                        "id": "primary_pain",
-                        "type": "select",
-                        "label": "",
-                        "required": False,
-                        "options": [
-                            {"id": "pain_career", "label": "Не знаю, кем стать"},
-                            {"id": "pain_no_exp", "label": "Нет опыта — не возьмут"},
-                            {"id": "pain_region", "label": "Мало вакансий в моём городе"},
-                            {"id": "pain_money_courses", "label": "Нет денег на курсы"},
-                            {"id": "pain_interview", "label": "Боюсь собеседований"},
-                            {"id": "pain_overload", "label": "Слишком много информации"},
-                            {"id": "pain_low_confidence", "label": "Кажется, что ничего не умею"},
-                            {"id": "pain_gap_skills", "label": "Умею многое, но работу не дают"},
-                        ],
-                    },
-                ],
-            },
-            {
                 "id": "base",
+                "theme": "Личные данные",
                 "title": "Базовые данные",
                 "fields": [
                     {
@@ -238,7 +216,32 @@ def get_profile_schema() -> Dict[str, Any]:
                 ],
             },
             {
+                "id": "pain",
+                "theme": "Ваша ситуация",
+                "title": "Что сейчас больше всего мешает?",
+                "optional": True,
+                "fields": [
+                    {
+                        "id": "primary_pain",
+                        "type": "select",
+                        "label": "",
+                        "required": False,
+                        "options": [
+                            {"id": "pain_career", "label": "Не знаю, кем стать"},
+                            {"id": "pain_no_exp", "label": "Нет опыта — не возьмут"},
+                            {"id": "pain_region", "label": "Мало вакансий в моём городе"},
+                            {"id": "pain_money_courses", "label": "Нет денег на курсы"},
+                            {"id": "pain_interview", "label": "Боюсь собеседований"},
+                            {"id": "pain_overload", "label": "Слишком много информации"},
+                            {"id": "pain_low_confidence", "label": "Кажется, что ничего не умею"},
+                            {"id": "pain_gap_skills", "label": "Умею многое, но работу не дают"},
+                        ],
+                    },
+                ],
+            },
+            {
                 "id": "interests",
+                "theme": "Предпочтения",
                 "title": "Интересы и склонности",
                 "fields": [
                     {
@@ -304,6 +307,7 @@ def get_profile_schema() -> Dict[str, Any]:
             },
             {
                 "id": "skills_hard",
+                "theme": "Навыки",
                 "title": "Навыки (профессиональные)",
                 "subtitle": "Можно пропустить — заполните позже.",
                 "optional": True,
@@ -342,6 +346,7 @@ def get_profile_schema() -> Dict[str, Any]:
             },
             {
                 "id": "skills_soft",
+                "theme": "Личные качества",
                 "title": "Личные качества (1–5)",
                 "subtitle": "По умолчанию — середина шкалы.",
                 "optional": True,
@@ -398,6 +403,7 @@ def get_profile_schema() -> Dict[str, Any]:
             },
             {
                 "id": "experience",
+                "theme": "Опыт",
                 "title": "Опыт",
                 "subtitle": "Даже подработка и проекты — это плюс.",
                 "optional": True,
@@ -435,6 +441,7 @@ def get_profile_schema() -> Dict[str, Any]:
             },
             {
                 "id": "goals",
+                "theme": "Цели",
                 "title": "Цели и работа",
                 "fields": [
                     {
@@ -494,6 +501,7 @@ def get_profile_schema() -> Dict[str, Any]:
             },
             {
                 "id": "extra",
+                "theme": "Дополнительно",
                 "title": "Дополнительно",
                 "subtitle": "По желанию — для точнее разбора и чата.",
                 "optional": True,

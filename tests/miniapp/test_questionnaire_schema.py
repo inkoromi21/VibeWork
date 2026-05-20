@@ -53,6 +53,12 @@ def test_schema_has_product_blocks() -> None:
     section_ids = {s["id"] for s in schema.get("sections") or []}
     for sid in ("pain", "base", "interests", "skills_hard", "skills_soft", "experience", "goals", "extra"):
         assert sid in section_ids, sid
+    assert schema["sections"][0]["id"] == "base"
+
+
+def test_schema_sections_have_theme() -> None:
+    for sec in get_profile_schema().get("sections") or []:
+        assert (sec.get("theme") or "").strip(), sec.get("id")
 
 
 def test_interest_spheres_multiselect() -> None:
