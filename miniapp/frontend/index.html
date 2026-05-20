@@ -2563,6 +2563,9 @@
         if (!d.course_grade && d.course_or_grade != null && d.course_or_grade !== '') {
             d.course_grade = String(d.course_or_grade);
         }
+        if (String(d.education_detail || '').trim() === 'graduate' && !String(d.course_grade || '').trim()) {
+            d.course_grade = 'выпускник';
+        }
         const sections = (schema && schema.sections) || [];
         for (let si = 0; si < sections.length; si++) {
             const fields = sections[si].fields || [];
@@ -2572,6 +2575,8 @@
                 if (d[f.id] == null || d[f.id] === '') d[f.id] = f.default != null ? f.default : 3;
             }
         }
+        const sh = vwShared();
+        if (sh && sh.normalizeProfileForCompletion) return sh.normalizeProfileForCompletion(d);
         return d;
     }
 
@@ -2584,6 +2589,8 @@
 
     function profileFieldFilled(profile, fieldId) {
         if (!profile) return false;
+        const sh = vwShared();
+        if (sh && sh.isProfileFieldFilled) return sh.isProfileFieldFilled(profile, fieldId);
         if (fieldId === 'interest_spheres') return parseProfileSpheres(profile).length > 0;
         if (fieldId === 'course_grade') {
             return profileValueFilled(profile.course_grade) || profileValueFilled(profile.course_or_grade);
@@ -2682,6 +2689,8 @@
 
     function isProfileComplete(schema, profile) {
         if (!schema || !profile) return false;
+        const sh = vwShared();
+        if (sh && sh.isProfileCompleteCheck) return sh.isProfileCompleteCheck(schema, profile);
         const p = normalizeProfileDraftFromServer(profile, schema);
         const comp = schema.completion;
         if (comp && comp.required) {
@@ -2785,8 +2794,8 @@
     let sessionCheckedThisPage = false;
 
     function clearAuth() {
-        const __prevUid = localStorage.getItem('userId');
-        if (__prevUid) localStorage.removeItem('vw_chat_session_' + __prevUid);
+        const prevUidForCleanup = userId || localStorage.getItem('userId');
+        if (prevUidForCleanup) localStorage.removeItem('vw_chat_session_' + prevUidForCleanup);
         chatSessionId = null;
         chatMessages = [];
         localStorage.removeItem('userId');
@@ -2800,14 +2809,15 @@
             }
             keys.forEach(function (k) { localStorage.removeItem(k); });
         } catch (e) { /* */ }
+        if (prevUidForCleanup && vwShared() && vwShared().clearProfileDraftForUser) {
+            vwShared().clearProfileDraftForUser(prevUidForCleanup);
+        }
+        if (vwShared() && vwShared().rememberActiveUserId) {
+            vwShared().rememberActiveUserId(null);
+        }
         userId = null;
         sessionCheckedThisPage = false;
-        testSphereSelection = null;
-        cachedProfile = {};
-        profileFetchDone = false;
-        profileDraft = {};
-        profileWizardStep = 0;
-        profileDraftSessionUser = null;
+        resetProfileStateForAccountSwitch();
         hasSavedAnalysis = false;
         analysisCheckDone = false;
         clearAnalysisCache();
@@ -3013,9 +3023,17 @@
             window.location.href = data.redirect || '/admin';
             return;
         }
+        const prevUid = userId || localStorage.getItem('userId') || '';
+        const nextUid = data.user_id;
+        if (!data.onboarding && (!prevUid || prevUid !== nextUid)) {
+            resetProfileStateForAccountSwitch();
+        }
         localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
         localStorage.setItem('userId', data.user_id);
         localStorage.setItem(USER_EMAIL_KEY, data.email || email);
+        if (vwShared() && vwShared().rememberActiveUserId) {
+            vwShared().rememberActiveUserId(nextUid);
+        }
         userId = data.user_id;
         profileFetchDone = false;
         profileDraftSessionUser = null;
@@ -3383,15 +3401,25 @@
         }
     }
 
+    function resetProfileStateForAccountSwitch() {
+        profileDraft = {};
+        cachedProfile = {};
+        profileFetchDone = false;
+        profileDraftSessionUser = null;
+        profileWizardStep = 0;
+        profileForceWizard = false;
+        testSphereSelection = null;
+        quizState.answers = {};
+        quizState.modules = [];
+        quizState.trackLabel = '';
+        quizState.trackHint = '';
+    }
+
     function startProfileOnboarding() {
         const sh = vwShared();
         if (sh && sh.clearNewAccountOnboardingFlag) sh.clearNewAccountOnboardingFlag();
+        resetProfileStateForAccountSwitch();
         profileForceWizard = true;
-        profileWizardStep = 0;
-        profileDraft = {};
-        profileDraftSessionUser = null;
-        cachedProfile = {};
-        profileFetchDone = false;
         currentTab = 'profile';
     }
 
@@ -3505,6 +3533,9 @@
                 out.interest_spheres = spheres.join(',');
             }
             out.main_sphere = spheres[0];
+        }
+        if (String(draft.education_detail || '').trim() === 'graduate' && !String(out.course_grade || '').trim()) {
+            out.course_grade = 'выпускник';
         }
         return out;
     }
@@ -3776,6 +3807,7 @@
             const btnSave = document.getElementById('btnSaveProfile');
             if (btnSave) {
                 btnSave.onclick = async function () {
+                    syncProfileDraftFromCurrentStep(schema, profileWizardStep);
                     if (!validateWizardStep(schema, profileWizardStep)) {
                         showAppAlert('Заполните обязательные поля на этом шаге.', 'Анкета');
                         return;
@@ -3848,7 +3880,16 @@
         try {
             const schema = await ensureSchema();
             const pres = await fetchJson('/profile/' + encodeURIComponent(userId));
-            const profile = normalizeProfileDraftFromServer(await pres.json(), schema);
+            let profile = normalizeProfileDraftFromServer(await pres.json(), schema);
+            if (
+                profileDraftSessionUser === userId &&
+                profileDraft &&
+                Object.keys(profileDraft).length &&
+                !isProfileComplete(schema, profile) &&
+                isProfileComplete(schema, profileDraft)
+            ) {
+                profile = normalizeProfileDraftFromServer(Object.assign({}, profile, profileDraft), schema);
+            }
             cachedProfile = Object.assign({}, profile);
             profileFetchDone = true;
             if (testSphereSelection == null) {
@@ -6215,10 +6256,14 @@
                 return {};
             });
             if (!data.access_token || !data.user_id) return false;
+            const prevTg = userId || localStorage.getItem('userId') || '';
+            if (prevTg && prevTg !== data.user_id) resetProfileStateForAccountSwitch();
             localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
             localStorage.setItem('userId', data.user_id);
             userId = data.user_id;
             profileFetchDone = false;
+            profileDraftSessionUser = null;
+            if (vwShared() && vwShared().rememberActiveUserId) vwShared().rememberActiveUserId(data.user_id);
             currentTab = 'home';
             sessionCheckedThisPage = false;
             return true;
@@ -6238,7 +6283,12 @@
             if (!res.ok) return false;
             const data = await res.json().catch(function () { return {}; });
             if (!data.ok || !data.user_id) return false;
+            if (uid !== data.user_id) {
+                resetProfileStateForAccountSwitch();
+                profileFetchDone = false;
+            }
             userId = data.user_id;
+            localStorage.setItem('userId', data.user_id);
             if (data.email) localStorage.setItem(USER_EMAIL_KEY, data.email);
             return true;
         } catch (e) {

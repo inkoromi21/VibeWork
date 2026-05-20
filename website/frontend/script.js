@@ -7,7 +7,67 @@ window.serverLoggedIn = false;
 window.serverEmail = null;
 window.serverNickname = null;
 window.serverUserId = null;
+/** Последний user_id с сервера — чтобы сбрасывать черновик анкеты при смене аккаунта. */
+let _lastAuthUserId = null;
 let chatMessages = [];
+
+function getProfileDraftStorageKey() {
+  const uid = window.serverUserId;
+  const sh = window.VibeWorkShared;
+  if (sh && sh.profileDraftKey && uid) return sh.profileDraftKey(uid);
+  return STORAGE_PROFILE_DRAFT;
+}
+
+function clearProfileFormFields() {
+  const form = document.getElementById("diag-form");
+  if (!form) return;
+  form.reset();
+  document.querySelectorAll("input.sheet-multi[type=checkbox]").forEach((cb) => {
+    cb.checked = false;
+  });
+  document.querySelectorAll("select[data-sheet-field], textarea[data-sheet-field]").forEach((el) => {
+    el.value = "";
+  });
+  document.querySelectorAll('input[type="number"][data-sheet-field], input[type="text"][data-sheet-field]').forEach((el) => {
+    if (!el.classList.contains("sheet-multi")) el.value = "";
+  });
+  document.querySelectorAll('input[type="radio"][data-sheet-field]').forEach((el) => {
+    el.checked = false;
+  });
+  syncEducationFromDetail();
+}
+
+/** Смена аккаунта: не показываем анкету предыдущего пользователя из localStorage/DOM. */
+function handleAuthUserSwitch(userId, snapshot) {
+  const sh = window.VibeWorkShared;
+  profileForceWizard = false;
+  sheetProfileRendered = false;
+  if (sh) {
+    if (_lastAuthUserId && _lastAuthUserId !== userId) sh.clearProfileDraftForUser(_lastAuthUserId);
+    sh.clearLegacyProfileDraft();
+    sh.rememberActiveUserId(userId || null);
+  } else {
+    try {
+      localStorage.removeItem(STORAGE_PROFILE_DRAFT);
+    } catch (_) {}
+  }
+  const prof = snapshot?.profile;
+  const hasProf = prof && typeof prof === "object" && Object.keys(prof).length > 0;
+  if (hasProf) {
+    applyProfileToForm(prof);
+    try {
+      localStorage.setItem(getProfileDraftStorageKey(), JSON.stringify({ sheet: prof }));
+    } catch (_) {}
+  } else {
+    clearProfileFormFields();
+    try {
+      localStorage.removeItem(getProfileDraftStorageKey());
+    } catch (_) {}
+  }
+  refreshProfilePanelMode();
+  updateFlowUI();
+  updateAvatarBubble();
+}
 const MICRO_TIPS = [
   "Один мини-проект в портфолио ценнее десяти «почти начал».",
   "Спросите у знакомого на 15 минут разбор резюме — свежий взгляд бесценен.",
@@ -888,7 +948,15 @@ function wireProfileWizardNav() {
     profileForceWizard = false;
     saveProfileDraft();
     debouncedQuizReload();
+    schedulePushServerSnapshot();
+    if (saveProfileDraftTimer) {
+      clearTimeout(saveProfileDraftTimer);
+      saveProfileDraftTimer = null;
+      saveProfileDraft();
+    }
+    pushServerSnapshot().catch(() => {});
     renderProfileSummaryView();
+    updateFlowUI();
   });
 }
 
@@ -941,6 +1009,8 @@ function buildProfileForCompletion() {
 }
 
 function fieldFilledClient(p, fieldId) {
+  const sh = window.VibeWorkShared;
+  if (sh && sh.isProfileFieldFilled) return sh.isProfileFieldFilled(p, fieldId);
   const v = p[fieldId];
   if (fieldId === "interest_spheres") {
     if (Array.isArray(v) && v.length) return true;
@@ -1189,20 +1259,35 @@ function normalizeProfilePayload(sheet) {
 
 function profilePayloadForCompletion() {
   if (document.querySelector("[data-sheet-field]")) {
+    const sh = window.VibeWorkShared;
+    if (sh && sh.normalizeProfileForCompletion) {
+      return sh.normalizeProfileForCompletion(buildProfileForCompletion());
+    }
     return buildProfileForCompletion();
   }
   try {
-    const raw = localStorage.getItem(STORAGE_PROFILE_DRAFT);
+    const raw = localStorage.getItem(getProfileDraftStorageKey());
     if (!raw) return {};
     const draft = JSON.parse(raw);
     const sheet = draft?.sheet && typeof draft.sheet === "object" ? draft.sheet : {};
-    return normalizeProfilePayload(sheet);
+    const merged = { ...sheet };
+    if (draft.age != null && merged.age == null) merged.age = draft.age;
+    if (draft.education && !merged.education_detail) merged.education = draft.education;
+    const sh = window.VibeWorkShared;
+    if (sh && sh.normalizeProfileForCompletion) {
+      return sh.normalizeProfileForCompletion(normalizeProfilePayload(merged));
+    }
+    return normalizeProfilePayload(merged);
   } catch (_) {
     return {};
   }
 }
 
 function profileBasicsOkFromPayload(p) {
+  const sh = window.VibeWorkShared;
+  if (sh && sh.isProfileCompleteCheck && PROFILE_SCHEMA) {
+    return sh.isProfileCompleteCheck(PROFILE_SCHEMA, p);
+  }
   const comp = PROFILE_SCHEMA?.completion;
   if (!comp) return false;
   for (const fid of comp.required || []) {
@@ -1215,22 +1300,7 @@ function profileBasicsOkFromPayload(p) {
 }
 
 function profileBasicsOk() {
-  if (document.querySelector("[data-sheet-field]")) {
-    const edu = document.getElementById("field-education-sync");
-    if (edu && !String(edu.value || "").trim()) return false;
-    return profileBasicsOkFromPayload(buildProfileForCompletion());
-  }
-  try {
-    const raw = localStorage.getItem(STORAGE_PROFILE_DRAFT);
-    if (!raw) return false;
-    const draft = JSON.parse(raw);
-    const sheet = draft?.sheet && typeof draft.sheet === "object" ? draft.sheet : {};
-    const edu = String(draft?.education || "").trim();
-    if (!edu && !String(sheet.education_detail || "").trim()) return false;
-    return profileBasicsOkFromPayload(normalizeProfilePayload(sheet));
-  } catch (_) {
-    return false;
-  }
+  return profileBasicsOkFromPayload(profilePayloadForCompletion());
 }
 
 function shouldShowProfileSummary() {
@@ -1786,13 +1856,13 @@ function applyProfileToForm(p) {
 function saveProfileDraft() {
   try {
     const p = collectProfileFields();
-    if (p) localStorage.setItem(STORAGE_PROFILE_DRAFT, JSON.stringify(p));
+    if (p) localStorage.setItem(getProfileDraftStorageKey(), JSON.stringify(p));
   } catch (_) {}
 }
 
 function loadProfileDraft() {
   try {
-    const raw = localStorage.getItem(STORAGE_PROFILE_DRAFT);
+    const raw = localStorage.getItem(getProfileDraftStorageKey());
     if (!raw) return;
     applyProfileToForm(JSON.parse(raw));
   } catch (_) {}
@@ -1928,7 +1998,8 @@ function startProfileOnboarding() {
 function resetClientStateForNewAccount() {
   try {
     localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(STORAGE_PROFILE_DRAFT);
+    localStorage.removeItem(getProfileDraftStorageKey());
+    if (window.VibeWorkShared) window.VibeWorkShared.clearLegacyProfileDraft();
     localStorage.removeItem("vibework_focus_streak_v2");
     localStorage.removeItem("vibework_streak_demo_v1");
     localStorage.removeItem("vibework_last_tab");
@@ -2227,15 +2298,23 @@ async function refreshAuthState() {
     const r = await fetch("/api/auth/me", { credentials: "include" });
     const j = await r.json();
     if (j.authenticated) {
+      const uid = j.user_id || null;
       window.serverLoggedIn = true;
       window.serverEmail = j.email || "";
       window.serverNickname = j.nickname || null;
-      window.serverUserId = j.user_id || null;
+      window.serverUserId = uid;
       updateAuthPanel();
-      applyServerSnapshot(j.snapshot || {});
+      if (uid !== _lastAuthUserId) {
+        handleAuthUserSwitch(uid, j.snapshot || {});
+        _lastAuthUserId = uid;
+      } else {
+        applyServerSnapshot(j.snapshot || {});
+      }
       return j;
     }
   } catch (_) {}
+  if (_lastAuthUserId) handleAuthUserSwitch(null, null);
+  _lastAuthUserId = null;
   window.serverLoggedIn = false;
   window.serverEmail = null;
   window.serverNickname = null;
@@ -2251,7 +2330,7 @@ function saveResult(data, analyzePayload = null) {
       STORAGE_KEY,
       JSON.stringify({ savedAt: Date.now(), data, profile, analyzePayload })
     );
-    if (profile) localStorage.setItem(STORAGE_PROFILE_DRAFT, JSON.stringify(profile));
+    if (profile) localStorage.setItem(getProfileDraftStorageKey(), JSON.stringify(profile));
     schedulePushServerSnapshot();
   } catch (_) {}
 }
@@ -3478,11 +3557,21 @@ document.getElementById("btn-auth-logout").addEventListener("click", async () =>
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem("userId");
     localStorage.removeItem("userEmail");
+    if (window.VibeWorkShared) {
+      if (_lastAuthUserId) window.VibeWorkShared.clearProfileDraftForUser(_lastAuthUserId);
+      window.VibeWorkShared.clearLegacyProfileDraft();
+      window.VibeWorkShared.rememberActiveUserId(null);
+    }
+    localStorage.removeItem(STORAGE_PROFILE_DRAFT);
   } catch (_) {}
+  _lastAuthUserId = null;
+  profileForceWizard = false;
   window.serverLoggedIn = false;
   window.serverEmail = null;
   window.serverNickname = null;
   window.serverUserId = null;
+  clearProfileFormFields();
+  refreshProfilePanelMode();
   const pw = document.getElementById("auth-password");
   if (pw) pw.value = "";
   updateAuthPanel();

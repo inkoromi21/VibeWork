@@ -5,6 +5,42 @@
     'use strict';
 
     var NEW_ACCOUNT_FLAG = 'vibework_new_account';
+    var PROFILE_DRAFT_LEGACY = 'vibework_profile_draft_v1';
+    var PROFILE_DRAFT_PREFIX = 'vibework_profile_draft_v1_';
+    var ACTIVE_USER_KEY = 'vibework_active_user_id';
+
+    function profileDraftKey(userId) {
+        if (!userId) return PROFILE_DRAFT_LEGACY;
+        return PROFILE_DRAFT_PREFIX + String(userId);
+    }
+
+    function clearLegacyProfileDraft() {
+        try {
+            localStorage.removeItem(PROFILE_DRAFT_LEGACY);
+        } catch (e) {}
+    }
+
+    function clearProfileDraftForUser(userId) {
+        try {
+            if (userId) localStorage.removeItem(profileDraftKey(userId));
+            clearLegacyProfileDraft();
+        } catch (e) {}
+    }
+
+    function rememberActiveUserId(userId) {
+        try {
+            if (userId) localStorage.setItem(ACTIVE_USER_KEY, String(userId));
+            else localStorage.removeItem(ACTIVE_USER_KEY);
+        } catch (e) {}
+    }
+
+    function readActiveUserId() {
+        try {
+            return localStorage.getItem(ACTIVE_USER_KEY) || '';
+        } catch (e) {
+            return '';
+        }
+    }
 
     function courseGradeOptionsForEducation(eduDetail) {
         var d = String(eduDetail || '').trim();
@@ -114,6 +150,10 @@
                 if (hooks.onChange) hooks.onChange(sel.value);
             });
         }
+        if (opts.length === 1) {
+            sel.value = opts[0].v;
+            if (hooks.onChange) hooks.onChange(sel.value);
+        }
     }
 
     function wireEducationDetailForCourseGrade(root, hooks) {
@@ -210,6 +250,93 @@
         } catch (e) {}
     }
 
+    function parseInterestSpheres(profile) {
+        if (!profile) return [];
+        const raw = profile.interest_spheres;
+        if (!raw) {
+            return profile.main_sphere ? [String(profile.main_sphere)] : [];
+        }
+        if (Array.isArray(raw)) return raw.filter(Boolean);
+        const s = String(raw).trim();
+        if (!s) return profile.main_sphere ? [String(profile.main_sphere)] : [];
+        if (s.charAt(0) === '[') {
+            try {
+                const arr = JSON.parse(s);
+                if (Array.isArray(arr)) return arr.map(String).filter(Boolean);
+            } catch (e) {}
+        }
+        return s
+            .split(',')
+            .map(function (x) {
+                return x.trim();
+            })
+            .filter(Boolean);
+    }
+
+    function normalizeProfileForCompletion(profile) {
+        const p = Object.assign({}, profile || {});
+        if (!String(p.course_grade || '').trim() && p.course_or_grade != null && p.course_or_grade !== '') {
+            p.course_grade = String(p.course_or_grade).trim();
+        }
+        if (!String(p.work_format_preference || '').trim()) {
+            const wfp = p.work_format_pref;
+            if (Array.isArray(wfp) && wfp.length) p.work_format_preference = String(wfp[0]).trim();
+            else if (typeof wfp === 'string' && wfp.trim()) p.work_format_preference = wfp.split(',')[0].trim();
+        }
+        if (!String(p.education_detail || '').trim() && String(p.education_level || '').trim()) {
+            p.education_detail = String(p.education_level).trim();
+        }
+        if (!String(p.like_to_do || '').trim() && String(p.interests || '').trim()) {
+            p.like_to_do = String(p.interests).trim();
+        }
+        return p;
+    }
+
+    function valueFilled(v) {
+        if (v == null || v === '') return false;
+        if (typeof v === 'number') return !isNaN(v);
+        if (typeof v === 'string') return !!v.trim();
+        return true;
+    }
+
+    function isProfileFieldFilled(profile, fieldId) {
+        const p = normalizeProfileForCompletion(profile);
+        if (!p) return false;
+        if (fieldId === 'interest_spheres') {
+            return parseInterestSpheres(p).length > 0;
+        }
+        if (fieldId === 'course_grade') {
+            return valueFilled(p.course_grade) || valueFilled(p.course_or_grade);
+        }
+        if (fieldId === 'work_format_preference') {
+            return valueFilled(p.work_format_preference) || valueFilled(p.work_format_pref);
+        }
+        if (fieldId === 'education_detail') {
+            return valueFilled(p.education_detail) || valueFilled(p.education_level);
+        }
+        if (fieldId === 'like_to_do') {
+            return valueFilled(p.like_to_do) || valueFilled(p.interests);
+        }
+        return valueFilled(p[fieldId]);
+    }
+
+    function isProfileCompleteCheck(schema, profile) {
+        const p = normalizeProfileForCompletion(profile);
+        const comp = schema && schema.completion;
+        if (comp && comp.required && comp.required.length) {
+            for (let i = 0; i < comp.required.length; i++) {
+                if (!isProfileFieldFilled(p, comp.required[i])) return false;
+            }
+            const anyOf = comp.any_of || comp.anyOf || [];
+            for (let g = 0; g < anyOf.length; g++) {
+                const group = anyOf[g];
+                if (!group.some(function (fid) { return isProfileFieldFilled(p, fid); })) return false;
+            }
+            return true;
+        }
+        return false;
+    }
+
     function clearNewAccountOnboardingFlag() {
         try {
             localStorage.removeItem(NEW_ACCOUNT_FLAG);
@@ -223,6 +350,12 @@
 
     global.VibeWorkShared = {
         NEW_ACCOUNT_FLAG: NEW_ACCOUNT_FLAG,
+        PROFILE_DRAFT_LEGACY: PROFILE_DRAFT_LEGACY,
+        profileDraftKey: profileDraftKey,
+        clearLegacyProfileDraft: clearLegacyProfileDraft,
+        clearProfileDraftForUser: clearProfileDraftForUser,
+        rememberActiveUserId: rememberActiveUserId,
+        readActiveUserId: readActiveUserId,
         courseGradeOptionsForEducation: courseGradeOptionsForEducation,
         syncCourseGradeField: syncCourseGradeField,
         wireEducationDetailForCourseGrade: wireEducationDetailForCourseGrade,
@@ -230,5 +363,9 @@
         isNewAccountOnboarding: isNewAccountOnboarding,
         setNewAccountOnboardingFlag: setNewAccountOnboardingFlag,
         clearNewAccountOnboardingFlag: clearNewAccountOnboardingFlag,
+        normalizeProfileForCompletion: normalizeProfileForCompletion,
+        isProfileFieldFilled: isProfileFieldFilled,
+        isProfileCompleteCheck: isProfileCompleteCheck,
+        parseInterestSpheres: parseInterestSpheres,
     };
 })(typeof window !== 'undefined' ? window : this);
