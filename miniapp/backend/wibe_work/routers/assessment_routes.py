@@ -339,9 +339,20 @@ async def learning_progress_update(
     user_id: str, request: Request, body: LearningStepBody
 ):
     require_bearer_matches_user(request, user_id)
-    set_step_status(user_id, body.path_id.strip(), body.step_id.strip(), body.status.strip())
     snap = _load_analysis_snapshot(user_id)
     lp = (snap or {}).get("learning_path")
+    path_steps = (
+        list(lp.get("steps") or [])
+        if isinstance(lp, dict) and str(lp.get("path_id") or "") == body.path_id.strip()
+        else None
+    )
+    set_step_status(
+        user_id,
+        body.path_id.strip(),
+        body.step_id.strip(),
+        body.status.strip(),
+        steps=path_steps,
+    )
     if isinstance(lp, dict) and lp.get("steps") and str(lp.get("path_id") or "") == body.path_id.strip():
         from wibe_work.services.learning.engine import merge_learning_progress_in_snapshot
 

@@ -35,6 +35,11 @@ def test_miniapp_anydo_step_checkbox_not_full_width():
     assert ".anydo-step__check" in html
     assert "width: 22px !important" in html
     assert "flex: 1 1 auto" in html
+    assert "renderAnyDoSubsteps" in html
+    assert "anydo-substeps" in html
+    assert "data-storage-id" in html
+    assert "ensureSubstepsForStep" in html
+    assert "anydo-step__head" in html
 
 
 def test_reset_password_miniapp_back_link():

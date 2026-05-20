@@ -20,6 +20,7 @@ from wibe_work.services.learning.progress import (
     compute_metrics,
     get_progress_map,
 )
+from wibe_work.services.learning.substeps import attach_substeps_to_step
 
 
 def _infer_track(
@@ -182,17 +183,19 @@ def build_learning_path_payload(
             step_raw, sphere=sphere, track=track, signals=signals
         )
         steps_out.append(
-            {
-                "step_id": raw.get("id"),
-                "order": raw.get("order"),
-                "title": raw.get("title"),
-                "goal": raw.get("goal"),
-                "duration_hint": raw.get("duration_hint"),
-                "skills": raw.get("skills") or [],
-                "checkpoint": raw.get("goal"),
-                "resources": resources,
-                "status": "pending",
-            }
+            attach_substeps_to_step(
+                {
+                    "step_id": raw.get("id"),
+                    "order": raw.get("order"),
+                    "title": raw.get("title"),
+                    "goal": raw.get("goal"),
+                    "duration_hint": raw.get("duration_hint"),
+                    "skills": raw.get("skills") or [],
+                    "checkpoint": raw.get("goal"),
+                    "resources": resources,
+                    "status": "pending",
+                }
+            )
         )
 
     progress: Dict[str, str] = {}

@@ -2260,11 +2260,7 @@
             min-width: 0;
         }
         .anydo-step {
-            display: flex;
-            flex-direction: row;
-            flex-wrap: nowrap;
-            gap: 10px;
-            align-items: flex-start;
+            display: block;
             width: 100%;
             max-width: 100%;
             min-width: 0;
@@ -2274,6 +2270,20 @@
             border: 1px solid var(--border);
             background: var(--bg);
             transition: opacity 0.2s, border-color 0.2s;
+        }
+        .anydo-step__head {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            gap: 10px;
+            width: 100%;
+            min-width: 0;
+        }
+        .anydo-step__head-text {
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow-wrap: break-word;
+            word-break: normal;
         }
         .anydo-step.is-done {
             border-color: rgba(110, 231, 183, 0.35);
@@ -2306,14 +2316,6 @@
         .anydo-step.is-locked .anydo-step__check {
             cursor: not-allowed;
         }
-        .anydo-step__body {
-            flex: 1 1 auto;
-            min-width: 0;
-            width: auto;
-            max-width: 100%;
-            overflow-wrap: break-word;
-            word-break: normal;
-        }
         .anydo-step__title {
             font-size: 0.92rem;
             font-weight: 600;
@@ -2330,11 +2332,96 @@
         .anydo-step__goal {
             font-size: 0.82rem;
             color: var(--text-muted);
-            margin: 0 0 8px;
+            margin: 8px 0 0 32px;
             line-height: 1.45;
         }
-        .anydo-step__resources .learn-path-resource {
-            margin-top: 6px;
+        .anydo-substeps {
+            list-style: none;
+            margin: 10px 0 0;
+            padding: 0 0 0 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        .anydo-sub {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+        }
+        .anydo-sub.is-done {
+            border-color: rgba(110, 231, 183, 0.3);
+            opacity: 0.92;
+        }
+        .anydo-sub__check {
+            flex: 0 0 18px;
+            width: 18px !important;
+            min-width: 18px !important;
+            max-width: 18px !important;
+            height: 18px;
+            margin: 1px 0 0;
+            padding: 0 !important;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+        .anydo-sub__body {
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow-wrap: break-word;
+            word-break: normal;
+        }
+        .anydo-sub__row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 6px 10px;
+            margin: 0 0 4px;
+        }
+        .anydo-sub__title {
+            font-size: 0.84rem;
+            font-weight: 600;
+            line-height: 1.35;
+            margin: 0;
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+        .anydo-sub__kind {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin: 0 0 4px;
+        }
+        .anydo-sub__desc {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin: 0;
+            line-height: 1.4;
+        }
+        .anydo-sub__link {
+            flex: 0 0 auto;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--accent-dark);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .anydo-sub__link:hover {
+            text-decoration: underline;
+        }
+        .anydo-step .analysis-spoiler,
+        .anydo-step .learn-path-resource,
+        .anydo-step .analysis-block {
+            display: none !important;
         }
         .anydo-next-wrap {
             margin-top: 14px;
@@ -2759,7 +2846,7 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="/static/miniapp-shell.css?v=20260521-keyboard-chrome">
+    <link rel="stylesheet" href="/static/miniapp-shell.css?v=20260522-anydo-layout">
     <script src="/static/auth-password-toggle.js?v=20260521-mobile-ui-fix"></script>
 </head>
 <body>
@@ -2992,7 +3079,7 @@
 
     const HOME_TAB = { id: 'home', label: 'Разделы', ico: '☰' };
     const ACCOUNT_TAB = { id: 'account', label: 'Аккаунт', ico: '✦' };
-    const VW_BUILD = '20260521-keyboard-chrome';
+    const VW_BUILD = '20260522-anydo-layout';
     const SECTION_TABS = [
         { id: 'profile', label: 'Профиль', short: 'Анкета', snIco: '◇', ico: '📋' },
         { id: 'test', label: 'Тестирование', short: 'Тест', snIco: '☑', ico: '🎯' },
@@ -5925,6 +6012,95 @@
         return data.learning_path || null;
     }
 
+    function ensureSubstepsForStep(st) {
+        if (st.substeps && st.substeps.length) {
+            return st.substeps;
+        }
+        const subs = [];
+        const goal = String(st.goal || '').trim();
+        const resList = st.resources || [];
+        if (goal) {
+            subs.push({
+                sub_id: 'goal',
+                title: 'Понять цель этапа',
+                description: goal,
+                status: st.status || 'pending'
+            });
+        }
+        for (let ri = 0; ri < resList.length; ri++) {
+            const r = resList[ri];
+            subs.push({
+                sub_id: 'res' + ri,
+                title: r.title || 'Материал',
+                url: r.url || '',
+                kind: r.kind || '',
+                description: r.description || '',
+                provider: r.provider,
+                status: 'pending'
+            });
+        }
+        if (!subs.length) {
+            subs.push({
+                sub_id: 'main',
+                title: 'Выполнить этап',
+                description: goal,
+                status: st.status || 'pending'
+            });
+        }
+        return subs;
+    }
+
+    function renderAnyDoSubsteps(st, stepId, stepLocked) {
+        const subs = ensureSubstepsForStep(st);
+        if (!subs.length) {
+            return '';
+        }
+        let h = '<ul class="anydo-substeps">';
+        for (let i = 0; i < subs.length; i++) {
+            const sub = subs[i];
+            const subId = String(sub.sub_id != null ? sub.sub_id : i);
+            const subDone = (sub.status || '') === 'done';
+            const storageId = stepId + '__' + subId;
+            const showDesc =
+                sub.description &&
+                sub.sub_id !== 'goal' &&
+                String(sub.description).trim().length > 0 &&
+                String(sub.description).trim() !== String(st.goal || '').trim();
+            h +=
+                '<li class="anydo-sub' +
+                (subDone ? ' is-done' : '') +
+                '" data-sub-id="' +
+                esc(subId) +
+                '" data-storage-id="' +
+                esc(storageId) +
+                '">';
+            h +=
+                '<input type="checkbox" class="anydo-sub__check" aria-label="Отметить подшаг"' +
+                (subDone ? ' checked' : '') +
+                (stepLocked ? ' disabled' : '') +
+                ' />';
+            h += '<div class="anydo-sub__body">';
+            h += '<div class="anydo-sub__row">';
+            h += '<div class="anydo-sub__title">' + esc(sub.title || 'Подшаг') + '</div>';
+            if (sub.url) {
+                h +=
+                    '<a class="anydo-sub__link" href="' +
+                    esc(String(sub.url)) +
+                    '" target="_blank" rel="noopener">Открыть →</a>';
+            }
+            h += '</div>';
+            if (sub.kind) {
+                h += '<div class="anydo-sub__kind">' + esc(String(sub.kind)) + '</div>';
+            }
+            if (showDesc) {
+                h += '<p class="anydo-sub__desc">' + esc(String(sub.description)) + '</p>';
+            }
+            h += '</div></li>';
+        }
+        h += '</ul>';
+        return h;
+    }
+
     function renderLearningPathAnyDo(lp) {
         const pathId = String(lp.path_id || '');
         const steps = lp.steps || [];
@@ -5933,8 +6109,18 @@
         }
         const metrics = lp.metrics || {};
         const pct = metrics.coverage_percent != null ? metrics.coverage_percent : 0;
-        const doneN = metrics.completed_steps != null ? metrics.completed_steps : 0;
-        const total = metrics.total_steps != null ? metrics.total_steps : steps.length;
+        const doneN =
+            metrics.completed_substeps != null
+                ? metrics.completed_substeps
+                : metrics.completed_steps != null
+                  ? metrics.completed_steps
+                  : 0;
+        const total =
+            metrics.total_substeps != null
+                ? metrics.total_substeps
+                : metrics.total_steps != null
+                  ? metrics.total_steps
+                  : steps.length;
         const curIdx = metrics.current_step_index != null ? metrics.current_step_index : 0;
         let html =
             '<div class="anydo-path" id="anydoPath" data-path-id="' +
@@ -5955,7 +6141,7 @@
             esc(String(doneN)) +
             '</strong> из ' +
             esc(String(total)) +
-            '</span><span>Текущий этап: <strong>' +
+            ' подшагов</span><span>Текущий этап: <strong>' +
             esc(String(Math.min(curIdx + 1, total))) +
             '</strong></span></div></div>';
         html += '<ul class="anydo-steps">';
@@ -5978,28 +6164,33 @@
                 '" data-step-index="' +
                 si +
                 '">';
+            const subsList = ensureSubstepsForStep(st);
+            const hasGoalSub = subsList.some(function (s) {
+                return s.sub_id === 'goal';
+            });
+            html += '<div class="anydo-step__head">';
             html +=
                 '<input type="checkbox" class="anydo-step__check" aria-label="Отметить этап выполненным"' +
                 (isDone ? ' checked' : '') +
                 (isLocked ? ' disabled' : '') +
                 ' />';
-            html += '<div class="anydo-step__body">';
-            html += '<div class="anydo-step__title">' + esc(String(st.order || si + 1) + '. ' + (st.title || 'Шаг')) + '</div>';
+            html += '<div class="anydo-step__head-text">';
+            html +=
+                '<div class="anydo-step__title">' +
+                esc(String(st.order || si + 1) + '. ' + (st.title || 'Шаг')) +
+                '</div>';
             if (st.duration_hint) {
                 html += '<div class="anydo-step__meta">Срок: ' + esc(String(st.duration_hint)) + '</div>';
             }
-            if (st.goal) {
+            html += '</div></div>';
+            if (st.goal && !hasGoalSub) {
                 html += '<p class="anydo-step__goal">' + esc(String(st.goal)) + '</p>';
             }
-            const resList = st.resources || [];
-            if (resList.length) {
-                html += '<div class="anydo-step__resources">';
-                for (let ri = 0; ri < resList.length; ri++) {
-                    html += renderLearnResourceSpoiler(resList[ri], 'inline');
-                }
-                html += '</div>';
+            const subsHtml = renderAnyDoSubsteps(st, stepId, isLocked);
+            if (subsHtml) {
+                html += subsHtml;
             }
-            html += '</div></li>';
+            html += '</li>';
         }
         html += '</ul>';
         const curStep = steps[curIdx];
@@ -6029,6 +6220,33 @@
         const lp = d.learning_path || {};
         const steps = lp.steps || [];
 
+        wrap.querySelectorAll('.anydo-sub').forEach(function (row) {
+            const check = row.querySelector('.anydo-sub__check');
+            if (!check || check.disabled) return;
+            check.onchange = async function () {
+                const storageId = row.getAttribute('data-storage-id') || '';
+                if (!storageId || !pathId) return;
+                const wantDone = !!check.checked;
+                check.disabled = true;
+                try {
+                    const updated = await postLearningStepStatus(
+                        pathId,
+                        storageId,
+                        wantDone ? 'done' : 'pending'
+                    );
+                    if (updated && cachedAnalysisPayload) {
+                        cachedAnalysisPayload.learning_path = updated;
+                        d = cachedAnalysisPayload;
+                    }
+                    refreshPathStepsSubpanel(root, d);
+                } catch (e) {
+                    check.checked = !wantDone;
+                    alert(e.message || String(e));
+                    check.disabled = false;
+                }
+            };
+        });
+
         wrap.querySelectorAll('.anydo-step').forEach(function (row) {
             const check = row.querySelector('.anydo-step__check');
             if (!check || check.disabled) return;
@@ -6037,6 +6255,9 @@
                 if (!stepId || !pathId) return;
                 const wantDone = !!check.checked;
                 check.disabled = true;
+                row.querySelectorAll('.anydo-sub__check').forEach(function (c) {
+                    c.disabled = true;
+                });
                 try {
                     const updated = await postLearningStepStatus(
                         pathId,

@@ -53,7 +53,9 @@ def test_school_learning_path_has_subject_steps() -> None:
     assert "sub_informatics" in ids
     assert "school_sphere_probe" in ids
     assert all(s.get("title") and s.get("goal") for s in steps)
+    assert all((s.get("substeps") or []) for s in steps)
     assert lp["metrics"]["total_steps"] == len(steps)
+    assert lp["metrics"]["total_substeps"] >= len(steps)
 
 
 def test_school_full_analysis_anydo_after_accept() -> None:

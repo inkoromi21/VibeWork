@@ -852,3 +852,37 @@ html[data-theme="dark"] #app .vw-wave-strip g {
     bottom: calc(max(14px, env(safe-area-inset-bottom, 0px)) + var(--vw-bottom-nav-h) + 8px);
   }
 }
+
+/* Путь: чекбоксы шагов не на всю ширину, подшаги без спойлеров */
+#app .anydo-step__check,
+#app .anydo-sub__check {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 2px 0 0 !important;
+  padding: 0 !important;
+  flex: 0 0 auto !important;
+}
+
+#app .anydo-step__head,
+#app .anydo-sub {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+#app .anydo-step__head-text,
+#app .anydo-sub__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+#app .anydo-step .analysis-spoiler,
+#app .anydo-step .learn-path-resource {
+  display: none !important;
+}

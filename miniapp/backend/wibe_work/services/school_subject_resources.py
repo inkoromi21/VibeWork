@@ -417,6 +417,7 @@ def build_school_learning_path_payload(
         compute_metrics,
         get_progress_map,
     )
+    from wibe_work.services.learning.substeps import attach_substeps_to_step
     from wibe_work.services.profile_analysis_context import SUBJECT_GAP_LABELS
 
     gap = gap or {}
@@ -529,6 +530,7 @@ def build_school_learning_path_payload(
         }
     )
 
+    steps_out = [attach_substeps_to_step(s) for s in steps_out]
     progress: Dict[str, str] = {}
     if user_id and path_id:
         progress = get_progress_map(user_id, path_id)
