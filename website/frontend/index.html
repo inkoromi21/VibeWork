@@ -150,46 +150,15 @@
         <div class="card float-in cdek-profile-card">
         <div class="card-head cdek-card-head">
           <h1>Шаг 1 — профиль</h1>
-          <p class="muted">Анкета по блокам: базовые данные, интересы, навыки, опыт и цели. От первой выбранной сферы зависят вопросы теста. Поля со звёздочкой обязательны для перехода к тесту.</p>
-        </div>
-        <ol class="flow-steps cdek-flow-steps" aria-label="Порядок шагов">
-          <li><strong>Профиль</strong></li>
-          <li><strong>Тесты</strong> — 2 блока (сфера + личность)</li>
-          <li><strong>Разбор</strong></li>
-          <li><strong>Чат ИИ</strong></li>
-        </ol>
-        <div class="profi-method" aria-labelledby="profi-method-title">
-          <h2 id="profi-method-title" class="profi-method-title">Три опоры перед выбором трека</h2>
-          <p class="muted small profi-method-lead">Опираемся на практику профориентации: так проще честно заполнить профиль и интерпретировать тесты.</p>
-          <div class="profi-method-grid">
-            <article class="profi-pillar">
-              <span class="profi-pillar-num" aria-hidden="true">1</span>
-              <h3 class="profi-pillar-title">Сильные стороны</h3>
-              <p class="profi-pillar-text muted small">Выписывайте, на что опираетесь: коммуникация, аналитика, организация, креатив, техническая рука — то, что реально даёт уверенность.</p>
-            </article>
-            <article class="profi-pillar">
-              <span class="profi-pillar-num" aria-hidden="true">2</span>
-              <h3 class="profi-pillar-title">Интерес и энергия</h3>
-              <p class="profi-pillar-text muted small">Где сейчас тянет развиваться и копать глубже. Интересы меняются — это нормально. Если нравится специальность выпускника — берите её за основу и «докручивайте» роль под себя.</p>
-            </article>
-            <article class="profi-pillar">
-              <span class="profi-pillar-num" aria-hidden="true">3</span>
-              <h3 class="profi-pillar-title">Для других людей</h3>
-              <p class="profi-pillar-text muted small">Хобби — в основном для себя. Работа — про запросы тех, кто платит: готовы ли в рамках интереса решать чужие задачи день за днём? Это и отличает любимое дело от «просто нравится».</p>
-            </article>
-          </div>
-          <p class="profi-method-foot muted small"><strong>Карьерные ценности</strong> (в духе якорей Шейна): что в работе мотивирует — служение людям, рост до эксперта, управление и статус, баланс жизни. Если важен баланс, роль «24/7» будет давить; если служение, одни деньги редко хватят.</p>
         </div>
         <div class="progress-wrap profile-metrics-wrap" id="profile-metrics-wrap" hidden>
           <div class="progress-label"><span>Сводка профиля</span><span id="profile-pct">0%</span></div>
           <div class="progress-bar"><div class="progress-fill" id="profile-bar"></div></div>
         </div>
-        <p id="profile-metrics-hint" class="muted small metrics-hint">Эта шкала и итоговые метрики появятся после теста и разбора — до этого заполните поля и пройдите вопросы.</p>
         <form id="diag-form" class="cdek-profile-form" novalidate>
           <input type="hidden" name="education" id="field-education-sync" value="школа" />
           <div id="sheet-profile-root" class="sheet-profile-root" aria-live="polite"></div>
         </form>
-        <p class="muted small skills-note">Заполненный профиль учитывается в разборе и подборе вакансий вместе с тестом.</p>
         <div class="actions flow-actions">
           <p id="flow-hint" class="flow-hint muted small"></p>
           <button type="button" id="btn-analyze" class="btn primary" disabled>Сначала заполните профиль</button>

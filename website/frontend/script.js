@@ -473,6 +473,20 @@ function sheetFieldHint(f) {
   return h ? `<p class="field-hint muted small">${esc(h)}</p>` : "";
 }
 
+
+function syncSheetScaleFill(el) {
+  if (!el || el.type !== "range") return;
+  const mn = parseInt(el.min || "1", 10);
+  const mx = parseInt(el.max || "5", 10);
+  const v = parseInt(el.value || String(mn), 10);
+  const pct = Math.round(((v - mn) * 100) / Math.max(1, mx - mn));
+  el.style.setProperty("--p", pct + "%");
+  el.setAttribute("aria-valuenow", String(v));
+  const fid = el.dataset.sheetField;
+  const lab = el.closest(".sheet-scale-slider")?.querySelector('[data-scale-for="' + fid + '"]');
+  if (lab) lab.textContent = String(v);
+}
+
 function renderSheetField(f) {
   if (!f || f.type === "hidden") return "";
   const ph = f.placeholder ? esc(f.placeholder) : "";
@@ -513,37 +527,36 @@ function renderSheetField(f) {
     const lo = f.scale_min ?? 1;
     const hi = f.scale_max ?? 5;
     const def = f.default ?? 3;
-    const nums = [];
-    for (let n = lo; n <= hi; n += 1) nums.push(n);
-    const radios = nums
-      .map(
-        (n) =>
-          `<label class="sheet-scale-opt"><input type="radio" name="sheet_sc_${esc(f.id)}" data-sheet-field="${esc(f.id)}" value="${n}"${n === def ? " checked" : ""} /> <span>${n}</span></label>`
-      )
-      .join("");
-    return `<div class="field full sheet-field"><span>${esc(f.label)}</span><div class="sheet-scale-row" role="radiogroup">${radios}</div>${hint}</div>`;
+    const pct = Math.round(((def - lo) * 100) / Math.max(1, hi - lo));
+    return `<div class="field full sheet-field sheet-scale-field"><span>${esc(f.label)}</span><div class="sheet-scale-row sheet-scale-slider"><span class="sheet-scale-bound muted small" aria-hidden="true">${lo}</span><input type="range" data-sheet-field="${esc(f.id)}" min="${lo}" max="${hi}" value="${def}" step="1" style="--p:${pct}%" aria-valuemin="${lo}" aria-valuemax="${hi}" aria-valuenow="${def}" /><span class="sheet-scale-val" data-scale-for="${esc(f.id)}">${def}</span><span class="sheet-scale-bound muted small" aria-hidden="true">${hi}</span></div>${hint}</div>`;
   }
   return "";
 }
 
-function renderSheetProfileFromSchema() {
-  const root = document.getElementById("sheet-profile-root");
-  const sections = schemaSections();
-  if (!root || !sections.length) return;
-  root.innerHTML = sections
-    .map((sec) => {
-      const fields = (sec.fields || []).map(renderSheetField).filter(Boolean).join("");
-      if (!fields) return "";
-      const opt = sec.optional
-        ? '<span class="sheet-section-badge muted small">по желанию</span>'
-        : "";
-      const sub = sec.subtitle
-        ? `<p class="sheet-section-sub muted small">${esc(sec.subtitle)}</p>`
-        : "";
-      return `<section class="sheet-section" data-section="${esc(sec.id || "")}"><div class="sheet-section-head"><h3 class="sheet-section-title">${esc(sec.title)}</h3>${opt}</div>${sub}<div class="sheet-section-body">${fields}</div></section>`;
-    })
-    .join("");
+let profileWizardStep = 0;
+let profileWizardWired = false;
 
+function wizardSectionItems() {
+  return schemaSections()
+    .map((sec, schemaIdx) => ({ sec, schemaIdx }))
+    .filter(({ sec }) => (sec.fields || []).some((f) => f.type !== "hidden"));
+}
+
+function renderSheetSectionHtml(sec, stepIndex) {
+  const fields = (sec.fields || []).map(renderSheetField).filter(Boolean).join("");
+  if (!fields) return "";
+  const opt = sec.optional
+    ? '<span class="sheet-section-badge muted small">по желанию</span>'
+    : "";
+  const sub = sec.subtitle
+    ? `<p class="sheet-section-sub muted small">${esc(sec.subtitle)}</p>`
+    : "";
+  const hidden = stepIndex === 0 ? "" : " hidden";
+  return `<section class="sheet-section profile-wizard-step"${hidden} data-wizard-step="${stepIndex}" data-section="${esc(sec.id || "")}"><div class="sheet-section-head"><h3 class="sheet-section-title">${esc(sec.title)}</h3>${opt}</div>${sub}<div class="sheet-section-body">${fields}</div></section>`;
+}
+
+function wireSheetFieldListeners(root) {
+  if (!root) return;
   root.querySelectorAll(".sheet-multigroup").forEach((wrap) => {
     const fid = wrap.dataset.multiField;
     const maxN = parseInt(wrap.dataset.multiMax || "5", 10);
@@ -553,6 +566,7 @@ function renderSheetProfileFromSchema() {
         if (fid === "interest_spheres") debouncedQuizReload();
         updateAvatarBubble();
         scheduleSaveProfileDraft();
+        updateFlowUI();
       });
     });
   });
@@ -561,16 +575,156 @@ function renderSheetProfileFromSchema() {
     el.addEventListener("change", () => {
       syncEducationFromDetail();
       scheduleSaveProfileDraft();
+      updateFlowUI();
+    });
+  });
+
+  root.querySelectorAll('input[type="range"][data-sheet-field]').forEach((el) => {
+    syncSheetScaleFill(el);
+    el.addEventListener("input", () => {
+      syncSheetScaleFill(el);
+      scheduleSaveProfileDraft();
+      updateFlowUI();
     });
   });
 
   root.querySelectorAll("input[data-sheet-field], select[data-sheet-field], textarea[data-sheet-field]").forEach((el) => {
-    if (el.classList.contains("sheet-multi")) return;
+    if (el.classList.contains("sheet-multi") || el.type === "range") return;
     const ev = el.tagName === "SELECT" || el.type === "radio" ? "change" : "input";
-    el.addEventListener(ev, scheduleSaveProfileDraft);
+    el.addEventListener(ev, () => {
+      scheduleSaveProfileDraft();
+      updateFlowUI();
+    });
   });
 
   syncEducationFromDetail();
+}
+
+function showProfileWizardErr(msg) {
+  const el = document.getElementById("profile-wizard-err");
+  if (!el) return;
+  if (!msg) {
+    el.hidden = true;
+    el.textContent = "";
+    return;
+  }
+  el.textContent = msg;
+  el.hidden = false;
+}
+
+function validateProfileWizardStep(stepIndex) {
+  const items = wizardSectionItems();
+  const item = items[stepIndex];
+  if (!item) return null;
+  const { sec } = item;
+  if (sec.optional) return null;
+  const p = buildProfileForCompletion();
+  for (const f of sec.fields || []) {
+    if (f.type === "hidden" || !f.required) continue;
+    if (!fieldFilledClient(p, f.id)) {
+      return `Заполните поле «${f.label}»`;
+    }
+  }
+  return null;
+}
+
+function showProfileWizardStep(step) {
+  const steps = document.querySelectorAll(".profile-wizard-step");
+  const total = steps.length;
+  if (!total) return;
+  profileWizardStep = Math.max(0, Math.min(step, total - 1));
+  steps.forEach((el, i) => {
+    el.hidden = i !== profileWizardStep;
+  });
+  const label = document.getElementById("profile-wizard-label");
+  const prog = document.getElementById("profile-wizard-progress");
+  const title = document.getElementById("profile-wizard-title");
+  const item = wizardSectionItems()[profileWizardStep];
+  if (label) label.textContent = `Шаг ${profileWizardStep + 1} из ${total}`;
+  if (prog) {
+    prog.max = total;
+    prog.value = profileWizardStep + 1;
+  }
+  if (title && item) title.textContent = item.sec.title || "";
+  const prev = document.getElementById("btn-profile-prev");
+  const next = document.getElementById("btn-profile-next");
+  if (prev) prev.hidden = profileWizardStep === 0;
+  if (next) next.textContent = profileWizardStep >= total - 1 ? "Готово" : "Далее";
+  showProfileWizardErr(null);
+  try {
+    localStorage.setItem("vibework_profile_wizard_step", String(profileWizardStep));
+  } catch (_) {}
+  updateFlowUI();
+  document.querySelector(".profile-wizard")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function wireProfileWizardNav() {
+  if (profileWizardWired) return;
+  profileWizardWired = true;
+  document.getElementById("btn-profile-prev")?.addEventListener("click", () => {
+    showProfileWizardStep(profileWizardStep - 1);
+  });
+  document.getElementById("btn-profile-next")?.addEventListener("click", () => {
+    const err = validateProfileWizardStep(profileWizardStep);
+    if (err) {
+      showProfileWizardErr(err);
+      return;
+    }
+    scheduleSaveProfileDraft();
+    const total = document.querySelectorAll(".profile-wizard-step").length;
+    if (profileWizardStep < total - 1) {
+      showProfileWizardStep(profileWizardStep + 1);
+      return;
+    }
+    if (!profileBasicsOk()) {
+      showProfileWizardErr(
+        "Проверьте обязательные поля во всех блоках (база, интересы, цели). Вернитесь к шагам «Назад»."
+      );
+      return;
+    }
+    saveProfileDraft();
+    debouncedQuizReload();
+    setTab("test");
+  });
+}
+
+function renderSheetProfileFromSchema() {
+  const root = document.getElementById("sheet-profile-root");
+  const items = wizardSectionItems();
+  if (!root || !items.length) return;
+
+  const stepsHtml = items
+    .map(({ sec }, stepIndex) => renderSheetSectionHtml(sec, stepIndex))
+    .filter(Boolean)
+    .join("");
+
+  root.innerHTML = `
+    <div class="profile-wizard">
+      <div class="profile-wizard-bar">
+        <div class="profile-wizard-bar-top">
+          <span id="profile-wizard-label">Шаг 1 из ${items.length}</span>
+          <span id="profile-wizard-title" class="profile-wizard-title"></span>
+        </div>
+        <progress id="profile-wizard-progress" class="profile-wizard-progress" max="${items.length}" value="1"></progress>
+      </div>
+      <div class="profile-wizard-steps">${stepsHtml}</div>
+      <div class="profile-wizard-nav">
+        <button type="button" class="btn ghost" id="btn-profile-prev" hidden>Назад</button>
+        <p id="profile-wizard-err" class="profile-wizard-err error" hidden role="alert"></p>
+        <button type="button" class="btn primary" id="btn-profile-next">Далее</button>
+      </div>
+    </div>`;
+
+  wireSheetFieldListeners(root);
+  wireProfileWizardNav();
+
+  try {
+    const saved = parseInt(localStorage.getItem("vibework_profile_wizard_step") || "0", 10);
+    profileWizardStep = Number.isFinite(saved) ? saved : 0;
+  } catch (_) {
+    profileWizardStep = 0;
+  }
+  showProfileWizardStep(profileWizardStep);
 }
 
 function buildProfileForCompletion() {
@@ -705,6 +859,9 @@ function collectSheetExtra() {
     const v = String(el.value || "").trim();
     if (v) out[k] = v;
   });
+  document.querySelectorAll('input[type="range"][data-sheet-field]').forEach((el) => {
+    out[el.dataset.sheetField] = el.value;
+  });
   document.querySelectorAll('input[type="radio"][data-sheet-field]:checked').forEach((el) => {
     out[el.dataset.sheetField] = el.value;
   });
@@ -748,6 +905,12 @@ function applySheetFieldValue(key, val) {
   const tx = document.querySelector(`input[type="text"][data-sheet-field="${key}"]`);
   if (tx) {
     tx.value = val != null ? String(val) : "";
+    return;
+  }
+  const range = document.querySelector(`input[type="range"][data-sheet-field="${key}"]`);
+  if (range) {
+    range.value = val != null ? String(val) : range.min;
+    syncSheetScaleFill(range);
     return;
   }
   const rad = document.querySelector(`input[type="radio"][data-sheet-field="${key}"][value="${val}"]`);
@@ -1413,17 +1576,22 @@ function buildProfileSummaryLines(profile, analysis) {
   return lines;
 }
 
+function updateAccountPageSubtitle() {
+  const el = document.getElementById("account-page-email");
+  if (!el) return;
+  const nick = (window.serverNickname || "").trim();
+  const email = (window.serverEmail || "").trim();
+  el.textContent = nick || (email ? `Вход: ${email}` : "");
+}
+
 function renderAccountPage() {
   const root = document.getElementById("account-page-root");
-  const emailEl = document.getElementById("account-page-email");
   if (!root || !window.serverLoggedIn) return;
   const profile = collectProfileFields();
   const snap = buildServerSnapshot();
   const summary = buildProfileSummaryLines(profile, window.lastAnalysis || snap.analysis);
   const nickVal = esc((window.serverNickname || "").trim());
-  if (emailEl) {
-    emailEl.textContent = window.serverEmail ? `Вход: ${window.serverEmail}` : "";
-  }
+  updateAccountPageSubtitle();
   root.innerHTML = `
     <section class="account-section">
       <h2>Никнейм</h2>
@@ -1483,6 +1651,7 @@ function renderAccountPage() {
       }
       window.serverNickname = j.nickname || raw || null;
       updateAccountHubLabel();
+      updateAccountPageSubtitle();
       if (msg) {
         msg.textContent = "Никнейм сохранён.";
         msg.className = "account-msg account-msg--ok";
@@ -1587,6 +1756,7 @@ function updateAuthPanel() {
     document.body.classList.remove("app-ready");
   }
   updateAccountHubLabel();
+  updateAccountPageSubtitle();
 }
 
 async function refreshAuthState() {
