@@ -324,8 +324,8 @@ document.querySelectorAll(".nav-pill, .tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => setTab(btn.dataset.tab));
 });
 
-document.getElementById("btn-go-profile").addEventListener("click", () => setTab("profile"));
-document.getElementById("btn-go-test").addEventListener("click", () => setTab("test"));
+document.getElementById("btn-go-profile")?.addEventListener("click", () => setTab("profile"));
+document.getElementById("btn-go-test")?.addEventListener("click", () => setTab("test"));
 document.getElementById("btn-go-analysis")?.addEventListener("click", () => setTab("analysis"));
 document.getElementById("btn-analysis-go-profile")?.addEventListener("click", () => setTab("profile"));
 document.getElementById("btn-analysis-go-test")?.addEventListener("click", () => setTab("test"));
@@ -1682,97 +1682,105 @@ function updateAiChecklist() {
 
 function updateFlowUI() {
   const hint = document.getElementById("flow-hint");
-    const btn = document.getElementById("btn-analyze");
-    const tf = document.getElementById("test-footer");
-    const tff = document.getElementById("test-footer-hint");
-    const aiBtn = document.getElementById("btn-request-ai");
-    updateAiChecklist();
+  const btn = document.getElementById("btn-analyze");
+  const tf = document.getElementById("test-footer");
+  const tff = document.getElementById("test-footer-hint");
+  const aiBtn = document.getElementById("btn-request-ai");
+  updateAiChecklist();
 
-    const pOk = profileBasicsOk();
-    const qOk = quizComplete();
+  const pOk = profileBasicsOk();
+  const qOk = quizComplete();
 
-    const testBanner = document.getElementById("test-blocked-banner");
-    if (testBanner) {
-      testBanner.hidden = pOk;
-      if (!pOk) {
-        const sh = window.VibeWorkShared;
-        let extra = "";
-        if (sh && sh.listIncompleteProfileFields && PROFILE_SCHEMA) {
-          const ids = sh.listIncompleteProfileFields(PROFILE_SCHEMA, profilePayloadForCompletion());
-          if (ids.length) {
-            const labels = ids.map((fid) => {
-              for (const sec of schemaSections()) {
-                for (const f of sec.fields || []) {
-                  if (f.id === fid) return f.label || fid;
-                }
-              }
-              if (fid === "interest_spheres") return "Сферы интересов";
-              return fid;
-            });
-            extra = " Не хватает: " + labels.join(", ") + ".";
-          }
-        }
-        testBanner.textContent =
-          "Сначала заполните этап 1 — обязательные поля анкеты (база, интересы, цели)." + extra;
-      }
-    }
-
-    if (!btn || !hint) {
-      updateQuizMetricsVisibility();
-      return;
-    }
-
+  const testBanner = document.getElementById("test-blocked-banner");
+  if (testBanner) {
+    testBanner.hidden = pOk;
     if (!pOk) {
+      const sh = window.VibeWorkShared;
+      let extra = "";
+      if (sh && sh.listIncompleteProfileFields && PROFILE_SCHEMA) {
+        const ids = sh.listIncompleteProfileFields(PROFILE_SCHEMA, profilePayloadForCompletion());
+        if (ids.length) {
+          const labels = ids.map((fid) => {
+            for (const sec of schemaSections()) {
+              for (const f of sec.fields || []) {
+                if (f.id === fid) return f.label || fid;
+              }
+            }
+            if (fid === "interest_spheres") return "Сферы интересов";
+            return fid;
+          });
+          extra = " Не хватает: " + labels.join(", ") + ".";
+        }
+      }
+      testBanner.textContent =
+        "Сначала заполните этап 1 — обязательные поля анкеты (база, интересы, цели)." + extra;
+    }
+  }
+
+  if (!pOk) {
+    if (btn) {
       btn.disabled = true;
       btn.textContent = "Сначала заполните профиль";
       btn.classList.remove("glow");
+    }
+    if (hint) {
       hint.textContent =
         "Шаг 1: заполните анкету — возраст, город, образование, сферы (до 5), цели.";
-      if (tf) tf.hidden = true;
-      updateQuizMetricsVisibility();
-      return;
     }
+    if (tf) tf.hidden = true;
+    updateQuizMetricsVisibility();
+    return;
+  }
 
+  if (hint) {
     hint.textContent = QUIZ.length
       ? "Профиль готов. Перейдите к тесту — вопросы по первой выбранной сфере."
       : "Профиль готов. Для вашего уровня — профориентационный блок (без «технических» задач по сфере; они для колледжа и вуза).";
+  }
 
-    if (!qOk) {
+  if (!qOk) {
+    if (btn) {
       btn.disabled = false;
       btn.textContent = "Шаг 2: перейти к тесту";
       btn.classList.remove("glow");
-      if (tf) {
-        tf.hidden = false;
-        if (tff) {
-          const nTech = QUIZ.length;
-          const nPers = PERSONALITY_QUIZ.length;
-          tff.textContent = nTech
-            ? `Пройдите оба блока на вкладке «Тест» (${nTech} по сфере + ${nPers} профориентация).`
-            : `Пройдите блок профориентации на вкладке «Тест» (${nPers} вопросов) — техническая часть для школьников не показывается.`;
-        }
-        if (aiBtn) aiBtn.hidden = true;
-      }
-      updateQuizMetricsVisibility();
-      return;
     }
-
-    btn.disabled = false;
-    btn.textContent = "К тесту и разбору";
-    btn.classList.add("glow");
-    hint.textContent = "После отправки ответов откройте вкладку «Разбор» — метрики и графики. Чат — на «ИИ».";
     if (tf) {
       tf.hidden = false;
       if (tff) {
-        tff.textContent = window.lastAnalysis
-          ? "Разбор готов — вкладка «Разбор». Здесь можно снова изменить ответы и пересчитать."
-          : "Тест заполнен — отправьте ответы или дождитесь авто-разбора.";
+        const nTech = QUIZ.length;
+        const nPers = PERSONALITY_QUIZ.length;
+        tff.textContent = nTech
+          ? `Пройдите оба блока на вкладке «Тест» (${nTech} по сфере + ${nPers} профориентация).`
+          : `Пройдите блок профориентации на вкладке «Тест» (${nPers} вопросов) — техническая часть для школьников не показывается.`;
       }
-      const openAnalysis = document.getElementById("btn-test-open-analysis");
-      if (openAnalysis) openAnalysis.hidden = !window.lastAnalysis;
-      if (aiBtn) aiBtn.hidden = !window.lastAnalysis;
+      if (aiBtn) aiBtn.hidden = true;
     }
-    const doneBanner = document.getElementById("test-done-banner");
-    if (doneBanner) doneBanner.hidden = !window.lastAnalysis;
+    updateQuizMetricsVisibility();
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = "К тесту и разбору";
+    btn.classList.add("glow");
+  }
+  if (hint) {
+    hint.textContent =
+      "После отправки ответов откройте вкладку «Разбор» — метрики и графики. Чат — на «ИИ».";
+  }
+  if (tf) {
+    tf.hidden = false;
+    if (tff) {
+      tff.textContent = window.lastAnalysis
+        ? "Разбор готов — вкладка «Разбор». Здесь можно снова изменить ответы и пересчитать."
+        : "Тест заполнен — отправьте ответы или дождитесь авто-разбора.";
+    }
+    const openAnalysis = document.getElementById("btn-test-open-analysis");
+    if (openAnalysis) openAnalysis.hidden = !window.lastAnalysis;
+    if (aiBtn) aiBtn.hidden = !window.lastAnalysis;
+  }
+  const doneBanner = document.getElementById("test-done-banner");
+  if (doneBanner) doneBanner.hidden = !window.lastAnalysis;
   updateQuizMetricsVisibility();
 }
 
@@ -3597,7 +3605,7 @@ document.getElementById("btn-analyze")?.addEventListener("click", async () => {
   await runConsultation({ switchToAnalysisTab: true });
 });
 
-document.getElementById("btn-request-ai").addEventListener("click", () => {
+document.getElementById("btn-request-ai")?.addEventListener("click", () => {
   showError("");
   if (!profileBasicsOk()) {
     setTab("profile");
@@ -3652,7 +3660,7 @@ document.getElementById("btn-restore")?.addEventListener("click", async () => {
   loadJobsData().catch(() => {});
 });
 
-document.getElementById("diag-form").addEventListener("input", () => {
+document.getElementById("diag-form")?.addEventListener("input", () => {
   scheduleSaveProfileDraft();
   updateAvatarBubble();
   updateFlowUI();
@@ -3831,7 +3839,7 @@ async function startSim() {
   renderSim(step);
 }
 
-document.getElementById("sim-restart").addEventListener("click", () => {
+document.getElementById("sim-restart")?.addEventListener("click", () => {
   startSim().catch((e) => alert(e.message));
 });
 
@@ -3895,7 +3903,7 @@ async function submitAuthLogin() {
   }
 }
 
-document.getElementById("btn-auth-login").addEventListener("click", () => {
+document.getElementById("btn-auth-login")?.addEventListener("click", () => {
   submitAuthLogin().catch((e) => showAuthGateError(e.message || "Не вышло войти"));
 });
 
@@ -3906,7 +3914,7 @@ document.getElementById("auth-password")?.addEventListener("keydown", (e) => {
   }
 });
 
-document.getElementById("btn-auth-logout").addEventListener("click", async () => {
+document.getElementById("btn-auth-logout")?.addEventListener("click", async () => {
   try {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     await fetch("/auth/email/logout", { method: "POST", credentials: "include" }).catch(() => {});

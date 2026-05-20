@@ -20,6 +20,22 @@ async function redirectIfAuthenticated() {
   } catch (_) {}
 }
 
+/** Локальная копия логики из auth-email.js — чтобы регистрация работала даже при старом кэше auth-email.js. */
+async function pollAuthMeAfterCookie(attempts = 3, delayMs = 120) {
+  let last = { authenticated: false };
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      const r = await fetch("/api/auth/me", { credentials: "include" });
+      last = await r.json().catch(() => ({ authenticated: false }));
+      if (last.authenticated) return last;
+    } catch (_) {}
+    if (i < attempts - 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+    }
+  }
+  return last;
+}
+
 document.getElementById("btn-auth-register")?.addEventListener("click", async () => {
   showAuthGateError("");
   const email = document.getElementById("auth-email")?.value?.trim();
@@ -41,7 +57,7 @@ document.getElementById("btn-auth-register")?.addEventListener("click", async ()
       showAuthGateError(formatAuthError(j.detail) || "Регистрация не удалась");
       return;
     }
-    const me = await fetchAuthMeWithRetry();
+    const me = await pollAuthMeAfterCookie();
     if (!me.authenticated) {
       showAuthGateError(
         "Аккаунт создан, но сессия не сохранилась. Разрешите cookie для сайта, проверьте что открыт тот же адрес что PUBLIC_BASE_URL (http://127.0.0.1:8000), и войдите на главной."
