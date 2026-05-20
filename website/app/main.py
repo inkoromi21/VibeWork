@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.account_auth_routes import router as auth_router
+from app.hh_client import suggest_areas
 from app.career_advisor import (
     build_analysis,
     career_chat,
@@ -25,6 +26,7 @@ from app.career_advisor import (
     simulator_advance,
     simulator_start,
 )
+from app.workday_simulator_bridge import simulator_options_list
 from app.mts_tracks_catalog import MtsTrack, load_mts_tracks
 from app.questionnaire_fields import get_profile_schema
 from app.sqlite_async_session import engine, init_db
@@ -178,6 +180,12 @@ async def jobs(
         raise HTTPException(status_code=500, detail="Не удалось загрузить вакансии") from e
 
 
+@app.get("/api/hh/area-suggest")
+async def hh_area_suggest(q: str = Query("", max_length=120)):
+    """Подсказки городов и регионов РФ (префиксный поиск hh.ru)."""
+    return {"items": await suggest_areas(q.strip(), limit=15)}
+
+
 @app.post("/api/jobs/match", response_model=list[VacancyEnriched])
 async def jobs_match(body: JobMatchRequest) -> list[VacancyEnriched]:
     try:
@@ -187,8 +195,16 @@ async def jobs_match(body: JobMatchRequest) -> list[VacancyEnriched]:
         raise HTTPException(status_code=500, detail="Не удалось подобрать вакансии") from e
 
 
+@app.get("/api/simulator/options")
+async def sim_options():
+    """Сферы из анкеты и профессии для симулятора дня."""
+    return {"options": simulator_options_list()}
+
+
 @app.get("/api/simulator/start")
-async def sim_start(role: str = Query("analyst", description="analyst | designer")):
+async def sim_start(
+    role: str = Query("it_dev", description="id сферы анкеты или ключ сценария"),
+):
     try:
         return simulator_start(role)
     except Exception as e:

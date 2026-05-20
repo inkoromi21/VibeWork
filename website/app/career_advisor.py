@@ -672,57 +672,6 @@ MOCK_VACANCIES: list[MockVacancy] = [
     ),
 ]
 
-SIMULATOR_BRANCHES: dict[str, list[dict[str, Any]]] = {
-    "analyst": [
-        {
-            "title": "Утро аналитика",
-            "narrative": "В 9:00 вам срочно прислали выгрузку: продажи упали на 12%. Нужно к обеду дать гипотезы.",
-            "choices": [
-                {"id": "a1", "label": "Сначала построю дашборд и сегментацию", "delta": 15},
-                {"id": "a2", "label": "Сразу напишу в чат отдела продаж", "delta": 8},
-                {"id": "a3", "label": "Попрошу ещё данные и отложу ответ", "delta": 4},
-            ],
-        },
-        {
-            "title": "Встреча с заказчиком",
-            "narrative": "Заказчик просит «сделать красиво», но ТЗ размыто. Что делаете?",
-            "choices": [
-                {"id": "a4", "label": "Зафиксирую цели и метрики письмом", "delta": 12},
-                {"id": "a5", "label": "Сделаю быстрый макет отчёта", "delta": 6},
-                {"id": "a6", "label": "Откажусь без уточнений", "delta": -5},
-            ],
-        },
-        {
-            "title": "Финал дня",
-            "narrative": "Директор хочет одну слайд-деку для совета директоров.",
-            "choices": [
-                {"id": "a7", "label": "3 слайда: проблема — данные — рекомендации", "delta": 18},
-                {"id": "a8", "label": "30 страниц подробностей", "delta": -8},
-            ],
-        },
-    ],
-    "designer": [
-        {
-            "title": "День дизайнера",
-            "narrative": "Продукт просит «ещё одну иконку», но без гайдлайна. Ваш шаг?",
-            "choices": [
-                {"id": "d1", "label": "Предложу минимальный паттерн в Figma", "delta": 14},
-                {"id": "d2", "label": "Нарисую в изоляции, как нравится", "delta": 2},
-                {"id": "d3", "label": "Откажусь без UX-исследования", "delta": 5},
-            ],
-        },
-        {
-            "title": "Ревью",
-            "narrative": "Стейкхолдер говорит: «не цепляет». Что отвечаете?",
-            "choices": [
-                {"id": "d4", "label": "Задам вопросы про критерии успеха", "delta": 12},
-                {"id": "d5", "label": "Переделаю всё ночью без вопросов", "delta": -6},
-            ],
-        },
-    ],
-}
-
-
 def _score_test(answers: list[Any]) -> dict[str, int]:
     totals = {"analytical": 0, "creative": 0, "people": 0}
     for a in answers:
@@ -1929,6 +1878,27 @@ def enrich_vacancy(
     return VacancyEnriched(vacancy=v, match_percent=match_pct, why_match=why, why_not=why_not, rows=rows)
 
 
+def _filter_by_profession(items: list[MockVacancy], profession: str) -> list[MockVacancy]:
+    """Фильтр «область»: подпись сферы из анкеты или подстрока в теге/названии."""
+    from wibe_work.questionnaire_fields import INTEREST_SPHERES, sphere_to_web_interest
+
+    p = profession.strip().lower()
+    for sphere in INTEREST_SPHERES:
+        sid = str(sphere.get("id") or "")
+        label = str(sphere.get("label") or "").lower()
+        if p == label or p == sid.lower():
+            try:
+                intr = Interest(sphere_to_web_interest(sid))
+            except ValueError:
+                intr = Interest.IT
+            return [
+                v
+                for v in items
+                if _interest_matches_vacancy(intr, v) or label in v.title.lower()
+            ]
+    return [v for v in items if p in v.profession_tag.lower() or p in v.title.lower()]
+
+
 def filter_vacancy_list(
     items: list[MockVacancy],
     profession: str | None,
@@ -1942,8 +1912,7 @@ def filter_vacancy_list(
     """Фильтрация списка вакансий (моки или выдача hh.ru)."""
     items = list(items)
     if profession:
-        p = profession.strip().lower()
-        items = [v for v in items if p in v.profession_tag.lower() or p in v.title.lower()]
+        items = _filter_by_profession(items, profession)
     if level and not skip_level_filter:
         l = level.strip().lower()
         items = [v for v in items if v.level.value.lower() == l]
@@ -2186,57 +2155,12 @@ async def build_analysis(payload: DiagnosisPayload) -> AnalysisResult:
 
 
 def simulator_start(role_key: str) -> SimulatorStep:
-    key = role_key if role_key in SIMULATOR_BRANCHES else "analyst"
-    branch = SIMULATOR_BRANCHES[key]
-    step0 = branch[0]
-    choices = [
-        SimulatorChoice(id=c["id"], label=c["label"], points_delta=c["delta"]) for c in step0["choices"]
-    ]
-    return SimulatorStep(
-        step_index=0,
-        title=step0["title"],
-        narrative=step0["narrative"],
-        choices=choices,
-        career_points=50,
-        is_final=False,
-    )
+    from app.workday_simulator_bridge import simulator_start as _start
+
+    return _start(role_key)
 
 
 def simulator_advance(adv: SimulatorAdvance) -> SimulatorStep:
-    key = adv.state.role_key if adv.state.role_key in SIMULATOR_BRANCHES else "analyst"
-    branch = SIMULATOR_BRANCHES[key]
-    idx = adv.state.step_index
-    step_data = branch[idx]
-    delta = 0
-    for c in step_data["choices"]:
-        if c["id"] == adv.choice_id:
-            delta = int(c["delta"])
-            break
-    new_pts = max(0, min(100, adv.state.career_points + delta))
-    hist = list(adv.state.history)
-    hist.append(adv.choice_id)
+    from app.workday_simulator_bridge import simulator_advance as _advance
 
-    next_idx = idx + 1
-    if next_idx >= len(branch):
-        return SimulatorStep(
-            step_index=next_idx,
-            title="Итог симуляции",
-            narrative=(
-                f"Ваши карьерные очки: {new_pts}/100. "
-                "В реальности добавьте дедлайны, стейкхолдеров и метрики — так растут быстрее."
-            ),
-            choices=[],
-            career_points=new_pts,
-            is_final=True,
-        )
-
-    sn = branch[next_idx]
-    choices = [SimulatorChoice(id=c["id"], label=c["label"], points_delta=c["delta"]) for c in sn["choices"]]
-    return SimulatorStep(
-        step_index=next_idx,
-        title=sn["title"],
-        narrative=sn["narrative"],
-        choices=choices,
-        career_points=new_pts,
-        is_final=False,
-    )
+    return _advance(adv)

@@ -4,8 +4,11 @@
 
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, HTTPException, Query
 
+from wibe_work.services.hh_client import suggest_areas
 from wibe_work.services.hh_web_link import build_hh_web_search_url
 
 try:
@@ -153,9 +156,16 @@ async def jobs_match(body: JobMatchRequest):
         raise HTTPException(status_code=500, detail="Не удалось подобрать вакансии") from e
 
 
+@router.get("/api/hh/area-suggest")
+async def hh_area_suggest(q: str = Query("", max_length=120)):
+    """Подсказки городов и регионов РФ (префиксный поиск hh.ru)."""
+    return {"items": suggest_areas(q.strip(), limit=15)}
+
+
 @router.get("/api/hh/search-url")
 async def hh_search_url(
     profession: str | None = Query(None),
+    interest: str | None = Query(None, description="Код интереса: IT, дизайн, маркетинг, …"),
     level: str | None = Query(None),
     city: str | None = Query(None),
     work_format: str | None = Query(None, description="удалённо | офис | гибрид"),
@@ -165,7 +175,19 @@ async def hh_search_url(
     Ссылка на web-поиск hh.ru по текущим фильтрам сайта.
     Никаких запросов к API hh.ru (важно при блокировках).
     """
-    txt = (profession or "").strip() or "вакансии"
+    txt = (profession or "").strip()
+    if not txt and interest:
+        try:
+            from app.hh_client import _INTEREST_SEARCH  # type: ignore
+
+            intr = Interest(interest.strip())
+            tmpl = _INTEREST_SEARCH.get(intr, "")
+            if tmpl:
+                txt = re.sub(r"\s+OR\s+", " ", tmpl, flags=re.IGNORECASE).strip()[:120]
+        except (ValueError, ImportError):
+            txt = interest.strip().replace("_", " ")
+    if not txt:
+        txt = "вакансии"
     only_remote = bool(work_format and ("удал" in work_format.lower() or "remote" in work_format.lower()))
     only_entry = bool(level and ("стаж" in level.lower() or "intern" in level.lower()))
     # salary_bracket маппится внутри build_hh_web_search_url (через int-попытку не пройдёт),
@@ -191,8 +213,15 @@ async def hh_search_url(
     return {"url": url}
 
 
+@router.get("/api/simulator/options")
+async def sim_options():
+    from wibe_work.services.workday_simulator import list_simulator_options
+
+    return {"options": list_simulator_options()}
+
+
 @router.get("/api/simulator/start")
-async def sim_start(role: str = Query("analyst", description="analyst | designer")):
+async def sim_start(role: str = Query("it_dev", description="id сферы анкеты или ключ сценария")):
     _ensure_imports()
     try:
         return simulator_start(role)

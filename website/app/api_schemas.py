@@ -1,7 +1,7 @@
 """Pydantic-схемы запросов и ответов HTTP API VibeWork (веб)."""
 
 from enum import Enum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -398,6 +398,8 @@ class SimulatorStep(BaseModel):
     choices: list[SimulatorChoice]
     career_points: int = Field(ge=0, le=100)
     is_final: bool = False
+    sim_role: str | None = Field(None, description="Нормализованный ключ сценария")
+    day_path: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class SimulatorState(BaseModel):
@@ -405,6 +407,7 @@ class SimulatorState(BaseModel):
     step_index: int
     career_points: int = Field(ge=0, le=100)
     history: list[str] = Field(default_factory=list)
+    day_path: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class SimulatorAdvance(BaseModel):

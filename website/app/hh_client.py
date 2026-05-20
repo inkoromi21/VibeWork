@@ -17,6 +17,7 @@ from app.api_schemas import EducationLevel, Interest, JobMatchRequest, MockVacan
 logger = logging.getLogger(__name__)
 
 HH_VACANCIES_URL = "https://api.hh.ru/vacancies"
+HH_SUGGEST_AREAS_URL = "https://api.hh.ru/suggests/areas"
 
 # Населённые пункты: id из справочника areas (частые города РФ)
 _CITY_TO_AREA: dict[str, str] = {
@@ -96,9 +97,91 @@ def _area_id_for_city(city: str | None) -> str | None:
     return _CITY_TO_AREA.get(n)
 
 
+def _primary_profession_tag(interest: Interest) -> str:
+    """Канонический тег как в демо-вакансиях (для матчинга по интересу)."""
+    m = {
+        Interest.IT: "IT",
+        Interest.DATA_AI: "IT",
+        Interest.DEVOPS: "IT",
+        Interest.DESIGN: "дизайн",
+        Interest.MARKETING: "маркетинг",
+        Interest.SALES: "маркетинг",
+        Interest.SUPPORT: "маркетинг",
+        Interest.PRODUCT: "маркетинг",
+        Interest.ENGINEERING: "инженерия",
+        Interest.SCIENCE: "наука",
+        Interest.LOGISTICS: "инженерия",
+        Interest.BUSINESS: "бизнес",
+        Interest.FINANCE: "бизнес",
+        Interest.HR: "бизнес",
+        Interest.LEGAL: "бизнес",
+        Interest.PROCUREMENT: "бизнес",
+        Interest.REAL_ESTATE: "бизнес",
+        Interest.ADMIN: "бизнес",
+    }
+    return m.get(interest, "бизнес")
+
+
+def _infer_profession_tag(title: str, reqs: list[str], primary: Interest) -> str:
+    """Тег области по заголовку и требованиям (не подставляем код интереса целиком)."""
+    blob = (title + " " + " ".join(reqs)).lower()
+    if re.search(
+        r"(дизайнер|ux\b|ui\b|figma|product design|графическ)",
+        blob,
+    ):
+        return "дизайн"
+    if re.search(
+        r"(маркетолог|smm|таргет|performance|digital marketing|копирайт|pr-менедж)",
+        blob,
+    ):
+        return "маркетинг"
+    if re.search(
+        r"(программист|разработчик|developer|devops|sre|frontend|backend|"
+        r"fullstack|тестировщик|qa engineer|python|golang|\.net|mobile)",
+        blob,
+    ):
+        return "IT"
+    if re.search(
+        r"(аналитик данных|data analyst|data scientist|bi analyst|machine learning)",
+        blob,
+    ):
+        return "IT"
+    if re.search(r"(инженер|проектировщик|cad|сварщ|монтажник|электромонт)", blob):
+        return "инженерия"
+    if re.search(r"(лаборант|научн|исследовател|биолог|химик)", blob):
+        return "наука"
+    if re.search(
+        r"(менеджер по продажам|sales manager|b2b|account manager|коммерческ)",
+        blob,
+    ):
+        return "маркетинг"
+    if re.search(
+        r"(hr\b|рекрутер|подбор персонала|кадров|обучени[ея] персонал)",
+        blob,
+    ):
+        return "бизнес"
+    if re.search(r"(юрист|legal counsel|комплаенс)", blob):
+        return "бизнес"
+    if re.search(r"(бухгалтер|финансов|экономист|казначей)", blob):
+        return "бизнес"
+    if re.search(r"(логист|склад|supply chain|экспедитор)", blob):
+        return "инженерия"
+    if re.search(r"(product manager|продакт|product owner)", blob):
+        return "маркетинг"
+    if re.search(r"(поддержк|support|customer service|call.?center)", blob):
+        return "маркетинг"
+    return _primary_profession_tag(primary)
+
+
 def _build_search_text(req: JobMatchRequest) -> str:
     if req.profession and req.profession.strip():
-        return req.profession.strip()
+        p = req.profession.strip()
+        # Короткая подпись сферы («Маркетинг») — ищем по шаблону интереса, не дословно.
+        if len(p) < 40 and " or " not in p.lower():
+            templ = _INTEREST_SEARCH.get(req.interests[0])
+            if templ:
+                return templ
+        return p
     return _INTEREST_SEARCH.get(req.interests[0], "специалист")
 
 
@@ -223,7 +306,7 @@ def _item_to_mock(item: dict[str, Any], primary: Interest) -> MockVacancy:
     wf = _schedule_to_work_format(item.get("schedule"))
     lvl = _exp_to_level(item.get("experience"))
     alt = item.get("alternate_url") or f"https://hh.ru/vacancy/{vid}"
-    tag = primary.value.replace("_", " ")
+    tag = _infer_profession_tag(name, reqs, primary)
     return MockVacancy(
         id=f"hh-{vid}",
         title=name[:200],
@@ -237,6 +320,44 @@ def _item_to_mock(item: dict[str, Any], primary: Interest) -> MockVacancy:
         salary_min_rub=salary_min,
         source_url=alt,
     )
+
+
+async def suggest_areas(text: str, *, limit: int = 15) -> list[dict[str, str]]:
+    """Подсказки городов и регионов РФ через API hh.ru (/suggests/areas)."""
+    t = (text or "").strip()
+    if len(t) < 2:
+        return []
+    headers = {"User-Agent": _user_agent(), "Accept": "application/json"}
+    timeout = float(os.getenv("HH_REQUEST_TIMEOUT", "12"))
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            r = await client.get(HH_SUGGEST_AREAS_URL, params={"text": t}, headers=headers)
+            r.raise_for_status()
+            data = r.json()
+    except (httpx.HTTPError, ValueError) as e:
+        logger.debug("hh.ru area suggest failed: %s", e)
+        return []
+
+    raw_items = data.get("items") or []
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for it in raw_items:
+        tid = it.get("id")
+        name = (it.get("text") or "").strip()
+        if tid is None or not name:
+            continue
+        sid = str(tid)
+        key = sid + "\n" + name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"id": sid, "text": name})
+
+    prefix = t.lower()
+    pref_match = [x for x in out if x["text"].lower().startswith(prefix)]
+    if not pref_match:
+        pref_match = [x for x in out if prefix in x["text"].lower()]
+    return pref_match[:limit] if pref_match else out[:limit]
 
 
 async def fetch_hh_vacancies(req: JobMatchRequest) -> list[MockVacancy]:

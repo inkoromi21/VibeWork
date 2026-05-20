@@ -29,6 +29,7 @@ def sphere_to_web_interest(sphere_id: str) -> str:
     return SPHERE_TO_WEB_INTEREST.get((sphere_id or "").strip(), "IT")
 
 
+# Короткие подписи (одна строка в сетке) — сверху; длинные — внизу.
 INTEREST_SPHERES: List[Dict[str, str]] = [
     {"id": "it_dev", "label": "IT"},
     {"id": "marketing", "label": "Маркетинг"},
@@ -37,14 +38,14 @@ INTEREST_SPHERES: List[Dict[str, str]] = [
     {"id": "logistics", "label": "Логистика"},
     {"id": "medicine", "label": "Медицина"},
     {"id": "education", "label": "Образование"},
-    {"id": "engineering", "label": "Рабочие специальности"},
     {"id": "creative", "label": "Творчество"},
     {"id": "sport", "label": "Спорт"},
-    {"id": "data", "label": "Данные и аналитика"},
-    {"id": "mgmt", "label": "Менеджмент и проекты"},
     {"id": "finance", "label": "Финансы"},
     {"id": "hr_edu", "label": "HR и обучение"},
     {"id": "other", "label": "Другое"},
+    {"id": "engineering", "label": "Рабочие специальности"},
+    {"id": "data", "label": "Данные и аналитика"},
+    {"id": "mgmt", "label": "Менеджмент и проекты"},
 ]
 
 # Минимум для «анкета заполнена» (чип в шапке, тест, вакансии)
@@ -146,7 +147,6 @@ def get_profile_schema() -> Dict[str, Any]:
                         "id": "age",
                         "type": "number",
                         "label": "Возраст",
-                        "help": "Для подбора вакансий по трудовому законодательству (14–30 лет).",
                         "placeholder": "17",
                         "min": 14,
                         "max": 30,
@@ -156,7 +156,6 @@ def get_profile_schema() -> Dict[str, Any]:
                         "id": "city",
                         "type": "text",
                         "label": "Город",
-                        "help": "Поиск вакансий рядом; подсказки как на вкладке «Вакансии».",
                         "placeholder": "Москва, Казань…",
                         "required": True,
                     },
@@ -164,7 +163,6 @@ def get_profile_schema() -> Dict[str, Any]:
                         "id": "education_detail",
                         "type": "select",
                         "label": "Уровень образования",
-                        "help": "Влияет на стажировки и должности без опыта.",
                         "required": True,
                         "options": [
                             {
@@ -190,7 +188,6 @@ def get_profile_schema() -> Dict[str, Any]:
                         "id": "course_grade",
                         "type": "text",
                         "label": "Курс / класс",
-                        "help": "Сколько времени до выхода на рынок.",
                         "placeholder": "10 класс, 2 курс…",
                         "required": True,
                     },
@@ -198,7 +195,6 @@ def get_profile_schema() -> Dict[str, Any]:
                         "id": "study_form",
                         "type": "select",
                         "label": "Форма обучения",
-                        "help": "Влияет на доступное время для работы.",
                         "required": True,
                         "options": [
                             {"id": "fulltime", "label": "Очная"},
@@ -223,7 +219,7 @@ def get_profile_schema() -> Dict[str, Any]:
                 "fields": [
                     {
                         "id": "primary_pain",
-                        "type": "select",
+                        "type": "radio",
                         "label": "",
                         "required": False,
                         "options": [
@@ -248,7 +244,6 @@ def get_profile_schema() -> Dict[str, Any]:
                         "id": "interest_spheres",
                         "type": "multiselect",
                         "label": "Сферы интересов (до 5)",
-                        "help": "Направление поиска профессий и вакансий.",
                         "max_select": 5,
                         "required": True,
                         "options": sphere_opts,
@@ -257,7 +252,6 @@ def get_profile_schema() -> Dict[str, Any]:
                         "id": "like_to_do",
                         "type": "textarea",
                         "label": "Чем нравится заниматься",
-                        "help": "Ключевые слова для подбора профессий.",
                         "placeholder": "Собирать ПК, рисовать, вести соцсети, помогать людям…",
                         "required": True,
                     },
@@ -265,7 +259,6 @@ def get_profile_schema() -> Dict[str, Any]:
                         "id": "dislike_to_do",
                         "type": "textarea",
                         "label": "Что не нравится делать",
-                        "help": "Отсекаем неподходящие роли.",
                         "placeholder": "Холодные звонки, сидеть без движения, считать цифры…",
                     },
                     {
@@ -294,7 +287,6 @@ def get_profile_schema() -> Dict[str, Any]:
                         "id": "work_schedule",
                         "type": "select",
                         "label": "График работы",
-                        "help": "Согласование с учёбой.",
                         "required": True,
                         "options": [
                             {"id": "weekends", "label": "Только выходные"},
@@ -309,7 +301,6 @@ def get_profile_schema() -> Dict[str, Any]:
                 "id": "skills_hard",
                 "theme": "Навыки",
                 "title": "Навыки (профессиональные)",
-                "subtitle": "Можно пропустить — заполните позже.",
                 "optional": True,
                 "fields": [
                     {
@@ -348,7 +339,6 @@ def get_profile_schema() -> Dict[str, Any]:
                 "id": "skills_soft",
                 "theme": "Личные качества",
                 "title": "Личные качества (1–5)",
-                "subtitle": "По умолчанию — середина шкалы.",
                 "optional": True,
                 "fields": [
                     {
@@ -405,7 +395,6 @@ def get_profile_schema() -> Dict[str, Any]:
                 "id": "experience",
                 "theme": "Опыт",
                 "title": "Опыт",
-                "subtitle": "Даже подработка и проекты — это плюс.",
                 "optional": True,
                 "fields": [
                     {
@@ -503,7 +492,6 @@ def get_profile_schema() -> Dict[str, Any]:
                 "id": "extra",
                 "theme": "Дополнительно",
                 "title": "Дополнительно",
-                "subtitle": "По желанию — для точнее разбора и чата.",
                 "optional": True,
                 "fields": [
                     {

@@ -902,45 +902,6 @@ html[data-theme="dark"] .avatar-bubble.sm {
   }
 }
 
-.step-dots {
-  display: flex;
-  align-items: center;
-  gap: 0.72rem;
-  flex-shrink: 0;
-}
-
-.step-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--border);
-  transition: background 0.25s, transform 0.25s;
-}
-
-.step-dot.step-done {
-  background: var(--green);
-}
-
-.step-dot.step-current {
-  transform: scale(1.35);
-  background: var(--green-dark);
-  box-shadow: 0 0 0 3px var(--green-soft);
-}
-
-.step-dot.step-done.step-current {
-  background: var(--green-dark);
-}
-
-.streak-chip {
-  font-size: 0.68rem;
-  font-weight: 600;
-  padding: 0.25rem 0.5rem;
-  border-radius: 999px;
-  background: #fff8e6;
-  border: 1px solid #f5e0a8;
-  color: #9a6b00;
-}
-
 .spark-btn {
   width: 36px;
   height: 36px;
@@ -2348,6 +2309,24 @@ body.app-ready .theme-toggle-btn--auth-gate {
   border: 1px solid var(--border);
 }
 
+.filters label:has(.city-ac-wrap) {
+  position: relative;
+  overflow: visible;
+}
+
+.filters label:has(.city-ac-wrap:focus-within) {
+  z-index: 80;
+}
+
+.filters .city-ac-wrap {
+  display: block;
+  width: 100%;
+}
+
+.filters .city-suggest-list {
+  z-index: 120;
+}
+
 .view-toggle {
   display: flex;
   flex-wrap: wrap;
@@ -2781,6 +2760,43 @@ body.app-ready .theme-toggle-btn--auth-gate {
   accent-color: var(--green);
 }
 
+.sheet-radio-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+
+.sheet-radio-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.75rem 0.9rem;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-card);
+  font-size: 0.95rem;
+  line-height: 1.35;
+  cursor: pointer;
+  color: var(--text);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.sheet-radio-opt:has(input:checked) {
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--green) 10%, var(--bg-card));
+}
+
+.sheet-radio-opt input[type="radio"] {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+  accent-color: var(--green);
+}
+
+.sheet-radio-opt span {
+  flex: 1;
+}
+
 .sheet-scale-row {
   margin-top: 0.35rem;
 }
@@ -2956,6 +2972,45 @@ html[data-theme="dark"] .profi-pillar {
   color: var(--green-dark);
 }
 
+.city-ac-wrap {
+  position: relative;
+}
+
+.city-suggest-list {
+  position: absolute;
+  z-index: 50;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.city-suggest-list li {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.city-suggest-list li:hover,
+.city-suggest-list li:focus {
+  background: color-mix(in srgb, var(--green) 14%, var(--bg-card));
+  outline: none;
+}
+
+.sheet-field--city .city-ac-wrap {
+  width: 100%;
+}
+
 .sheet-profile-root {
   border-top: none;
   margin-top: 0.5rem;
@@ -3024,6 +3079,28 @@ html[data-theme="dark"] .profi-pillar {
   border-radius: 999px;
 }
 
+/* Вопросы и варианты анкеты — основной цвет текста, не --muted */
+.cdek-profile-form .profile-wizard .field,
+.cdek-profile-form .profile-wizard .field > span,
+.cdek-profile-form .profile-wizard label.sheet-field,
+.cdek-profile-form .profile-wizard label.sheet-field > span,
+.cdek-profile-form .profile-wizard .sheet-multigroup,
+.cdek-profile-form .profile-wizard .sheet-multigroup > span,
+.cdek-profile-form .profile-wizard .sheet-multi-opt,
+.cdek-profile-form .profile-wizard .sheet-multi-opt span,
+.cdek-profile-form .profile-wizard .sheet-radio-opt,
+.cdek-profile-form .profile-wizard .sheet-radio-opt span,
+.cdek-profile-form .profile-wizard .sheet-scale-field > span:first-child,
+.cdek-profile-form .profile-wizard .sheet-radiogroup,
+.cdek-profile-form .profile-wizard .wizard-step-question,
+.cdek-profile-form .profile-wizard .profile-wizard-prompt {
+  color: var(--text);
+}
+
+.cdek-profile-form .profile-wizard .sheet-scale-bound {
+  color: var(--muted);
+}
+
 .profile-wizard-steps {
   min-height: 8rem;
 }
@@ -3057,19 +3134,12 @@ html[data-theme="dark"] .profi-pillar {
   display: none !important;
 }
 
-.profile-wizard-step[data-section="pain"] .sheet-field--bare select {
-  min-height: 3.35rem;
-  padding: 0.9rem 1.1rem;
-  font-size: 1rem;
-  font-weight: 400;
-  line-height: 1.35;
-  border-radius: 14px;
-  border-width: 1.5px;
-  color: var(--text);
+.profile-wizard-step[data-section="pain"] .sheet-radiogroup {
+  margin-top: 0;
 }
 
-.profile-wizard-step[data-section="pain"] .sheet-field--bare {
-  margin-top: 0;
+.profile-wizard-step[data-section="pain"] .sheet-radio-list {
+  gap: 0.55rem;
 }
 
 .profile-wizard-step .sheet-section-head {

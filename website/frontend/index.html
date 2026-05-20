@@ -118,20 +118,12 @@
           <div class="topbar-copy">
             <div class="topbar-heading-row">
               <p class="topbar-title">Карьерный трек</p>
-              <div class="step-dots" id="header-step-dots" aria-hidden="true">
-                <span class="step-dot" data-step="1" title="Профиль"></span>
-                <span class="step-dot" data-step="2" title="Тест"></span>
-                <span class="step-dot" data-step="3" title="Разбор"></span>
-                <span class="step-dot" data-step="4" title="ИИ"></span>
-                <span class="step-dot" data-step="5" title="Вакансии"></span>
-              </div>
             </div>
             <p class="topbar-quote">«Дорогу осилит идущий — а траекторию строит каждый выбранный шаг.»</p>
             <p class="profile-tagline" id="profile-tagline">Этапы откроются по мере прохождения</p>
           </div>
         </div>
         <div class="topbar-tools">
-          <span class="streak-chip" id="streak-chip" hidden>фокус</span>
           <button type="button" class="theme-toggle-btn theme-toggle-btn--topbar" id="btn-theme-toggle" title="Тёмная тема" aria-pressed="false" aria-label="Переключить тему">🌙</button>
           <button type="button" class="account-hub-btn" id="btn-account-hub" hidden title="Страница аккаунта">
             <span class="account-hub-star" aria-hidden="true">✦</span>
@@ -168,7 +160,6 @@
       <div class="card float-in">
         <div class="card-head">
           <h1>Этап 2 — тест</h1>
-          <p class="muted"><strong>Два отдельных теста:</strong> (1) <strong>10 вопросов</strong> по выбранной сфере — (2) <strong>8 вопросов</strong> «тип личности». Оба блока нужны для разбора. Учитывается время ответа.</p>
         </div>
         <p class="banner-warn" id="test-blocked-banner" hidden>Сначала заполните этап 1 — обязательные поля анкеты (база, интересы, цели).</p>
         <div class="quiz-metrics-wrap" id="quiz-metrics-wrap" hidden>
@@ -189,8 +180,6 @@
         </div>
         <div class="quiz-test-section quiz-test-section--personality">
           <h2 class="quiz-test-heading">Тест 2 — тип личности</h2>
-          <p class="muted small">Короткий блок про стиль работы и среду — в духе профориентации (ориентиры вроде типов Холланда, «логика / этика / практика / идеи»).</p>
-          <p class="muted small">По ответам виднее, где вам комфортно: порядок или постоянные сдвиги, опора на факты или на эмоции в решениях, много контактов или глубокий фокус. Вместе с тестом 1 это уходит в разбор как профиль «логика / идеи / люди».</p>
           <div id="quiz-personality" class="quiz"></div>
         </div>
         <div class="actions test-footer" id="test-footer" hidden>
@@ -286,12 +275,14 @@
       <div class="card float-in">
         <div class="card-head">
           <h1>Вакансии</h1>
-          <p class="muted">Матчинг — после разбора и (если есть) чата. Переключайте <strong>классика</strong>, <strong>компакт</strong> или <strong>тиндер</strong>.</p>
+          <p class="muted">Матчинг — после разбора и (если есть) чата. Переключайте <strong>классика</strong> или <strong>тиндер</strong>.</p>
         </div>
         <div class="filters">
           <label>
             Область
-            <input type="text" id="job-profession" placeholder="IT, дизайн…" />
+            <select id="job-sphere">
+              <option value="">Загрузка…</option>
+            </select>
           </label>
           <label>
             Уровень
@@ -305,7 +296,10 @@
           </label>
           <label>
             Город
-            <input type="text" id="job-city" placeholder="Москва…" />
+            <span class="city-ac-wrap">
+              <input type="text" id="job-city" placeholder="Начните вводить: кем…" autocomplete="off" spellcheck="false" />
+              <ul id="job-city-suggest" class="city-suggest-list" hidden></ul>
+            </span>
           </label>
           <label>
             Формат
@@ -328,14 +322,12 @@
         </div>
         <div class="view-toggle">
           <button type="button" class="btn tab-toggle active" data-view="match">Классика</button>
-          <button type="button" class="btn tab-toggle" data-view="list">Компакт</button>
           <button type="button" class="btn tab-toggle" data-view="swipe">Тиндер</button>
         </div>
         <div id="jobs-hh-search" class="muted small" style="margin:10px 0 0" hidden>
           hh.ru недоступен? <a id="jobs-hh-search-link" href="#" target="_blank" rel="noopener noreferrer">Открыть поиск на hh.ru →</a>
         </div>
         <div id="jobs-match" class="jobs-view active"></div>
-        <div id="jobs-list" class="jobs-view"></div>
         <div id="jobs-swipe" class="jobs-view">
           <div class="tinder-deck" id="tinder-deck">
             <div class="swipe-stack tinder-stack" id="swipe-stack"></div>
@@ -366,14 +358,13 @@
       <div class="card float-in">
         <div class="card-head">
           <h1>Симулятор дня</h1>
-          <p class="muted">Текстовый квест: проживите смену аналитика или дизайнера</p>
+          <p class="muted">Текстовый квест: проживите рабочий день в выбранной сфере из анкеты</p>
         </div>
         <div class="sim-controls">
           <label>
-            Роль
+            Сфера и профессия
             <select id="sim-role">
-              <option value="analyst">Аналитик данных</option>
-              <option value="designer">Продуктовый дизайнер</option>
+              <option value="">Загрузка…</option>
             </select>
           </label>
           <button type="button" class="btn secondary" id="sim-restart">Начать заново</button>
@@ -381,7 +372,7 @@
         <div class="sim-card" id="sim-card">
           <div class="sim-meta">
             <span class="badge" id="sim-step-badge">Шаг 0</span>
-            <span class="mono" id="sim-points">Очки: 50</span>
+            <span class="mono" id="sim-points">Очки: 0</span>
           </div>
           <h3 id="sim-title">Нажмите «Начать заново»</h3>
           <p id="sim-text" class="sim-text"></p>

@@ -127,6 +127,8 @@ def suggest_areas(text: str, *, limit: int = 15) -> List[Dict[str, str]]:
 
     prefix = t.lower()
     pref_match = [x for x in out if x["text"].lower().startswith(prefix)]
+    if not pref_match:
+        pref_match = [x for x in out if prefix in x["text"].lower()]
     chosen = pref_match[:limit] if pref_match else out[:limit]
     return chosen
 

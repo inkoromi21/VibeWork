@@ -1,8 +1,6 @@
 const STORAGE_KEY = "vibework_result_v6";
 const STORAGE_PROFILE_DRAFT = "vibework_profile_draft_v1";
 const STORAGE_SWIPES = "vibework_swipes_v1";
-/** Серия дней с заходом при заполненном профиле: { lastYmd, count } */
-const STORAGE_FOCUS_STREAK = "vibework_focus_streak_v2";
 
 window.lastAnalysis = null;
 window.serverLoggedIn = false;
@@ -59,58 +57,6 @@ function showToast(msg, ms = 4200) {
   }, ms);
 }
 
-function localYmd(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function prevLocalYmd(ymd) {
-  const [y, mo, da] = ymd.split("-").map(Number);
-  const dt = new Date(y, mo - 1, da);
-  dt.setDate(dt.getDate() - 1);
-  return localYmd(dt);
-}
-
-/** Учёт календарной серии: не чаще одного шага в день, обрыв если пропущен день. */
-function recordFocusStreakDay() {
-  if (!profileBasicsOk()) return 0;
-  const today = localYmd();
-  let data;
-  try {
-    data = JSON.parse(localStorage.getItem(STORAGE_FOCUS_STREAK) || "null");
-  } catch (_) {
-    data = null;
-  }
-  if (!data || typeof data.lastYmd !== "string" || typeof data.count !== "number") {
-    data = { lastYmd: today, count: 1 };
-  } else if (data.lastYmd === today) {
-    /* уже отмечен сегодня */
-  } else if (data.lastYmd === prevLocalYmd(today)) {
-    data = { lastYmd: today, count: data.count + 1 };
-  } else {
-    data = { lastYmd: today, count: 1 };
-  }
-  try {
-    localStorage.setItem(STORAGE_FOCUS_STREAK, JSON.stringify(data));
-  } catch (_) {}
-  return data.count;
-}
-
-function updateStreakChip() {
-  const chip = document.getElementById("streak-chip");
-  if (!chip) return;
-  if (!profileBasicsOk()) {
-    chip.hidden = true;
-    return;
-  }
-  const n = recordFocusStreakDay();
-  chip.textContent = `${Math.min(999, n)}-дн. фокус`;
-  chip.hidden = false;
-  chip.title = "Подряд календарных дней с заходом в сервис (профиль заполнен)";
-}
-
 function updateAvatarBubble() {
   const el = document.getElementById("avatar-bubble");
   if (!el) return;
@@ -128,39 +74,6 @@ function updateAvatarBubble() {
     .slice(0, 2)
     .toUpperCase();
   el.textContent = initials || "VW";
-}
-
-function updateHeaderStepper(tab) {
-  const dots = document.querySelectorAll(".step-dot");
-  if (!dots.length) return;
-  const p = profileBasicsOk();
-  const q = quizComplete();
-  const r = !!window.lastAnalysis;
-  dots.forEach((d) => d.classList.remove("step-done", "step-current"));
-  if (!p) {
-    dots[0].classList.add("step-current");
-    return;
-  }
-  dots[0].classList.add("step-done");
-  if (!q) {
-    dots[1].classList.add("step-current");
-    return;
-  }
-  dots[1].classList.add("step-done");
-  if (!r) {
-    dots[2].classList.add("step-current");
-    return;
-  }
-  dots[2].classList.add("step-done");
-  if (tab === "ai") {
-    dots[3].classList.add("step-current");
-  } else if (tab === "jobs" || tab === "sim") {
-    dots[4].classList.add("step-current");
-  } else if (tab === "test") {
-    dots[2].classList.add("step-current");
-  } else {
-    dots[0].classList.add("step-done", "step-current");
-  }
 }
 
 function skillsFromAnalysis(a) {
@@ -211,7 +124,7 @@ const QUIZ_FALLBACK = [
     { k: "D", t: "пошагово доводите задачу до результата" },
   ]},
   { id: 6, text: "Если задача неясна, вы в первую очередь:", options: [
-    { k: "A", t: "соберете факты и ограничения, чтобы сузить проблему" },
+    { k: "A", t: "соберёте факты и ограничения, чтобы сузить проблему" },
     { k: "B", t: "поищете нестандартные аналогии и примеры" },
     { k: "C", t: "обсудите ожидания с людьми, которым важен результат" },
     { k: "D", t: "разложите работу по шагам и начнёте с самого безопасного" },
@@ -259,7 +172,7 @@ const PERSONALITY_QUIZ_FALLBACK = [
   { id: 3, text: "После конфликта на проекте следующим утром вы скорее:", options: [
     { k: "A", t: "разложу факты: кто что обещал и что по регламенту" },
     { k: "B", t: "подумаю, как бы это выглядело «по-новому» и что можно смягчить" },
-    { k: "C", t: "договорюсь о отдельном разговоре без зрителей" },
+    { k: "C", t: "договорюсь об отдельном разговоре без зрителей" },
     { k: "D", t: "зафиксирую next steps в задаче/письме, чтобы не потерять нить" },
   ]},
   { id: 4, text: "Вас сильнее мотивирует ощущение:", options: [
@@ -271,7 +184,7 @@ const PERSONALITY_QUIZ_FALLBACK = [
   { id: 5, text: "Вы застреваете чаще, когда:", options: [
     { k: "A", t: "не хватает данных, критериев или ясных правил" },
     { k: "B", t: "нельзя попробовать свой вариант или эксперимент" },
-    { k: "C", t: "никто не объясняет «зачем» людям и к чему это их" },
+    { k: "C", t: "никто не объясняет людям «зачем» и к чему это приведёт" },
     { k: "D", t: "меняют условия посредине без формализации" },
   ]},
   { id: 6, text: "Новая роль: много неизвестного и мало инструкций. Ваш первый шаг:", options: [
@@ -317,10 +230,11 @@ function setTab(name) {
     localStorage.setItem("vibework_last_tab", name);
     if (name === "mts") localStorage.setItem("vibework_last_tab", "profile");
   } catch (_) {}
-  updateHeaderStepper(name);
   updateAvatarBubble();
   updateFlowUI();
   if (name === "account" && window.serverLoggedIn) renderAccountPage();
+  if (name === "jobs") wireJobCityAutocomplete();
+  if (name === "sim") loadSimRoleOptions().catch(() => {});
   schedulePushServerSnapshot();
 }
 
@@ -493,6 +407,9 @@ function renderSheetField(f) {
   const req = f.required ? ' <span class="req" aria-hidden="true">*</span>' : "";
   const hint = sheetFieldHint(f);
   if (f.type === "text") {
+    if (f.id === "city") {
+      return `<label class="field full sheet-field sheet-field--city"><span>${esc(f.label)}${req}</span><div class="city-ac-wrap"><input type="text" data-sheet-field="${esc(f.id)}" placeholder="${ph}" autocomplete="off" /><ul class="city-suggest-list" hidden></ul></div>${hint}</label>`;
+    }
     return `<label class="field full sheet-field"><span>${esc(f.label)}${req}</span><input type="text" data-sheet-field="${esc(f.id)}" placeholder="${ph}" autocomplete="off" />${hint}</label>`;
   }
   if (f.type === "number") {
@@ -517,6 +434,17 @@ function renderSheetField(f) {
     }
     return `<label class="field full sheet-field"><span>${esc(lbl)}${req}</span><select data-sheet-field="${esc(f.id)}">${opts}</select>${hint}</label>`;
   }
+  if (f.type === "radio" && f.options) {
+    const opts = f.options
+      .map(
+        (o) =>
+          `<label class="sheet-radio-opt"><input type="radio" name="sheet-${esc(f.id)}" data-sheet-field="${esc(f.id)}" value="${esc(sheetOptValue(o))}" /> <span>${esc(o.label)}</span></label>`
+      )
+      .join("");
+    const lbl = (f.label || "").trim();
+    const head = lbl ? `<span>${esc(lbl)}${req}</span>` : "";
+    return `<div class="field full sheet-field sheet-radiogroup"${head ? "" : ' sheet-field--bare'}>${head}<div class="sheet-radio-list">${opts}</div>${hint}</div>`;
+  }
   if (f.type === "multiselect" && f.options) {
     const maxN = f.max_select ?? f.max ?? 5;
     const opts = f.options
@@ -532,7 +460,7 @@ function renderSheetField(f) {
     const hi = f.scale_max ?? 5;
     const def = f.default ?? 3;
     const pct = Math.round(((def - lo) * 100) / Math.max(1, hi - lo));
-    return `<div class="field full sheet-field sheet-scale-field"><span>${esc(f.label)}</span><div class="sheet-scale-row sheet-scale-slider"><span class="sheet-scale-bound muted small" aria-hidden="true">${lo}</span><input type="range" data-sheet-field="${esc(f.id)}" min="${lo}" max="${hi}" value="${def}" step="1" style="--p:${pct}%" aria-valuemin="${lo}" aria-valuemax="${hi}" aria-valuenow="${def}" /><span class="sheet-scale-val" data-scale-for="${esc(f.id)}">${def}</span><span class="sheet-scale-bound muted small" aria-hidden="true">${hi}</span></div>${hint}</div>`;
+    return `<div class="field full sheet-field sheet-scale-field"><span>${esc(f.label)}</span><div class="sheet-scale-row sheet-scale-slider"><input type="range" data-sheet-field="${esc(f.id)}" min="${lo}" max="${hi}" value="${def}" step="1" style="--p:${pct}%" aria-valuemin="${lo}" aria-valuemax="${hi}" aria-valuenow="${def}" /><span class="sheet-scale-val" data-scale-for="${esc(f.id)}">${def}</span></div>${hint}</div>`;
   }
   return "";
 }
@@ -579,16 +507,155 @@ function renderSheetSectionHtml(sec, stepIndex) {
   const fields = (sec.fields || []).map(renderSheetField).filter(Boolean).join("");
   if (!fields) return "";
   const hideExtras = sec.id === "pain";
-  const opt =
-    !hideExtras && sec.optional
-      ? '<span class="sheet-section-badge muted small">по желанию</span>'
-      : "";
   const sub =
-    !hideExtras && sec.subtitle
+    !hideExtras && sec.subtitle && !sec.optional
       ? `<p class="sheet-section-sub muted small">${esc(sec.subtitle)}</p>`
       : "";
   const hidden = stepIndex === 0 ? "" : " hidden";
-  return `<section class="sheet-section profile-wizard-step"${hidden} data-wizard-step="${stepIndex}" data-section="${esc(sec.id || "")}" data-section-theme="${esc(sectionTheme(sec))}"><div class="sheet-section-head"><h3 class="sheet-section-title">${esc(sectionTheme(sec))}</h3>${opt}</div>${sub}<div class="sheet-section-body">${fields}</div></section>`;
+  return `<section class="sheet-section profile-wizard-step"${hidden} data-wizard-step="${stepIndex}" data-section="${esc(sec.id || "")}" data-section-theme="${esc(sectionTheme(sec))}"><div class="sheet-section-head"><h3 class="sheet-section-title">${esc(sectionTheme(sec))}</h3></div>${sub}<div class="sheet-section-body">${fields}</div></section>`;
+}
+
+const CITY_SUGGEST_FALLBACK = [
+  "Москва",
+  "Санкт-Петербург",
+  "Новосибирск",
+  "Екатеринбург",
+  "Казань",
+  "Нижний Новгород",
+  "Красноярск",
+  "Челябинск",
+  "Самара",
+  "Уфа",
+  "Ростов-на-Дону",
+  "Краснодар",
+  "Воронеж",
+  "Пермь",
+  "Волгоград",
+  "Кемерово",
+  "Тюмень",
+  "Омск",
+  "Иркутск",
+  "Хабаровск",
+];
+
+function localCitySuggestItems(q) {
+  const p = q.trim().toLowerCase();
+  if (p.length < 2) return [];
+  const out = [];
+  for (const name of CITY_SUGGEST_FALLBACK) {
+    const n = name.toLowerCase();
+    if (n.startsWith(p) || n.includes(p)) out.push({ id: "", text: name });
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+
+function attachCitySuggest(input, listEl, hooks = {}) {
+  if (!input || !listEl || input.dataset.citySuggestBound) return;
+  input.dataset.citySuggestBound = "1";
+  input.setAttribute("autocomplete", "off");
+  input.setAttribute("aria-autocomplete", "list");
+  listEl.setAttribute("role", "listbox");
+  let debounceTimer = null;
+  let suppressBlur = false;
+
+  function hideCitySuggest() {
+    listEl.hidden = true;
+    listEl.innerHTML = "";
+    input.removeAttribute("aria-expanded");
+  }
+
+  function pickCity(name) {
+    suppressBlur = true;
+    input.value = name;
+    hideCitySuggest();
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    if (hooks.afterCommit) hooks.afterCommit();
+    setTimeout(() => {
+      suppressBlur = false;
+    }, 400);
+  }
+
+  function renderCitySuggest(items) {
+    listEl.innerHTML = "";
+    if (!items?.length) {
+      hideCitySuggest();
+      return;
+    }
+    for (const it of items) {
+      const li = document.createElement("li");
+      li.setAttribute("role", "option");
+      li.textContent = it.text;
+      li.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        pickCity(it.text);
+      });
+      listEl.appendChild(li);
+    }
+    listEl.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+  }
+
+  async function fetchCitySuggest(q) {
+    if (q.length < 2) {
+      hideCitySuggest();
+      return;
+    }
+    let items = [];
+    try {
+      const res = await fetch(`/api/hh/area-suggest?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (res.ok) items = data.items || [];
+    } catch (_) {
+      items = [];
+    }
+    if (!items.length) items = localCitySuggestItems(q);
+    renderCitySuggest(items);
+  }
+
+  input.addEventListener("input", () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      fetchCitySuggest(input.value.trim());
+    }, 220);
+  });
+  input.addEventListener("focus", () => {
+    const q = input.value.trim();
+    if (q.length >= 2) fetchCitySuggest(q);
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") hideCitySuggest();
+  });
+  input.addEventListener("blur", () => {
+    setTimeout(() => {
+      if (suppressBlur) return;
+      hideCitySuggest();
+      if (hooks.afterCommit) hooks.afterCommit();
+    }, 200);
+  });
+}
+
+function wireProfileCityAutocomplete(root) {
+  if (!root) return;
+  root.querySelectorAll(".city-ac-wrap").forEach((wrap) => {
+    const input = wrap.querySelector('input[data-sheet-field="city"]');
+    const listEl = wrap.querySelector(".city-suggest-list");
+    attachCitySuggest(input, listEl, {
+      afterCommit: () => {
+        scheduleSaveProfileDraft();
+        updateFlowUI();
+      },
+    });
+  });
+}
+
+function wireJobCityAutocomplete() {
+  const input = document.getElementById("job-city");
+  const listEl = document.getElementById("job-city-suggest");
+  attachCitySuggest(input, listEl, {
+    afterCommit: () => debouncedJobs(),
+  });
 }
 
 function wireSheetFieldListeners(root) {
@@ -599,7 +666,10 @@ function wireSheetFieldListeners(root) {
     wrap.querySelectorAll(".sheet-multi").forEach((cb) => {
       cb.addEventListener("change", () => {
         enforceMultiMax(fid, maxN);
-        if (fid === "interest_spheres") debouncedQuizReload();
+        if (fid === "interest_spheres") {
+          syncJobSphereSelect();
+          debouncedQuizReload();
+        }
         updateAvatarBubble();
         scheduleSaveProfileDraft();
         updateFlowUI();
@@ -634,6 +704,7 @@ function wireSheetFieldListeners(root) {
   });
 
   syncEducationFromDetail();
+  wireProfileCityAutocomplete(root);
 }
 
 function showProfileWizardErr(msg) {
@@ -840,6 +911,60 @@ function getPrimaryQuizInterest() {
   return "IT";
 }
 
+function getProfileSphereIds() {
+  const sheet = collectSheetExtra();
+  const raw = sheet.interest_spheres;
+  if (Array.isArray(raw)) return raw.map((x) => String(x));
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      const p = JSON.parse(raw);
+      return Array.isArray(p) ? p.map((x) => String(x)) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+  return [];
+}
+
+function sphereLabelById(sphereId) {
+  const list = PROFILE_SCHEMA?.interest_spheres || [];
+  const hit = list.find((s) => s.id === sphereId);
+  return hit?.label || sphereId;
+}
+
+function syncJobSphereSelect() {
+  const sel = document.getElementById("job-sphere");
+  if (!sel) return;
+  const prev = sel.value;
+  const all = PROFILE_SCHEMA?.interest_spheres || [];
+  const profileIds = getProfileSphereIds();
+  sel.innerHTML = "";
+  if (!all.length) {
+    sel.appendChild(new Option("Загрузка…", "", true, true));
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  for (const s of all) {
+    const id = String(s.id || "");
+    if (!id) continue;
+    sel.appendChild(new Option(String(s.label || id), id));
+  }
+  const pick =
+    (prev && all.some((s) => s.id === prev) && prev) ||
+    (profileIds[0] && all.some((s) => s.id === profileIds[0]) && profileIds[0]) ||
+    String(all[0].id || "");
+  if (pick) sel.value = pick;
+}
+
+function getJobMatchInterest() {
+  const sel = document.getElementById("job-sphere");
+  const sid = (sel && !sel.disabled && sel.value) || getPrimarySphereId();
+  const map = getSphereToWebMap();
+  if (sid && map[sid]) return map[sid];
+  return getPrimaryQuizInterest();
+}
+
 function mapPreparationForApi(levelId) {
   const m = { weak: "слабый", medium: "средний", strong: "сильный" };
   if (m[levelId]) return m[levelId];
@@ -883,6 +1008,7 @@ async function ensureProfileSchemaRendered() {
   if (root) {
     renderSheetProfileFromSchema();
     sheetProfileRendered = true;
+    syncJobSphereSelect();
   }
 }
 
@@ -1059,7 +1185,6 @@ function clearReportUi() {
   updateProfileProgress();
   updateAiChecklist();
   updateFlowUI();
-  updateHeaderStepper(document.querySelector(".nav-pill.active, .tab-btn.active")?.dataset.tab || "profile");
 }
 
 function syncReportToQuizState() {
@@ -1107,8 +1232,7 @@ function updateAiChecklist() {
 }
 
 function updateFlowUI() {
-  try {
-    const hint = document.getElementById("flow-hint");
+  const hint = document.getElementById("flow-hint");
     const btn = document.getElementById("btn-analyze");
     const tf = document.getElementById("test-footer");
     const tff = document.getElementById("test-footer-hint");
@@ -1123,16 +1247,19 @@ function updateFlowUI() {
 
     const tag = document.getElementById("profile-tagline");
     if (tag && !window.lastAnalysis) {
+      tag.hidden = false;
       if (!pOk) tag.textContent = "Заполните обязательные блоки анкеты: база, интересы и цели.";
       else if (!qOk) tag.textContent = "Профиль готов — откройте «Тест»: два блока (сфера + тип личности).";
       else tag.textContent = "Дозаполните оба теста — затем появится разбор и метрики.";
     } else if (tag && window.lastAnalysis) {
-      tag.textContent = "Разбор готов: листайте блоки ниже или откройте ИИ и вакансии.";
+      tag.textContent = "";
+      tag.hidden = true;
+    } else if (tag) {
+      tag.hidden = false;
     }
 
     if (!btn || !hint) {
       updateQuizMetricsVisibility();
-      updateHeaderStepper(document.querySelector(".nav-pill.active, .tab-btn.active")?.dataset.tab || "profile");
       return;
     }
 
@@ -1144,7 +1271,6 @@ function updateFlowUI() {
         "Шаг 1: заполните анкету — возраст, город, образование, сферы (до 5), цели.";
       if (tf) tf.hidden = true;
       updateQuizMetricsVisibility();
-      updateHeaderStepper(document.querySelector(".nav-pill.active, .tab-btn.active")?.dataset.tab || "profile");
       return;
     }
 
@@ -1161,7 +1287,6 @@ function updateFlowUI() {
         if (aiBtn) aiBtn.hidden = true;
       }
       updateQuizMetricsVisibility();
-      updateHeaderStepper(document.querySelector(".nav-pill.active, .tab-btn.active")?.dataset.tab || "profile");
       return;
     }
 
@@ -1174,11 +1299,7 @@ function updateFlowUI() {
       if (tff) tff.textContent = "Тест заполнен — нажмите «К тесту и разбору» или дождитесь авто-разбора.";
       if (aiBtn) aiBtn.hidden = !window.lastAnalysis;
     }
-    updateQuizMetricsVisibility();
-    updateHeaderStepper(document.querySelector(".nav-pill.active, .tab-btn.active")?.dataset.tab || "profile");
-  } finally {
-    updateStreakChip();
-  }
+  updateQuizMetricsVisibility();
 }
 
 function updateProfileProgress() {
@@ -1336,9 +1457,9 @@ function buildJobContextBlob() {
 function collectMatchBody() {
   const form = document.getElementById("diag-form");
   const fd = new FormData(form);
-  const interest = getPrimaryQuizInterest();
+  const interest = getJobMatchInterest();
   const skills = skillsFromAnalysis(window.lastAnalysis);
-  const profession = document.getElementById("job-profession").value.trim() || null;
+  const profession = null;
   const level = document.getElementById("job-level").value || null;
   let city = document.getElementById("job-city").value.trim() || null;
   if (!city) {
@@ -1398,6 +1519,7 @@ function applyProfileToForm(p) {
     applySheetFieldValue(k, v);
   }
   syncEducationFromDetail();
+  syncJobSphereSelect();
 }
 
 function saveProfileDraft() {
@@ -1466,18 +1588,13 @@ async function pushServerSnapshot() {
   if (!window.serverLoggedIn) return;
   try {
     const body = buildServerSnapshot();
-    const r = await fetch("/api/auth/snapshot", {
+    await fetch("/api/auth/snapshot", {
       method: "PUT",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (r.ok) {
-      showToast("Сохранено на сервере.", 2000);
-    }
-  } catch (_) {
-    showToast("Не удалось сохранить на сервер — проверьте сеть.");
-  }
+  } catch (_) {}
 }
 
 /** Восстановление с сервера: профиль, localStorage-обёртка, чат, вкладка */
@@ -1507,7 +1624,7 @@ function resetClientStateForNewAccount() {
   try {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(STORAGE_PROFILE_DRAFT);
-    localStorage.removeItem(STORAGE_FOCUS_STREAK);
+    localStorage.removeItem("vibework_focus_streak_v2");
     localStorage.removeItem("vibework_streak_demo_v1");
     localStorage.removeItem("vibework_last_tab");
   } catch (_) {}
@@ -1533,7 +1650,6 @@ function resetClientStateForNewAccount() {
   renderChatMessages();
   refreshProfileMetricsVisibility();
   updateProfileProgress();
-  updateStreakChip();
   updateAvatarBubble();
 }
 
@@ -1580,7 +1696,7 @@ function sphereLabelsFromSheet(sheet) {
   return labels;
 }
 
-function buildProfileSummaryLines(profile, analysis) {
+function buildProfileSummaryLines(profile) {
   const lines = [];
   if (!profile || typeof profile !== "object") {
     return ["<li>Анкета ещё не заполнена — начните с раздела «Профиль».</li>"];
@@ -1613,18 +1729,6 @@ function buildProfileSummaryLines(profile, analysis) {
   }
   const city = sheet.city || sheet.location;
   if (city) lines.push(`<li><strong>Город:</strong> ${esc(String(city))}</li>`);
-  if (analysis?.profile_summary) {
-    const s = String(analysis.profile_summary).trim();
-    if (s) {
-      lines.push(
-        `<li><strong>Разбор:</strong> ${esc(s.length > 200 ? `${s.slice(0, 197)}…` : s)}</li>`
-      );
-    }
-  } else if (analysis?.scenarios?.inferred_profession?.label) {
-    lines.push(
-      `<li><strong>Направление:</strong> ${esc(String(analysis.scenarios.inferred_profession.label))}</li>`
-    );
-  }
   if (!lines.length) {
     return ["<li>Заполните анкету в разделе «Профиль», чтобы здесь появилась сводка.</li>"];
   }
@@ -1643,8 +1747,7 @@ function renderAccountPage() {
   const root = document.getElementById("account-page-root");
   if (!root || !window.serverLoggedIn) return;
   const profile = collectProfileFields();
-  const snap = buildServerSnapshot();
-  const summary = buildProfileSummaryLines(profile, window.lastAnalysis || snap.analysis);
+  const summary = buildProfileSummaryLines(profile);
   const nickVal = esc((window.serverNickname || "").trim());
   updateAccountPageSubtitle();
   root.innerHTML = `
@@ -2264,7 +2367,6 @@ function renderResults(res) {
   window.lastAnalysis = res;
   lastReportAnswerFingerprint = quizAnswerFingerprint();
   unlockProfileMetrics();
-  updateStreakChip();
   updateAvatarBubble();
   const av = document.getElementById("avatar-bubble");
   if (av) {
@@ -2343,8 +2445,6 @@ function renderResults(res) {
     )
     .join("");
 
-  const tabNow = document.querySelector(".nav-pill.active, .tab-btn.active")?.dataset.tab || "test";
-  updateHeaderStepper(tabNow);
 }
 
 function showError(msg) {
@@ -2369,6 +2469,7 @@ async function refreshHhSearchLink() {
   if (!box || !a) return;
   const m = collectMatchBody();
   const qs = new URLSearchParams();
+  if (m.interests?.[0]) qs.set("interest", m.interests[0]);
   if (m.profession) qs.set("profession", m.profession);
   if (m.level) qs.set("level", m.level);
   if (m.city) qs.set("city", m.city);
@@ -2385,7 +2486,7 @@ async function refreshHhSearchLink() {
   }
 }
 
-function renderEnrichedJobCard(e, compact) {
+function renderEnrichedJobCard(e) {
   const j = e.vacancy;
   const rows = e.rows
     .map(
@@ -2408,7 +2509,7 @@ function renderEnrichedJobCard(e, compact) {
       </div>
       <p class="muted small" style="margin:0.35rem 0"><strong>Матч ${e.match_percent}%</strong> — ${esc(e.why_match)}</p>
       ${e.why_not ? `<p class="muted small" style="margin:0">${esc(e.why_not)}</p>` : ""}
-      ${compact ? "" : `<div class="match-grid">${rows}</div>`}
+      <div class="match-grid">${rows}</div>
       ${
         j.source_url
           ? `<p style="margin:0.5rem 0 0"><a href="${esc(j.source_url)}" target="_blank" rel="noopener noreferrer" style="color:var(--primary2);font-size:0.88rem">Открыть на hh.ru →</a></p>`
@@ -2423,12 +2524,7 @@ function renderJobsMatch(list) {
     el.innerHTML = "<p class=\"muted\">Нет вакансий — ослабьте фильтры.</p>";
     return;
   }
-  el.innerHTML = list.map((e) => renderEnrichedJobCard(e, false)).join("");
-}
-
-function renderJobsListFromEnriched(list) {
-  const el = document.getElementById("jobs-list");
-  el.innerHTML = list.map((e) => renderEnrichedJobCard(e, true)).join("");
+  el.innerHTML = list.map((e) => renderEnrichedJobCard(e)).join("");
 }
 
 let swipeData = [];
@@ -2578,10 +2674,10 @@ document.querySelectorAll(".view-toggle .tab-toggle").forEach((b) => {
 });
 
 async function loadJobsData() {
+  syncJobSphereSelect();
   refreshHhSearchLink().catch(() => {});
   const data = await fetchJobsMatch();
   renderJobsMatch(data);
-  renderJobsListFromEnriched(data);
   swipeData = data;
   swipeIndex = 0;
   renderSwipeStack();
@@ -2715,11 +2811,16 @@ document.getElementById("diag-form").addEventListener("input", () => {
 });
 
 const debouncedJobs = debounce(() => loadJobsData().catch(() => {}), 450);
-["job-profession", "job-level", "job-city", "job-format", "job-salary"].forEach((id) => {
+["job-sphere", "job-level", "job-format", "job-salary"].forEach((id) => {
   const el = document.getElementById(id);
-  const ev = id === "job-profession" ? "input" : "change";
-  el.addEventListener(ev, () => debouncedJobs());
+  if (!el) return;
+  el.addEventListener("change", () => debouncedJobs());
 });
+const jobCityEl = document.getElementById("job-city");
+if (jobCityEl) {
+  jobCityEl.addEventListener("input", () => debouncedJobs());
+  jobCityEl.addEventListener("change", () => debouncedJobs());
+}
 
 function debounce(fn, ms) {
   let t;
@@ -2803,7 +2904,39 @@ document.getElementById("swipe-left")?.addEventListener("click", () => swipeVote
 document.getElementById("swipe-right")?.addEventListener("click", () => swipeVote(1));
 
 /** Симулятор */
-let simState = { role_key: "analyst", step_index: 0, career_points: 50, history: [] };
+let simState = { role_key: "it_dev", step_index: 0, career_points: 0, history: [], day_path: [] };
+
+async function loadSimRoleOptions() {
+  const sel = document.getElementById("sim-role");
+  if (!sel) return;
+  try {
+    const res = await fetch("/api/simulator/options");
+    const data = await res.json();
+    if (!res.ok) throw new Error("options");
+    const opts = data.options || [];
+    sel.innerHTML = "";
+    if (!opts.length) {
+      sel.appendChild(new Option("Нет сценариев", "", true, true));
+      sel.disabled = true;
+      return;
+    }
+    sel.disabled = false;
+    const profileIds = getProfileSphereIds();
+    let pick = opts[0].sphere_id;
+    for (const o of opts) {
+      const label = o.title || `${o.label} — ${o.profession || o.role}`;
+      sel.appendChild(new Option(label, o.sphere_id));
+      if (profileIds[0] && o.sphere_id === profileIds[0]) pick = o.sphere_id;
+    }
+    sel.value = pick;
+  } catch (_) {
+    sel.innerHTML = "";
+    sel.appendChild(new Option("IT — разработчик", "it_dev"));
+    sel.appendChild(new Option("Дизайн — UX/UI", "design"));
+    sel.appendChild(new Option("Данные — аналитик", "data"));
+    sel.value = "it_dev";
+  }
+}
 
 function renderSim(step) {
   document.getElementById("sim-step-badge").textContent = step.is_final ? "Финал" : `Шаг ${step.step_index + 1}`;
@@ -2828,6 +2961,8 @@ function renderSim(step) {
       simState.step_index = next.step_index;
       simState.career_points = next.career_points;
       simState.history = [...simState.history, c.id];
+      if (next.day_path) simState.day_path = next.day_path;
+      if (next.sim_role) simState.role_key = next.sim_role;
       renderSim(next);
     });
     ch.appendChild(b);
@@ -2836,11 +2971,15 @@ function renderSim(step) {
 
 async function startSim() {
   const role = document.getElementById("sim-role").value;
-  simState = { role_key: role, step_index: 0, career_points: 50, history: [] };
+  if (!role) return;
+  simState = { role_key: role, step_index: 0, career_points: 0, history: [], day_path: [] };
   const res = await fetch(`/api/simulator/start?role=${encodeURIComponent(role)}`);
+  if (!res.ok) throw new Error("Не удалось начать симулятор");
   const step = await res.json();
   simState.step_index = step.step_index;
   simState.career_points = step.career_points;
+  if (step.sim_role) simState.role_key = step.sim_role;
+  if (step.day_path) simState.day_path = step.day_path;
   renderSim(step);
 }
 
@@ -2930,6 +3069,8 @@ document.getElementById("btn-auth-logout").addEventListener("click", async () =>
 
 (async () => {
   await ensureProfileSchemaRendered();
+  syncJobSphereSelect();
+  loadSimRoleOptions().catch(() => {});
   const me = await refreshAuthState();
   if (!me.authenticated) {
     const storedOnLoad = loadResult();
@@ -3008,7 +3149,6 @@ document.getElementById("btn-auth-logout").addEventListener("click", async () =>
     clearReportUi();
   }
   updateQuizProgress();
-  updateHeaderStepper(document.querySelector(".nav-pill.active, .tab-btn.active")?.dataset.tab || "profile");
 })();
 
 const THEME_STORAGE_KEY = "vibework_theme";
@@ -3050,4 +3190,5 @@ function initThemeToggle() {
 }
 
 initThemeToggle();
+wireJobCityAutocomplete();
 
