@@ -3191,6 +3191,7 @@
               esc(tabTagline(currentTab)) +
               '</p></div></div>';
         const showScrollTop = currentTab !== 'home' && currentTab !== 'account';
+        const disp = displayUserPillText() || 'Аккаунт';
         const scrollTopBtnHtml = showScrollTop
             ? '<button type="button" class="vw-scroll-top" id="vwScrollTop" aria-label="Наверх">' +
               '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
@@ -6452,24 +6453,40 @@
         return ok;
     }
 
+    function showBootstrapError(err) {
+        console.error('[VibeWork miniapp]', err);
+        var app = document.getElementById('app');
+        if (!app) return;
+        app.innerHTML =
+            MINIAPP_BG_HTML +
+            '<div class="layout layout--auth" style="padding:24px">' +
+            '<p class="auth-error" style="display:block">Не удалось открыть приложение. Обновите страницу или войдите заново.</p>' +
+            '<button type="button" class="btn-primary" style="width:100%;margin-top:12px" onclick="location.reload()">Обновить</button>' +
+            '</div>';
+    }
+
     (async function bootstrap() {
-        if (await tryTelegramWebAppAuth()) {
-            await renderShell();
-            return;
-        }
-        const tok = localStorage.getItem(ACCESS_TOKEN_KEY);
-        if (userId && tok) {
-            if (await validateStoredSession()) {
-                const sh = vwShared();
-                if (sh && sh.isNewAccountOnboarding && sh.isNewAccountOnboarding()) {
-                    startProfileOnboarding();
-                }
+        try {
+            if (await tryTelegramWebAppAuth()) {
                 await renderShell();
-            } else {
-                clearAuth();
-                showAuthScreen();
+                return;
             }
-        } else showAuthScreen();
+            const tok = localStorage.getItem(ACCESS_TOKEN_KEY);
+            if (userId && tok) {
+                if (await validateStoredSession()) {
+                    const sh = vwShared();
+                    if (sh && sh.isNewAccountOnboarding && sh.isNewAccountOnboarding()) {
+                        startProfileOnboarding();
+                    }
+                    await renderShell();
+                } else {
+                    clearAuth();
+                    showAuthScreen();
+                }
+            } else showAuthScreen();
+        } catch (e) {
+            showBootstrapError(e);
+        }
     })();
 })();
 </script>
