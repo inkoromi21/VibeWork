@@ -104,10 +104,6 @@
         <button type="button" class="nav-pill side-nav-item" data-tab="jobs">
           <span class="sn-ico" aria-hidden="true">▦</span> Вакансии
         </button>
-        <div class="sidebar-sep" role="separator"></div>
-        <button type="button" class="nav-pill side-nav-item" data-tab="sim">
-          <span class="sn-ico" aria-hidden="true">▶</span> Симулятор
-        </button>
         <button type="button" class="nav-pill side-nav-item" data-tab="account" id="nav-account" hidden>
           <span class="sn-ico" aria-hidden="true">◎</span> Аккаунт
         </button>
@@ -313,8 +309,13 @@
       <div class="card float-in">
         <div class="card-head">
           <h1>Вакансии</h1>
-          <p class="muted">Матчинг — после разбора и (если есть) чата. Переключайте <strong>классика</strong> или <strong>тиндер</strong>.</p>
+          <p class="muted" id="jobs-section-lead">Матчинг — после разбора и (если есть) чата. Переключайте <strong>классика</strong> или <strong>тиндер</strong>.</p>
         </div>
+        <div class="view-toggle jobs-section-toggle" role="tablist" aria-label="Режим раздела вакансий">
+          <button type="button" class="btn tab-toggle active" data-jobs-section="hh">Подбор</button>
+          <button type="button" class="btn tab-toggle" data-jobs-section="sim">Симулятор дня</button>
+        </div>
+        <div id="jobs-mode-hh" class="jobs-mode-panel">
         <div class="filters jobs-filters-grid">
           <div class="job-filter-field">
             <label for="job-sphere">Область</label>
@@ -379,25 +380,8 @@
           </div>
           <p class="muted small swipe-hint">Свайп вправо — в локальное избранное (демо)</p>
         </div>
-      </div>
-    </section>
-
-    <section class="panel" id="panel-account" data-panel="account">
-      <div class="card float-in account-page-card">
-        <div class="card-head">
-          <h1>Аккаунт</h1>
-          <p class="muted" id="account-page-email"></p>
         </div>
-        <div id="account-page-root" class="account-page-root"></div>
-      </div>
-    </section>
-
-    <section class="panel" id="panel-sim" data-panel="sim">
-      <div class="card float-in">
-        <div class="card-head">
-          <h1>Симулятор дня</h1>
-          <p class="muted">Текстовый квест: проживите рабочий день в выбранной сфере из анкеты</p>
-        </div>
+        <div id="jobs-mode-sim" class="jobs-mode-panel" hidden>
         <div class="sim-controls">
           <label>
             Сфера и профессия
@@ -416,8 +400,20 @@
           <p id="sim-text" class="sim-text"></p>
           <div class="sim-choices" id="sim-choices"></div>
         </div>
+        </div>
       </div>
     </section>
+
+    <section class="panel" id="panel-account" data-panel="account">
+      <div class="card float-in account-page-card">
+        <div class="card-head">
+          <h1>Аккаунт</h1>
+          <p class="muted" id="account-page-email"></p>
+        </div>
+        <div id="account-page-root" class="account-page-root"></div>
+      </div>
+    </section>
+
   </main>
       <nav class="bottom-nav" aria-label="Вкладки">
         <button type="button" class="nav-pill bottom-tab active" data-tab="profile" aria-label="Профиль">

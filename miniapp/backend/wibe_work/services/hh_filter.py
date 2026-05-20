@@ -299,8 +299,8 @@ _SPHERE_ID_TO_HH_PHRASE: Dict[str, str] = {
 }
 
 
-def _load_analysis_best_track(user_id: str) -> Optional[str]:
-    """Лучший сценарий из сохранённого разбора (после теста)."""
+def _load_analysis_snapshot(user_id: str) -> Optional[Dict[str, Any]]:
+    """Сохранённый разбор после теста."""
     try:
         with get_db() as conn:
             row = conn.execute(
@@ -310,15 +310,23 @@ def _load_analysis_best_track(user_id: str) -> Optional[str]:
         if not row:
             return None
         data = json.loads(row["payload_json"])
-        scenarios = data.get("scenarios") or {}
-        best = str(scenarios.get("best_plan_name") or "").strip()
-        if not best:
-            plans = scenarios.get("plans") or []
-            if plans:
-                best = str(plans[0].get("name") or "").strip()
-        return re.sub(r"^План [ABC]:\s*", "", best).strip() or None
+        return data if isinstance(data, dict) else None
     except (json.JSONDecodeError, TypeError, KeyError):
         return None
+
+
+def _load_analysis_best_track(user_id: str) -> Optional[str]:
+    """Лучший сценарий из сохранённого разбора (после теста)."""
+    data = _load_analysis_snapshot(user_id)
+    if not data:
+        return None
+    scenarios = data.get("scenarios") or {}
+    best = str(scenarios.get("best_plan_name") or "").strip()
+    if not best:
+        plans = scenarios.get("plans") or []
+        if plans:
+            best = str(plans[0].get("name") or "").strip()
+    return re.sub(r"^План [ABC]:\s*", "", best).strip() or None
 
 
 def _hh_search_phrase(
@@ -517,7 +525,8 @@ def fetch_live_hh_vacancies(
     """
     profile = load_profile(user_id)
     competencies = load_competencies(user_id)
-    rec = run_recommendations(profile, competencies)
+    analysis = _load_analysis_snapshot(user_id)
+    rec = run_recommendations(profile, competencies, analysis=analysis)
     sd = (search_direction or "").strip()
     if sd:
         rec = {**rec, "primary_direction": sd}
@@ -606,7 +615,8 @@ def build_hh_demo_fallback(
     from wibe_work.services.hh_web_link import build_hh_web_search_url, demo_hh_items
 
     competencies = load_competencies(user_id)
-    rec = run_recommendations(profile, competencies)
+    analysis = _load_analysis_snapshot(user_id)
+    rec = run_recommendations(profile, competencies, analysis=analysis)
     sd = (search_direction or "").strip()
     if sd:
         rec = {**rec, "primary_direction": sd}
@@ -663,7 +673,8 @@ def build_hh_demo_fallback(
 def build_filter_bundle(user_id: str) -> Dict[str, Any]:
     profile = load_profile(user_id)
     competencies = load_competencies(user_id)
-    rec = run_recommendations(profile, competencies)
+    analysis = _load_analysis_snapshot(user_id)
+    rec = run_recommendations(profile, competencies, analysis=analysis)
 
     city = profile.get("city")
     area_id = suggest_area_id(str(city)) if city else None

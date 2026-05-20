@@ -5,6 +5,10 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from wibe_work.services.learning.adapters import integration_status, run_dynamic_adapter
+from wibe_work.services.learning.assessment_signals import (
+    build_assessment_signals,
+    resource_allowed,
+)
 from wibe_work.services.learning.catalog import (
     get_resource,
     pick_path,
@@ -18,12 +22,25 @@ from wibe_work.services.learning.progress import (
 )
 
 
-def _infer_track(scenarios: Optional[Dict[str, Any]]) -> Optional[str]:
-    if not scenarios:
-        return None
-    inf = scenarios.get("inferred_profession") or {}
-    tid = inf.get("track_id")
-    return str(tid) if tid else None
+def _infer_track(
+    scenarios: Optional[Dict[str, Any]],
+    *,
+    sphere: str = "",
+    answers: Optional[List[Dict[str, Any]]] = None,
+    axes: Optional[List[Dict[str, Any]]] = None,
+    signals: Optional[Dict[str, Any]] = None,
+) -> Optional[str]:
+    if signals and signals.get("track"):
+        return str(signals["track"])
+    from wibe_work.services.learning.assessment_signals import resolve_learning_track
+
+    track, _ = resolve_learning_track(
+        sphere=sphere,
+        scenarios=scenarios,
+        answers=answers,
+        axes=axes,
+    )
+    return track
 
 
 def _resolve_sphere(interest: str, profile: Dict[str, Any]) -> str:
@@ -37,6 +54,7 @@ def _enrich_step_resources(
     *,
     sphere: Optional[str] = None,
     track: Optional[str] = None,
+    signals: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     by_id = resources_by_id()
     seen_urls: set[str] = set()
@@ -51,7 +69,7 @@ def _enrich_step_resources(
 
     for rid in step.get("resource_ids") or []:
         r = by_id.get(str(rid))
-        if r:
+        if r and (not signals or resource_allowed(r, signals)):
             add(resource_to_card(r, source_type="curated"))
 
     for spec in step.get("dynamic") or []:
@@ -66,6 +84,16 @@ def _enrich_step_resources(
     return out[:8]
 
 
+_SPHERE_STEP_RESOURCE: Dict[str, str] = {
+    "marketing": "hubspot_academy",
+    "sales": "hubspot_academy",
+    "design": "figma_learn",
+    "creative": "figma_learn",
+    "data": "kaggle_learn",
+    "it_dev": "stepik_python",
+}
+
+
 def build_learning_path_payload(
     *,
     user_id: Optional[str],
@@ -74,10 +102,30 @@ def build_learning_path_payload(
     preparation_level: str,
     scenarios: Optional[Dict[str, Any]] = None,
     gap: Optional[Dict[str, Any]] = None,
+    axes: Optional[List[Dict[str, Any]]] = None,
+    answers: Optional[List[Dict[str, Any]]] = None,
+    assessment_signals: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    sphere = _resolve_sphere(interest, profile)
-    track = _infer_track(scenarios)
-    path_def = pick_path(sphere, track, preparation_level)
+    signals = assessment_signals or build_assessment_signals(
+        profile=profile,
+        interest=interest,
+        preparation_level=preparation_level,
+        scenarios=scenarios,
+        gap=gap,
+        axes=axes,
+        answers=answers,
+    )
+    sphere = str(signals.get("sphere") or _resolve_sphere(interest, profile))
+    track = _infer_track(
+        scenarios,
+        sphere=sphere,
+        answers=answers,
+        axes=axes,
+        signals=signals,
+    )
+    signals = dict(signals)
+    signals["track"] = track
+    path_def = pick_path(sphere, track, preparation_level, signals=signals)
     if not path_def:
         return {
             "path_id": None,
@@ -89,8 +137,24 @@ def build_learning_path_payload(
 
     path_id = str(path_def.get("id") or "")
     steps_out: List[Dict[str, Any]] = []
+    by_id = resources_by_id()
     for raw in sorted(path_def.get("steps") or [], key=lambda s: int(s.get("order") or 0)):
-        resources = _enrich_step_resources(raw, sphere=sphere, track=track)
+        step_raw = dict(raw)
+        if path_id == "general_career":
+            rids = [
+                str(rid)
+                for rid in (step_raw.get("resource_ids") or [])
+                if by_id.get(str(rid)) and resource_allowed(by_id[str(rid)], signals)
+            ]
+            if not rids:
+                fallback_rid = _SPHERE_STEP_RESOURCE.get(sphere)
+                fb_res = by_id.get(fallback_rid) if fallback_rid else None
+                if fb_res and resource_allowed(fb_res, signals):
+                    rids = [fallback_rid]
+            step_raw["resource_ids"] = rids
+        resources = _enrich_step_resources(
+            step_raw, sphere=sphere, track=track, signals=signals
+        )
         steps_out.append(
             {
                 "step_id": raw.get("id"),
@@ -127,6 +191,13 @@ def build_learning_path_payload(
         "steps": steps_out,
         "metrics": metrics,
         "priority_skills_from_gap": priority_skills[:5],
+        "assessment_signals": {
+            "sphere": signals.get("sphere"),
+            "track": track,
+            "track_source": signals.get("track_source"),
+            "best_plan_name": signals.get("best_plan_name"),
+            "dominant_axis": signals.get("dominant_axis"),
+        },
         "integration": integration_status(),
     }
 
@@ -139,6 +210,9 @@ def build_learning_for_analysis(
     preparation_level: str,
     scenarios: Optional[Dict[str, Any]] = None,
     gap: Optional[Dict[str, Any]] = None,
+    axes: Optional[List[Dict[str, Any]]] = None,
+    answers: Optional[List[Dict[str, Any]]] = None,
+    assessment_signals: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Карточки для блока «Обучение» + полный learning_path."""
     path_payload = build_learning_path_payload(
@@ -148,6 +222,9 @@ def build_learning_for_analysis(
         preparation_level=preparation_level,
         scenarios=scenarios,
         gap=gap,
+        axes=axes,
+        answers=answers,
+        assessment_signals=assessment_signals,
     )
     cards: List[Dict[str, Any]] = []
     seen: set[str] = set()
@@ -181,9 +258,20 @@ def build_learning_for_analysis(
             break
 
     if not cards:
-        r = get_resource("stepik_python")
-        if r:
-            cards.append(resource_to_card(r))
+        sig = assessment_signals or path_payload.get("assessment_signals") or {}
+        if not sig.get("sphere"):
+            sig = build_assessment_signals(
+                profile=profile,
+                interest=interest,
+                preparation_level=preparation_level,
+                scenarios=scenarios,
+                gap=gap,
+                axes=axes,
+                answers=answers,
+            )
+        from wibe_work.services.learning.catalog import pick_catalog_resources_for_signals
+
+        cards = pick_catalog_resources_for_signals(sig, limit=6)
 
     return {"learning": cards, "learning_path": path_payload}
 

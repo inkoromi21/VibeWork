@@ -295,17 +295,7 @@
         }
         /* Без 100vw: иначе на Windows справа остаётся щель (vw vs полоса прокрутки) */
         .vw-wave-strip {
-            position: relative;
-            width: 100%;
-            max-width: 100%;
-            margin-left: 0;
-            margin-right: 0;
-            height: 88px;
-            flex-shrink: 0;
-            overflow: hidden;
-            isolation: isolate;
-            /* Под прозрачный низ SVG — цвет полосы совпадает с темой */
-            background: var(--wave-strip-bg);
+            display: none;
         }
         .vw-wave-strip-inner {
             position: absolute;
@@ -331,7 +321,7 @@
             flex-wrap: wrap;
             align-items: center;
             gap: 12px 16px;
-            padding: 12px 20px 14px;
+            padding: max(10px, env(safe-area-inset-top, 0px)) 20px 14px;
             background: var(--card);
             border-bottom: 1px solid var(--border);
         }
@@ -1067,6 +1057,33 @@
             line-height: 1.45;
             color: var(--text-muted);
         }
+        .learn-desc-spoiler {
+            margin-top: 6px;
+            width: 100%;
+        }
+        .learn-desc-spoiler__sum {
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            list-style: none;
+            user-select: none;
+        }
+        .learn-desc-spoiler__sum::-webkit-details-marker {
+            display: none;
+        }
+        .learn-desc-spoiler__sum::before {
+            content: "▸ ";
+            color: var(--green);
+        }
+        .learn-desc-spoiler[open] .learn-desc-spoiler__sum::before {
+            content: "▾ ";
+        }
+        .learn-desc-spoiler__body {
+            margin: 6px 0 0;
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
         .multiselect-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
         .radio-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 14px; }
         .radio-opt {
@@ -1244,17 +1261,24 @@
             font-family: var(--font);
         }
         .quiz-q > p {
-            font-size: 18px;
+            font-size: clamp(0.95rem, 4.2vw, 1.125rem);
             font-weight: 400;
             font-family: var(--font);
             color: var(--text);
             line-height: 1.45;
+            overflow-wrap: break-word;
+            word-break: break-word;
         }
         .quiz-opt {
             display: block;
+            position: relative;
             width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
             text-align: left;
-            padding: 12px 16px;
+            padding: 12px 40px 12px 16px;
+            overflow-wrap: break-word;
+            word-break: break-word;
             margin-bottom: 8px;
             border-radius: var(--btn-anketa-radius);
             border: 2px solid var(--btn-anketa-border-strong);
@@ -1265,7 +1289,7 @@
             font-weight: 500;
             cursor: pointer;
             box-shadow: none;
-            transition: border-color 0.18s, background 0.18s;
+            transition: border-color 0.18s, background 0.18s, color 0.18s, box-shadow 0.18s;
         }
         .quiz-opt:hover {
             border-color: var(--btn-anketa-border-strong);
@@ -1273,9 +1297,32 @@
             box-shadow: none;
         }
         .quiz-opt.selected {
-            border-color: var(--btn-primary-border);
-            background: var(--btn-anketa-bg-selected);
-            box-shadow: none;
+            border-width: 3px;
+            border-color: var(--green);
+            background: color-mix(in srgb, var(--green) 18%, var(--bg-card));
+            color: var(--green-dark);
+            font-weight: 600;
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 28%, transparent);
+        }
+        .quiz-opt.selected::after {
+            content: "✓";
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--green);
+            line-height: 1;
+        }
+        html[data-theme="dark"] .quiz-opt.selected {
+            border-color: #3dd87a;
+            background: rgba(61, 216, 122, 0.34);
+            color: #ecfdf5;
+            box-shadow: 0 0 0 2px rgba(61, 216, 122, 0.5);
+        }
+        html[data-theme="dark"] .quiz-opt.selected::after {
+            color: #3dd87a;
         }
         .readiness-metric__head {
             display: flex;
@@ -1834,20 +1881,30 @@
             background: var(--accent-soft);
             outline: none;
         }
+        .jobs-section-modes,
         .jobs-view-modes {
             display: flex;
             flex-wrap: wrap;
-            align-items: center;
+            align-items: stretch;
             gap: 8px;
             margin-bottom: 12px;
         }
+        .jobs-hh-panel.hidden,
+        .jobs-sim-host.hidden {
+            display: none;
+        }
+        .jobs-section-modes .subtab,
         .jobs-view-modes .subtab {
-            flex: 1;
+            flex: 1 1 calc(50% - 4px);
             min-width: 0;
             justify-content: center;
             text-align: center;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
         @media (min-width: 520px) {
+            .jobs-section-modes .subtab,
             .jobs-view-modes .subtab {
                 flex: 0 1 auto;
                 min-width: 120px;
@@ -1866,7 +1923,8 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            gap: 12px;
+            flex-wrap: wrap;
+            gap: 8px 12px;
             margin-bottom: 8px;
         }
         .hh-job-card h4 {
@@ -1874,8 +1932,10 @@
             font-size: 0.95rem;
             line-height: 1.35;
             color: var(--text);
-            flex: 1;
+            flex: 1 1 100%;
             min-width: 0;
+            overflow-wrap: break-word;
+            word-break: break-word;
         }
         .hh-job-meta {
             font-size: 0.78rem;
@@ -1887,6 +1947,27 @@
             color: var(--text-muted);
             line-height: 1.45;
             margin-bottom: 12px;
+            overflow-wrap: break-word;
+            word-break: break-word;
+        }
+        .learn-path-step-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .learn-path-step-head .muted {
+            flex-shrink: 0;
+            max-width: 100%;
+            overflow-wrap: anywhere;
+        }
+        .sim-day-recap pre {
+            max-width: 100%;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
+            word-break: break-word;
         }
         .hh-job-cta {
             display: inline-flex;
@@ -2032,6 +2113,86 @@
                 padding: 28px 26px;
             }
             .hub-card-ico { font-size: 2.125rem; }
+        }
+        /* Телефоны: без горизонтального съезда, читаемый текст, зона нажатия */
+        @media (max-width: 480px) {
+            .shell {
+                padding-left: max(14px, env(safe-area-inset-left, 0px));
+                padding-right: max(14px, env(safe-area-inset-right, 0px));
+                padding-top: 16px;
+            }
+            .topbar {
+                padding-left: max(14px, env(safe-area-inset-left, 0px));
+                padding-right: max(14px, env(safe-area-inset-right, 0px));
+                gap: 10px;
+            }
+            .topbar-left {
+                flex: 1 1 100%;
+            }
+            .topbar-titles h1 {
+                font-size: 1rem;
+                line-height: 1.25;
+                overflow-wrap: anywhere;
+            }
+            .topbar-titles .dynamic-tagline {
+                font-size: 0.7rem;
+                line-height: 1.4;
+                max-width: 100%;
+                overflow-wrap: anywhere;
+            }
+            .account-chip-btn {
+                max-width: 100%;
+                flex: 1 1 auto;
+            }
+            .dash-grid-2 {
+                grid-template-columns: 1fr;
+            }
+            .quiz-q {
+                padding: 14px 12px 12px;
+            }
+            .quiz-module-title {
+                font-size: 0.88rem;
+                overflow-wrap: break-word;
+            }
+            .subtab {
+                padding: 10px 10px;
+                font-size: 0.72rem;
+            }
+            .jobs-section-modes .subtab,
+            .jobs-view-modes .subtab {
+                flex: 1 1 calc(50% - 4px);
+                padding: 10px 8px;
+                font-size: 0.7rem;
+            }
+            .job-filter-field select,
+            .job-filter-field input.jf-city-input,
+            #app input:not([type="range"]),
+            #app select,
+            #app textarea {
+                font-size: 16px;
+            }
+            .hh-job-cta {
+                width: 100%;
+                justify-content: center;
+                box-sizing: border-box;
+            }
+            .learn-path-step-head {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .vw-bottom-tab {
+                font-size: 0.58rem;
+                padding: 6px 1px;
+            }
+            .vw-bt-ico {
+                font-size: 1rem;
+            }
+        }
+        @media (max-width: 360px) {
+            .vw-bt-label {
+                font-size: 0.52rem;
+                letter-spacing: -0.03em;
+            }
         }
         @media (prefers-reduced-motion: reduce) {
             .hub-card:hover {
@@ -2250,10 +2411,9 @@
         { id: 'analysis', label: 'Разбор', ico: '📊' },
         { id: 'chat', label: 'ИИ-чат', ico: '🤖' },
         { id: 'jobs', label: 'Вакансии', ico: '💼' },
-        { id: 'simulator', label: 'Симулятор', ico: '📅' },
     ];
 
-    const TAB_ORDER = ['profile', 'test', 'analysis', 'chat', 'jobs', 'simulator'];
+    const TAB_ORDER = ['profile', 'test', 'analysis', 'chat', 'jobs'];
 
     let userId = localStorage.getItem('userId');
     let authMode = 'login';
@@ -2285,6 +2445,11 @@
     let chatReplyPending = false;
     /** Текущая сессия ИИ-чата (UUID), хранится в localStorage vw_chat_session_<userId>. */
     let chatSessionId = null;
+    let jobsSectionMode = 'hh';
+    try {
+        const savedJobsSec = localStorage.getItem('vw_jobs_section');
+        if (savedJobsSec === 'hh' || savedJobsSec === 'simulator') jobsSectionMode = savedJobsSec;
+    } catch (e) {}
     let jobsViewMode = 'classic';
     let jobsFilters = {
         search_direction: '',
@@ -2376,6 +2541,18 @@
         const d = document.createElement('div');
         d.textContent = s;
         return d.innerHTML;
+    }
+
+    function learnDescSpoiler(desc) {
+        const t = desc != null ? String(desc).trim() : '';
+        if (!t) return '';
+        return (
+            '<details class="learn-desc-spoiler">' +
+            '<summary class="learn-desc-spoiler__sum">Описание</summary>' +
+            '<p class="learn-desc-spoiler__body muted">' +
+            esc(t) +
+            '</p></details>'
+        );
     }
 
     var vwAppAlertEscapeBound = false;
@@ -2518,7 +2695,6 @@
             analysis: 'Разбор',
             chat: 'ИИ',
             jobs: 'Вакансии',
-            simulator: 'День',
         };
         return m[tabId] || '—';
     }
@@ -2587,8 +2763,7 @@
             test: 'Ответьте честно: так точнее разбор по сфере.',
             analysis: 'Метрики, сценарии и план роста в одном месте.',
             chat: 'ИИ опирается на ваш сохранённый разбор.',
-            jobs: 'Вакансии с hh.ru по вашей анкете — ссылки на отклик.',
-            simulator: 'Текстовый день на работе — выбор решений.',
+            jobs: 'Подбор с hh.ru и симулятор рабочего дня — два режима в одном разделе.',
             account: 'Почта, направление из анкеты и смена пароля.',
         };
         return map[tabId] || 'Карьерный навигатор 14–30';
@@ -2736,43 +2911,6 @@
             }
         }
         return missing;
-    }
-
-    function profileQuickChips() {
-        let filled = 0;
-        let total = 6;
-        if (profileSchema && profileSchema.completion && profileSchema.completion.required) {
-            total = profileSchema.completion.required.length;
-            const req = profileSchema.completion.required;
-            for (let i = 0; i < req.length; i++) {
-                if (profileFieldFilled(cachedProfile, req[i])) filled++;
-            }
-            const anyOf = profileSchema.completion.any_of || profileSchema.completion.anyOf || [];
-            for (let g = 0; g < anyOf.length; g++) {
-                const group = anyOf[g];
-                if (group.some(function (fid) { return profileFieldFilled(cachedProfile, fid); })) filled++;
-                total++;
-            }
-        } else if (cachedProfile && Object.keys(cachedProfile).length) {
-            if (cachedProfile.age) filled++;
-            if (cachedProfile.city) filled++;
-            if (parseProfileSpheres(cachedProfile).length || cachedProfile.main_sphere) filled++;
-            if (cachedProfile.education_detail || cachedProfile.education_level) filled++;
-            if (cachedProfile.like_to_do) filled++;
-            if (cachedProfile.work_format_preference || cachedProfile.work_format_pref) filled++;
-        }
-        const pct = Math.min(100, Math.round((filled / total) * 100));
-        return (
-            '<div class="topbar-profile-hint" title="Заполните анкету — точнее подбор вакансий и разбор">' +
-            '<span class="profile-hint-bar" style="--p:' +
-            pct +
-            '%"></span>' +
-            '<span class="profile-hint-text">Анкета ' +
-            filled +
-            '/' +
-            total +
-            '</span></div>'
-        );
     }
 
     function isProfileComplete(schema, profile) {
@@ -3202,12 +3340,8 @@
             MINIAPP_BG_HTML +
             '<div class="layout layout--full">' +
             '<div class="main-col">' +
-            MINIAPP_WAVE_STRIP_HTML +
             '<header class="topbar">' +
             topLeft +
-            '<div class="topbar-chips">' +
-            profileQuickChips() +
-            '</div>' +
             '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%">' +
             '<button type="button" class="account-chip-btn' +
             (currentTab === 'account' ? ' is-active' : '') +
@@ -4003,16 +4137,9 @@
                   });
             const spheres = schema.interest_spheres || [];
             const profileOk = isProfileComplete(schema, profile);
-            const missingProfile = profileOk ? [] : listIncompleteProfileFields(schema, profile);
             const warnBanner = profileOk
                 ? ''
-                : '<div class="banner-warn"><strong>Анкета не заполнена.</strong> Заполните обязательные шаги во вкладке «Анкета» (база, интересы, цели).' +
-                  (missingProfile.length
-                      ? '<br><span style="font-size:.9em">Не хватает: ' +
-                        esc(missingProfile.join(', ')) +
-                        '.</span>'
-                      : '') +
-                  '</div>';
+                : '<div class="banner-warn">Анкета не заполнена.</div>';
             const gradeBanner =
                 quizState.testGradeLabel
                     ? '<div class="banner-grade" style="margin-bottom:12px;padding:10px 14px;background:var(--accent-soft);border-radius:var(--radius-sm);border:1px solid var(--accent-border);font-size:.82rem;line-height:1.45"><strong>Грейд теста:</strong> ' +
@@ -4043,8 +4170,6 @@
                 };
                 return;
             }
-            let answered = 0;
-            for (let i = 0; i < qs.length; i++) if (quizState.answers[qs[i].id]) answered++;
             const jobSearch = quizState.assessmentFocus === 'job_search';
             const testTitle = quizState.trackLabel
                 ? (jobSearch ? 'Тест: ' : 'Профориентационный тест (') +
@@ -4070,16 +4195,9 @@
                 gradeBanner +
                 trackHintBanner +
                 '<label for="testSphereSelect">Сфера для теста</label>' +
-                '<select id="testSphereSelect">' + sphereOpts + '</select>' +
-                '<p class="muted" id="quizProgCaption" style="margin:0 0 14px;font-size:.95rem">Отвечено ' +
-                answered +
-                ' из ' +
-                qs.length +
-                ' (техника ' +
-                techQs.length +
-                (jobSearch ? ', роль и вакансии ' : ', профориентация ') +
-                persQs.length +
-                ')</p>';
+                '<select id="testSphereSelect">' + sphereOpts + '</select>';
+
+            let userQuestionNum = 0;
 
             function renderQuizQuestions(blockQs) {
                 if (!blockQs.length) return '';
@@ -4088,9 +4206,10 @@
                     const q = blockQs[bi];
                     const qid = q.id;
                     const picked = quizState.answers[qid];
+                    userQuestionNum += 1;
                     blockHtml +=
                         '<div class="quiz-q"><strong>Вопрос ' +
-                        qid +
+                        userQuestionNum +
                         '</strong><p style="margin:10px 0 12px">' +
                         esc(q.text) +
                         '</p>';
@@ -4099,7 +4218,8 @@
                         const o = opts[j];
                         const choice = o.id != null ? o.id : o.k;
                         const label = o.label != null ? o.label : o.t || '';
-                        const sel = picked === choice ? ' selected' : '';
+                        const sel =
+                            picked != null && String(picked) === String(choice) ? ' selected' : '';
                         blockHtml +=
                             '<button type="button" class="quiz-opt' +
                             sel +
@@ -4129,7 +4249,19 @@
             }
 
             function renderTest2Blocks() {
-                let out = '<div class="section-title" style="margin-top:20px">' + esc(test2Heading) + '</div>';
+                let out = '';
+                if (techQs.length) {
+                    out +=
+                        '<div class="section-title" style="margin-top:20px">Тест 1 — задачи в вашей сфере</div>' +
+                        renderQuizQuestions(techQs);
+                }
+                const careerQs = persQs.filter(function (q) {
+                    return q.module === 'career' || q.block === 'career';
+                });
+                const hasBlock2 = orientMods.length || careerQs.length || (!orientMods.length && persQs.length);
+                if (!hasBlock2) return out;
+                out +=
+                    '<div class="section-title" style="margin-top:20px">' + esc(test2Heading) + '</div>';
                 if (orientMods.length) {
                     for (let mi = 0; mi < orientMods.length; mi++) {
                         const mod = orientMods[mi];
@@ -4140,9 +4272,6 @@
                             renderQuizQuestions(mod.questions || []) +
                             '</div>';
                     }
-                    const careerQs = persQs.filter(function (q) {
-                        return q.module === 'career' || q.block === 'career';
-                    });
                     if (careerQs.length) {
                         out +=
                             '<div class="quiz-module-block"><h3 class="quiz-module-title">' +
@@ -4153,7 +4282,7 @@
                     }
                     return out;
                 }
-                return out + renderQuizQuestions(persQs);
+                return out + renderQuizQuestions(careerQs.length ? careerQs : persQs);
             }
 
             html += renderTest2Blocks();
@@ -4164,23 +4293,6 @@
                 quizState.answers = {};
                 await renderTestTab();
             };
-            function refreshQuizProgress() {
-                let a = 0;
-                for (let i = 0; i < qs.length; i++) if (quizState.answers[qs[i].id]) a++;
-                const cap = document.getElementById('quizProgCaption');
-                if (cap) {
-                    cap.textContent =
-                        'Отвечено ' +
-                        a +
-                        ' из ' +
-                        qs.length +
-                        (quizState.technicalCount === 0
-                            ? ' (без задач по сфере — только профориентация)'
-                            : jobSearch
-                              ? ' (техника ' + techQs.length + ', роль и вакансии ' + persQs.length + ')'
-                              : ' (техника ' + techQs.length + ', личность ' + persQs.length + ')');
-                }
-            }
             el.querySelectorAll('.quiz-opt').forEach(function (b) {
                 b.onclick = function () {
                     const qid = parseInt(b.getAttribute('data-qid'), 10);
@@ -4189,7 +4301,6 @@
                     const parent = b.closest('.quiz-q');
                     parent.querySelectorAll('.quiz-opt').forEach(function (x) { x.classList.remove('selected'); });
                     b.classList.add('selected');
-                    refreshQuizProgress();
                 };
             });
             document.getElementById('btnSubmitQuiz').onclick = async function () {
@@ -4541,10 +4652,7 @@
                               esc(c.title || 'Материал') +
                               '</a>'
                             : esc(c.title || 'Материал'));
-                    if (c.description) {
-                        html +=
-                            '<p class="muted" style="margin:6px 0 0;font-size:.78rem">' + esc(String(c.description)) + '</p>';
-                    }
+                    html += learnDescSpoiler(c.description);
                     html += '</div>';
                 }
                 html += '</div>';
@@ -4578,11 +4686,11 @@
                               : 'ожидает';
                     html +=
                         '<div class="learn-path-step" style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-sm)">' +
-                        '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
-                        '<b style="font-size:.92rem">' +
+                        '<div class="learn-path-step-head">' +
+                        '<b style="font-size:.92rem;min-width:0;overflow-wrap:break-word">' +
                         esc(String(st.order || si + 1) + '. ' + (st.title || '')) +
                         '</b>' +
-                        '<span class="muted" style="font-size:.75rem;white-space:nowrap">' +
+                        '<span class="muted" style="font-size:.75rem">' +
                         esc(statusLbl) +
                         '</span></div>';
                     if (st.goal) {
@@ -4619,12 +4727,7 @@
                                 esc(String(R.provider)) +
                                 '</span>';
                         }
-                        if (rdesc) {
-                            html +=
-                                '<p class="muted" style="margin:4px 0 0;font-size:.78rem;line-height:1.45">' +
-                                esc(rdesc) +
-                                '</p>';
-                        }
+                        html += learnDescSpoiler(rdesc);
                         html += '</div>';
                     }
                     html += '</div>';
@@ -4705,12 +4808,7 @@
                                         esc(String(M.provider)) +
                                         '</span>';
                                 }
-                                if (mdesc) {
-                                    html +=
-                                        '<p class="muted" style="margin:4px 0 0;font-size:.76rem;line-height:1.4">' +
-                                        esc(mdesc) +
-                                        '</p>';
-                                }
+                                html += learnDescSpoiler(mdesc);
                                 html += '</div>';
                             }
                             html += '</div>';
@@ -4857,12 +4955,7 @@
                                     esc(String(M.path_step)) +
                                     '</span>';
                             }
-                            if (mdesc) {
-                                html +=
-                                    '<p class="muted" style="margin:4px 0 0;font-size:.76rem;line-height:1.4">' +
-                                    esc(mdesc) +
-                                    '</p>';
-                            }
+                            html += learnDescSpoiler(mdesc);
                             html += '</div>';
                         }
                     }
@@ -5459,6 +5552,43 @@
         });
     }
 
+    function persistJobsSectionMode() {
+        try {
+            localStorage.setItem('vw_jobs_section', jobsSectionMode);
+        } catch (e) {}
+    }
+
+    function jobsSectionModesHtml() {
+        const hhOn = jobsSectionMode === 'hh' ? ' active' : '';
+        const simOn = jobsSectionMode === 'simulator' ? ' active' : '';
+        return (
+            '<div class="jobs-section-modes" role="tablist" aria-label="Режим раздела вакансий">' +
+            '<button type="button" class="subtab' +
+            hhOn +
+            '" data-jsec="hh" role="tab" aria-selected="' +
+            (jobsSectionMode === 'hh' ? 'true' : 'false') +
+            '">Подбор</button>' +
+            '<button type="button" class="subtab' +
+            simOn +
+            '" data-jsec="simulator" role="tab" aria-selected="' +
+            (jobsSectionMode === 'simulator' ? 'true' : 'false') +
+            '">Симулятор дня</button>' +
+            '</div>'
+        );
+    }
+
+    function wireJobsSectionModes(root) {
+        root.querySelectorAll('.jobs-section-modes .subtab[data-jsec]').forEach(function (b) {
+            b.onclick = async function () {
+                const mode = b.getAttribute('data-jsec') || 'hh';
+                if (mode === jobsSectionMode) return;
+                jobsSectionMode = mode;
+                persistJobsSectionMode();
+                await renderJobsTab();
+            };
+        });
+    }
+
     function wireJobsToolbar(root) {
         root.querySelectorAll('.job-filter-field select').forEach(function (sel) {
             sel.onchange = function () {
@@ -5543,7 +5673,9 @@
             { v: '200000', l: 'от 200 000 ₽' }
         ];
         return (
-            '<div class="jobs-toolbar" id="jobsToolbar">' +
+            '<div class="jobs-toolbar jobs-hh-panel' +
+            (jobsSectionMode === 'hh' ? '' : ' hidden') +
+            '" id="jobsToolbar">' +
             '<div class="jobs-filters-grid">' +
             '<div class="job-filter-field"><label for="jfArea">Область</label>' +
             '<select id="jfArea">' +
@@ -5774,10 +5906,23 @@
 
     async function renderJobsTab() {
         const el = document.getElementById('tabContent');
+        const lead =
+            jobsSectionMode === 'simulator'
+                ? 'Короткий сценарий рабочего дня под сферу из анкеты — выбирайте действия на шагах.'
+                : 'Подбор по анкете, разбору и сферам интересов. Фильтры можно изменить ниже.';
         el.innerHTML =
             '<h2>Вакансии</h2>' +
-            '<p class="muted" style="margin:0 0 12px;font-size:.88rem">Подбор по анкете, разбору и сферам интересов. Фильтры можно изменить ниже.</p>' +
-            jobsToolbarHtml();
+            '<p class="muted" style="margin:0 0 12px;font-size:.88rem">' +
+            esc(lead) +
+            '</p>' +
+            jobsSectionModesHtml() +
+            (jobsSectionMode === 'hh' ? jobsToolbarHtml() : '<div id="jobsSimHost" class="jobs-sim-host"></div>');
+        wireJobsSectionModes(el);
+        if (jobsSectionMode === 'simulator') {
+            const simHost = el.querySelector('#jobsSimHost');
+            if (simHost) renderSimulatorPanel(simHost);
+            return;
+        }
         wireJobsToolbar(el);
         await applyJobsFiltersFromProfile();
         const areaSel = el.querySelector('#jfArea');
@@ -5793,11 +5938,10 @@
         loadHhVacancies(el, false);
     }
 
-    function renderSimulatorTab() {
-        const el = document.getElementById('tabContent');
+    function renderSimulatorPanel(host) {
+        if (!host) return;
         if (!simulatorState) {
-            el.innerHTML =
-                '<h2>День на работе</h2><p class="muted">Загрузка сценариев…</p>';
+            host.innerHTML = '<p class="muted">Загрузка сценариев…</p>';
             (async function () {
                 try {
                     if (!simulatorRoleOptions) {
@@ -5823,30 +5967,37 @@
                             esc(o.title || o.label) +
                             '</option>';
                     }
-                    el.innerHTML =
-                        '<h2>День на работе</h2><p class="muted">Короткий сценарий рабочего дня под вашу сферу (те же направления, что и главная сфера в анкете). Выбирайте ответы на шагах.</p>' +
+                    host.innerHTML =
+                        '<p class="muted" style="margin:0 0 12px">Короткий сценарий рабочего дня под вашу сферу (те же направления, что и главная сфера в анкете).</p>' +
                         '<label for="simRole">Сфера</label>' +
                         '<select id="simRole">' +
                         opts +
                         '</select>' +
-                        '<button type="button" class="btn-primary" id="simStart">Начать день</button>';
-                    document.getElementById('simStart').onclick = async function () {
-                        const role = document.getElementById('simRole').value;
-                        try {
-                            const r = await fetch(apiUrl('/vibework/simulator/start'), {
-                                method: 'POST',
-                                headers: Object.assign({ 'Content-Type': 'application/json' }, apiFetchHeaders()),
-                                body: JSON.stringify({ role: role })
-                            });
-                            simulatorState = await r.json();
-                            renderSimulatorTab();
-                        } catch (e) {
-                            showAppAlert(String(e.message || e), 'Ошибка');
-                        }
-                    };
+                        '<button type="button" class="btn-primary" id="simStart" style="margin-top:12px">Начать день</button>';
+                    const startBtn = host.querySelector('#simStart');
+                    const roleSel = host.querySelector('#simRole');
+                    if (startBtn && roleSel) {
+                        startBtn.onclick = async function () {
+                            const role = roleSel.value;
+                            try {
+                                const r = await fetch(apiUrl('/vibework/simulator/start'), {
+                                    method: 'POST',
+                                    headers: Object.assign(
+                                        { 'Content-Type': 'application/json' },
+                                        apiFetchHeaders()
+                                    ),
+                                    body: JSON.stringify({ role: role })
+                                });
+                                simulatorState = await r.json();
+                                renderJobsTab();
+                            } catch (e) {
+                                showAppAlert(String(e.message || e), 'Ошибка');
+                            }
+                        };
+                    }
                 } catch (e) {
-                    el.innerHTML =
-                        '<h2>День на работе</h2><p class="muted">' +
+                    host.innerHTML =
+                        '<p class="muted">' +
                         esc(e.message || String(e)) +
                         '</p><button type="button" class="btn-secondary" onclick="window.__vw.goTab(\'profile\')">К анкете</button>';
                 }
@@ -5857,7 +6008,7 @@
         const node = st.node || {};
         const choices = node.choices || [];
         const stepNum = st.step_index != null ? st.step_index + 1 : 1;
-        let html = '<h2>День на работе</h2>';
+        let html = '';
         if (st.done) {
             html += '<div class="sim-progress">День завершён</div>';
             const recap = (st.day_recap || st.summary || 'День завершён.').trim();
@@ -5866,11 +6017,14 @@
                 esc(recap) +
                 '</pre></div>';
             html += '<button type="button" class="btn-secondary" id="simAgain">Сыграть снова</button>';
-            el.innerHTML = html;
-            document.getElementById('simAgain').onclick = function () {
-                simulatorState = null;
-                renderSimulatorTab();
-            };
+            host.innerHTML = html;
+            const againBtn = host.querySelector('#simAgain');
+            if (againBtn) {
+                againBtn.onclick = function () {
+                    simulatorState = null;
+                    renderJobsTab();
+                };
+            }
             return;
         }
         html += '<div class="sim-progress">Шаг ' + stepNum + ' — выберите действие</div>';
@@ -5889,8 +6043,8 @@
             html += '<button type="button" class="quiz-opt" data-cid="' + esc(c.id) + '">' + esc(c.label) + '</button>';
         }
         html += '<div class="row-btns"><button type="button" class="btn-secondary" id="simReset">Сбросить</button></div>';
-        el.innerHTML = html;
-        el.querySelectorAll('.quiz-opt[data-cid]').forEach(function (b) {
+        host.innerHTML = html;
+        host.querySelectorAll('.quiz-opt[data-cid]').forEach(function (b) {
             b.onclick = async function () {
                 const cid = b.getAttribute('data-cid');
                 try {
@@ -5906,16 +6060,19 @@
                         })
                     });
                     simulatorState = await r.json();
-                    renderSimulatorTab();
+                    renderJobsTab();
                 } catch (e) {
                     showAppAlert(String(e.message || e), 'Ошибка');
                 }
             };
         });
-        document.getElementById('simReset').onclick = function () {
-            simulatorState = null;
-            renderSimulatorTab();
-        };
+        const resetBtn = host.querySelector('#simReset');
+        if (resetBtn) {
+            resetBtn.onclick = function () {
+                simulatorState = null;
+                renderJobsTab();
+            };
+        }
     }
 
     function renderAccountTab() {
@@ -6294,7 +6451,7 @@
         let html =
             '<div class="hub-page">' +
             '<h2 class="hub-heading">Разделы</h2>' +
-            '<p class="hub-lead">Выберите блок — анкета, тесты, разбор, чат, вакансии или симулятор дня.</p>' +
+            '<p class="hub-lead">Выберите блок — анкета, тесты, разбор, чат или вакансии (подбор и симулятор дня).</p>' +
             '<div class="hub-grid">';
         for (let i = 0; i < SECTION_TABS.length; i++) {
             const t = SECTION_TABS[i];
@@ -6327,7 +6484,6 @@
         if (currentTab === 'analysis') return renderAnalysisTab();
         if (currentTab === 'chat') return renderChatTab();
         if (currentTab === 'jobs') return renderJobsTab();
-        if (currentTab === 'simulator') return renderSimulatorTab();
     }
 
     function mountTelegramLoginWidget(botUsername) {
@@ -6349,7 +6505,13 @@
         logout: logout,
         toggleTheme: toggleAppTheme,
         goTab: async function (id) {
-            currentTab = id;
+            if (id === 'simulator') {
+                jobsSectionMode = 'simulator';
+                persistJobsSectionMode();
+                currentTab = 'jobs';
+            } else {
+                currentTab = id;
+            }
             await renderShell();
         },
         onTelegramWidget: async function (user) {

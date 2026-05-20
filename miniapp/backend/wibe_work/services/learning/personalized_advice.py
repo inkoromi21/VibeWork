@@ -6,6 +6,12 @@ import json
 import re
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from wibe_work.services.learning.assessment_signals import (
+    build_assessment_signals,
+    infer_track_from_plan_name,
+    resource_allowed,
+    resource_match_score,
+)
 from wibe_work.services.learning.catalog import resource_to_card, resources_by_id
 from wibe_work.services.learning.engine import build_learning_path_payload
 from wibe_work.services.llm_client import fetch_llm_completion, llm_configured
@@ -32,11 +38,7 @@ def _plan_label(plan: Dict[str, Any]) -> str:
 
 
 def _infer_track_from_plan(plan_name: str) -> Optional[str]:
-    low = plan_name.lower()
-    for track, kws in _TRACK_HINTS:
-        if any(k in low for k in kws):
-            return track
-    return None
+    return infer_track_from_plan_name(plan_name)
 
 
 def _priority_skills(gap: Dict[str, Any]) -> List[str]:
@@ -74,32 +76,24 @@ def _catalog_resources_for_track(
     preparation: str,
     *,
     limit: int = 8,
+    signals: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
-    """Ресурсы из каталога под направление плана."""
-    by_id = resources_by_id()
-    track_l = (track or "").lower()
+    """Ресурсы из каталога под направление плана (строго по сфере/треку из разбора)."""
+    sig = signals or {
+        "sphere": sphere,
+        "track": track,
+        "preparation_level": preparation,
+        "priority_skills": [],
+        "catalog_min_score": 8,
+    }
+    if track and not sig.get("track"):
+        sig = dict(sig)
+        sig["track"] = track
     scored: List[Tuple[int, Dict[str, Any]]] = []
-    for r in by_id.values():
-        score = 0
-        spheres = r.get("spheres") or []
-        tracks = [str(t).lower() for t in (r.get("tracks") or [])]
-        skills = " ".join(str(s) for s in (r.get("skills") or [])).lower()
-        title = str(r.get("title") or "").lower()
-        if sphere in spheres:
-            score += 4
-        if track_l and track_l in tracks:
-            score += 12
-        if track_l and track_l in title:
-            score += 6
-        if track_l and track_l in skills:
-            score += 4
-        level = str(r.get("level") or "")
-        if preparation == "weak" and level == "beginner":
-            score += 3
-        if preparation == "strong" and level == "intermediate":
-            score += 2
-        if score > 0:
-            scored.append((score, resource_to_card(r)))
+    for r in resources_by_id().values():
+        if not resource_allowed(r, sig):
+            continue
+        scored.append((resource_match_score(r, sig), resource_to_card(r)))
     scored.sort(key=lambda x: -x[0])
     return [c for _, c in scored[:limit]]
 
@@ -110,6 +104,7 @@ def _pool_materials(
     track: Optional[str],
     preparation: str,
     learning_path: Optional[Dict[str, Any]],
+    signals: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     merged: List[Dict[str, Any]] = []
     seen: Set[str] = set()
@@ -122,7 +117,9 @@ def _pool_materials(
 
     for c in _flatten_path_resources(learning_path):
         add(c)
-    for c in _catalog_resources_for_track(sphere, track, preparation, limit=6):
+    for c in _catalog_resources_for_track(
+        sphere, track, preparation, limit=6, signals=signals
+    ):
         add(c)
     return merged[:14]
 
@@ -257,10 +254,10 @@ def _rule_based_plan_advice(
     materials: List[Dict[str, Any]],
     pain_id: Optional[str],
     priority: List[str],
+    base_track: Optional[str] = None,
 ) -> Dict[str, Any]:
-    del gap, sphere  # reserved for future profile hooks
     plan_name = _plan_label(plan)
-    track = _infer_track_from_plan(plan_name)
+    track = _infer_track_from_plan(plan_name) or base_track
     used: Set[str] = set()
     priority_top = [_human_skill_label(s) for s in priority[:3]]
     like = (profile.get("like_to_do") or "").strip()[:100]
@@ -450,6 +447,9 @@ def build_individual_advice(
     learning_path: Optional[Dict[str, Any]] = None,
     profile_summary: str = "",
     user_id: Optional[str] = None,
+    assessment_signals: Optional[Dict[str, Any]] = None,
+    axes: Optional[List[Dict[str, Any]]] = None,
+    answers: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Советы по планам A/B/C с материалами.
@@ -461,6 +461,16 @@ def build_individual_advice(
     sphere = _resolve_effective_interest(profile, interest)
     pain_id = (profile.get("primary_pain") or "").strip()
     priority = _priority_skills(gap)
+    signals = assessment_signals or build_assessment_signals(
+        profile=profile,
+        interest=interest,
+        preparation_level=preparation_level,
+        scenarios=scenarios,
+        gap=gap,
+        axes=axes,
+        answers=answers,
+    )
+    base_track = signals.get("track")
 
     if learning_path is None and user_id is not None:
         learning_path = build_learning_path_payload(
@@ -470,14 +480,18 @@ def build_individual_advice(
             preparation_level=preparation_level,
             scenarios=scenarios,
             gap=gap,
+            axes=axes,
+            answers=answers,
+            assessment_signals=signals,
         )
 
     by_plan: Dict[str, Any] = {}
     materials_global = _pool_materials(
         sphere=sphere,
-        track=_infer_track_from_plan(_plan_label(plans[0]) if plans else ""),
+        track=base_track or _infer_track_from_plan(_plan_label(plans[0]) if plans else ""),
         preparation=preparation_level,
         learning_path=learning_path,
+        signals=signals,
     )
 
     # LLM: один запрос на все планы
@@ -514,9 +528,10 @@ def build_individual_advice(
         track = _infer_track_from_plan(_plan_label(p))
         mats = _pool_materials(
             sphere=sphere,
-            track=track,
+            track=track or base_track,
             preparation=preparation_level,
             learning_path=learning_path,
+            signals=signals,
         )
         fallback = _rule_based_plan_advice(
             p,
@@ -527,6 +542,7 @@ def build_individual_advice(
             materials=mats,
             pain_id=pain_id if pid == "A" else None,
             priority=priority,
+            base_track=base_track,
         )
         llm_block = llm_by_plan.get(pid) if isinstance(llm_by_plan, dict) else None
         if isinstance(llm_block, dict) and llm_block.get("steps"):

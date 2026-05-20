@@ -1835,6 +1835,8 @@ def build_analysis_result(
             profile_summary=profile_summary_pre,
             user_id=str(profile.get("_user_id") or "") or None,
             eff_interest=eff_interest,
+            axes=axes,
+            answers=answers,
         )
         weekly = _weekly_roadmap(top_track, interest, preparation=preparation_level)
 
@@ -1844,6 +1846,7 @@ def build_analysis_result(
     advice = learn_x.get("individual_advice")
     stages = learn_x.get("growth_stages")
     growth_stages_rich = learn_x.get("growth_stages_rich")
+    assessment_signals = learn_x.get("assessment_signals")
     pain_focus = _pain_focus(
         profile,
         gap=gap,
@@ -1930,6 +1933,7 @@ def build_analysis_result(
         "individual_advice": advice,
         "growth_stages": stages,
         "growth_stages_rich": growth_stages_rich,
+        "assessment_signals": assessment_signals,
         "gap_analysis": gap,
         "pain_focus": pain_focus,
         "weekly_roadmap": weekly,
@@ -1963,6 +1967,7 @@ def public_analysis_payload(full: Dict[str, Any]) -> Dict[str, Any]:
         "individual_advice",
         "growth_stages",
         "growth_stages_rich",
+        "assessment_signals",
         "gap_analysis",
         "pain_focus",
         "weekly_roadmap",

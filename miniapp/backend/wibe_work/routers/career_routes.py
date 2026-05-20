@@ -46,12 +46,20 @@ async def get_diagnostics(user_id: str, request: Request):
     return run_diagnostics(profile, competencies)
 
 
+def _load_analysis_snapshot(user_id: str):
+    from wibe_work.services.hh_filter import _load_analysis_snapshot as _load
+
+    return _load(user_id)
+
+
 @router.get("/recommendations/{user_id}")
 async def get_recommendations(user_id: str, request: Request):
     _v(request, user_id)
     profile = load_profile(user_id)
     competencies = load_competencies(user_id)
-    return run_recommendations(profile, competencies)
+    return run_recommendations(
+        profile, competencies, analysis=_load_analysis_snapshot(user_id)
+    )
 
 
 @router.get("/navigator/{user_id}")

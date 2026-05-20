@@ -214,8 +214,55 @@ def _first_offer_skills(plan: List[Dict[str, Any]]) -> List[str]:
     return need[:3]
 
 
+def _plan_names_from_analysis(analysis: Optional[Dict[str, Any]]) -> List[str]:
+    if not analysis:
+        return []
+    scenarios = analysis.get("scenarios") or {}
+    names: List[str] = []
+    best = str(scenarios.get("best_plan_name") or "").strip()
+    if best:
+        names.append(re.sub(r"^План [ABC]:\s*", "", best, flags=re.I).strip())
+    for p in scenarios.get("plans") or []:
+        n = re.sub(r"^План [ABC]:\s*", "", str(p.get("name") or ""), flags=re.I).strip()
+        if n and n not in names:
+            names.append(n)
+    return names
+
+
+def _apply_analysis_to_inclinations(
+    inclinations: List[Dict[str, Any]],
+    analysis: Optional[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Поднять направления из планов A/B/C теста выше keyword-угадывания по анкете."""
+    plan_names = _plan_names_from_analysis(analysis)
+    if not plan_names:
+        return inclinations
+    front: List[Dict[str, Any]] = []
+    seen: Set[str] = set()
+    for idx, name in enumerate(plan_names):
+        scored = _score_directions(name.lower())
+        if not scored:
+            continue
+        direction = scored[0]["direction"]
+        if direction in seen:
+            continue
+        seen.add(direction)
+        front.append(
+            {
+                "direction": direction,
+                "score": round(0.97 - idx * 0.04, 2),
+                "reason": "Совпадает с планом из теста и разбора.",
+            }
+        )
+    rest = [i for i in inclinations if i.get("direction") not in seen]
+    return front + rest
+
+
 def run_recommendations(
-    profile: Dict[str, Any], competencies: List[Dict[str, Any]]
+    profile: Dict[str, Any],
+    competencies: List[Dict[str, Any]],
+    *,
+    analysis: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     spheres = parse_interest_spheres(profile)
     if not spheres and (profile.get("main_sphere") or "").strip():
@@ -230,6 +277,7 @@ def run_recommendations(
     ]
     blob = " ".join(blob_parts)
     inclinations = _score_directions(blob)
+    inclinations = _apply_analysis_to_inclinations(inclinations, analysis)
     main_sphere = (profile.get("main_sphere") or "").strip()
     main_dir = _direction_for_sphere_id(main_sphere) if main_sphere else None
     if main_dir:

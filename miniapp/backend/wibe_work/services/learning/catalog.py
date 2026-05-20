@@ -125,10 +125,16 @@ def pick_path(
     sphere: str,
     track: Optional[str],
     preparation: str,
+    *,
+    signals: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     paths = load_paths().get("paths") or []
     sphere = (sphere or "other").strip()
     track = (track or "").strip().lower()
+    if signals:
+        sphere = str(signals.get("sphere") or sphere)
+        track = str(signals.get("track") or track or "").strip().lower()
+        preparation = str(signals.get("preparation_level") or preparation)
     prep = preparation if preparation in ("weak", "medium", "strong") else "medium"
 
     scored: List[tuple[int, Dict[str, Any]]] = []
@@ -139,6 +145,8 @@ def pick_path(
         if sphere not in spheres and "other" not in spheres:
             continue
         if prep not in levels:
+            continue
+        if track and tracks and track not in tracks:
             continue
         score = 0
         if sphere in spheres:
@@ -160,3 +168,20 @@ def pick_path(
             if track in [str(t).lower() for t in (p.get("tracks") or [])]:
                 return p
     return best
+
+
+def pick_catalog_resources_for_signals(
+    signals: Dict[str, Any],
+    *,
+    limit: int = 8,
+) -> List[Dict[str, Any]]:
+    """Каталог, отфильтрованный по сфере/треку/разрыву из разбора."""
+    from wibe_work.services.learning.assessment_signals import resource_allowed, resource_match_score
+
+    scored: List[tuple[int, Dict[str, Any]]] = []
+    for r in resources_by_id().values():
+        sc = resource_match_score(r, signals)
+        if resource_allowed(r, signals):
+            scored.append((sc, resource_to_card(r)))
+    scored.sort(key=lambda x: -x[0])
+    return [c for _, c in scored[:limit]]

@@ -241,6 +241,8 @@ async def get_saved_analysis(user_id: str, request: Request):
         prep = _prep_for_user(profile, None)
         from wibe_work.services.learning.engine import build_learning_for_analysis
 
+        axes = list((refreshed.get("style_radar") or {}).get("axes") or [])
+        answers = list(refreshed.get("_quiz_answers") or [])
         pack = build_learning_for_analysis(
             user_id=user_id,
             profile=profile,
@@ -248,6 +250,8 @@ async def get_saved_analysis(user_id: str, request: Request):
             preparation_level=prep,
             scenarios=refreshed.get("scenarios"),
             gap=refreshed.get("gap_analysis"),
+            axes=axes,
+            answers=answers,
         )
         refreshed = dict(refreshed)
         refreshed["learning_path"] = pack.get("learning_path")
@@ -280,13 +284,18 @@ async def learning_progress_update(
     eff = _interest_for_user(profile, None)
     if snap and snap.get("_analysis_interest"):
         eff = str(snap["_analysis_interest"])
+    snap = snap or {}
+    axes = list((snap.get("style_radar") or {}).get("axes") or [])
+    answers = list(snap.get("_quiz_answers") or [])
     lp = build_learning_path_payload(
         user_id=user_id,
         profile=profile,
         interest=eff,
         preparation_level=_prep_for_user(profile, None),
-        scenarios=(snap or {}).get("scenarios"),
-        gap=(snap or {}).get("gap_analysis"),
+        scenarios=snap.get("scenarios"),
+        gap=snap.get("gap_analysis"),
+        axes=axes,
+        answers=answers,
     )
     return {"ok": True, "learning_path": lp}
 

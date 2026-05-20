@@ -276,7 +276,57 @@ function esc(s) {
   return d.innerHTML;
 }
 
+function learnDescSpoiler(description) {
+  const t = (description || "").trim();
+  if (!t) return "";
+  return `<details class="learn-desc-spoiler"><summary class="learn-desc-spoiler__sum">Описание</summary><p class="muted small learn-desc-spoiler__body">${esc(t)}</p></details>`;
+}
+
+let jobsSectionMode = "hh";
+
+try {
+  const savedJobsSec = localStorage.getItem("vibework_jobs_section");
+  if (savedJobsSec === "hh" || savedJobsSec === "sim") jobsSectionMode = savedJobsSec;
+  if (localStorage.getItem("vibework_last_tab") === "sim") {
+    localStorage.setItem("vibework_last_tab", "jobs");
+    jobsSectionMode = "sim";
+    localStorage.setItem("vibework_jobs_section", "sim");
+  }
+} catch (_) {}
+
+function setJobsSectionMode(mode) {
+  jobsSectionMode = mode === "sim" ? "sim" : "hh";
+  try {
+    localStorage.setItem("vibework_jobs_section", jobsSectionMode);
+  } catch (_) {}
+  document.querySelectorAll(".jobs-section-toggle .tab-toggle").forEach((b) => {
+    b.classList.toggle("active", b.dataset.jobsSection === jobsSectionMode);
+  });
+  const hh = document.getElementById("jobs-mode-hh");
+  const sim = document.getElementById("jobs-mode-sim");
+  const lead = document.getElementById("jobs-section-lead");
+  if (hh) hh.hidden = jobsSectionMode !== "hh";
+  if (sim) sim.hidden = jobsSectionMode !== "sim";
+  if (lead) {
+    lead.innerHTML =
+      jobsSectionMode === "sim"
+        ? "Текстовый квест: проживите рабочий день в выбранной сфере из анкеты."
+        : "Матчинг — после разбора и (если есть) чата. Переключайте <strong>классика</strong> или <strong>тиндер</strong>.";
+  }
+  if (jobsSectionMode === "sim") loadSimRoleOptions().catch(() => {});
+  if (jobsSectionMode === "hh") wireJobCityAutocomplete();
+}
+
+document.querySelectorAll(".jobs-section-toggle .tab-toggle").forEach((b) => {
+  b.addEventListener("click", () => setJobsSectionMode(b.dataset.jobsSection || "hh"));
+});
+setJobsSectionMode(jobsSectionMode);
+
 function setTab(name) {
+  if (name === "sim") {
+    jobsSectionMode = "sim";
+    name = "jobs";
+  }
   document.querySelectorAll(".nav-pill, .tab-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.tab === name);
   });
@@ -290,8 +340,7 @@ function setTab(name) {
   updateAvatarBubble();
   updateFlowUI();
   if (name === "account" && window.serverLoggedIn) renderAccountPage();
-  if (name === "jobs") wireJobCityAutocomplete();
-  if (name === "sim") loadSimRoleOptions().catch(() => {});
+  if (name === "jobs") setJobsSectionMode(jobsSectionMode);
   if (name === "profile") refreshProfilePanelMode();
   if (name === "test") {
     ensureProfileSchemaRendered()
@@ -1918,7 +1967,7 @@ function updateFlowUI() {
       prof.education_detail === "graduate";
     hint.textContent = QUIZ.length
       ? uni
-        ? "Профиль готов. Тест: задачи по вашей сфере и блок про должность и вакансии (без профориентации «кем быть»)."
+        ? "Профиль готов. Пройдите тест на вкладке «Тестирование»."
         : "Профиль готов. Перейдите к тесту — вопросы по первой выбранной сфере."
       : "Профиль готов. Для школьников — профориентация; для колледжа и вуза — с блоком по сфере.";
   }
@@ -1979,9 +2028,9 @@ function renderQuiz() {
   const root = document.getElementById("quiz");
   if (!root) return;
   root.innerHTML = QUIZ.map(
-    (q) => `
+    (q, idx) => `
     <div class="quiz-item" data-q="${q.id}">
-      <p>${q.id}. ${esc(q.text)}</p>
+      <p>${idx + 1}. ${esc(q.text)}</p>
       <div class="quiz-options">
         ${q.options
           .map(
@@ -2009,9 +2058,12 @@ function renderQuiz() {
 function renderPersonalityQuiz() {
   const root = document.getElementById("quiz-personality");
   if (!root) return;
-  const renderOne = (q) => `
+  let displayNum = 0;
+  const renderOne = (q) => {
+    displayNum += 1;
+    return `
     <div class="quiz-item" data-pq="${q.id}">
-      <p>${q.id}. ${esc(q.text)}</p>
+      <p>${displayNum}. ${esc(q.text)}</p>
       <div class="quiz-options">
         ${(q.options || [])
           .map(
@@ -2024,6 +2076,7 @@ function renderPersonalityQuiz() {
           .join("")}
       </div>
     </div>`;
+  };
   if (ASSESSMENT_MODULES.length > 0) {
     let html = "";
     for (const mod of ASSESSMENT_MODULES) {
@@ -3045,7 +3098,7 @@ function renderLearningPathDetail(host, lp) {
         html += esc(R.title || "Материал");
       }
       if (R.provider) html += ` <span class="muted small">· ${esc(String(R.provider))}</span>`;
-      if (R.description) html += `<p class="muted small learn-path-res-desc">${esc(R.description)}</p>`;
+      html += learnDescSpoiler(R.description);
       html += `</div>`;
     }
     html += `</div>`;
@@ -3105,7 +3158,7 @@ function renderGrowthStagesRich(host, stages) {
           let mh = `<div class="learn-path-resource">`;
           if (mu) mh += `<a href="${esc(mu)}" target="_blank" rel="noopener" class="learn-path-link">${esc(M.title || "Материал")}</a>`;
           else mh += esc(M.title || "Материал");
-          if (M.description) mh += `<p class="muted small learn-path-res-desc">${esc(M.description)}</p>`;
+          mh += learnDescSpoiler(M.description);
           return mh + `</div>`;
         })
         .join("");
@@ -3398,7 +3451,7 @@ function renderLearningBlock(res) {
       <div class="learn-card">
         <span class="badge">${esc(kind)}</span>
         <h4 style="margin:0.5rem 0 0.35rem">${esc(r.title || "Материал")}</h4>
-        <p class="muted small" style="margin:0">${esc(r.description || "")}</p>
+        ${learnDescSpoiler(r.description)}
         ${url && url !== "#" ? `<a href="${esc(url)}" target="_blank" rel="noopener" class="btn secondary">Открыть →</a>` : ""}
       </div>`;
         })
@@ -3414,7 +3467,7 @@ function renderLearningBlock(res) {
       <div class="learn-card">
         <span class="badge">${esc(r.type)}</span>
         <h4 style="margin:0.5rem 0 0.35rem">${esc(r.title)}</h4>
-        <p class="muted small" style="margin:0">${esc(r.description)}</p>
+        ${learnDescSpoiler(r.description)}
         ${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" class="btn secondary">Открыть →</a>` : ""}
       </div>`
         )
@@ -4160,7 +4213,10 @@ document.getElementById("btn-auth-logout")?.addEventListener("click", async () =
     refreshProfilePanelMode();
     try {
       const t = localStorage.getItem("vibework_last_tab");
-      if (t && t !== "mts") setTab(t);
+      if (t && t !== "mts") {
+        if (t === "sim") setTab("jobs");
+        else setTab(t);
+      }
     } catch (_) {}
   }
 
