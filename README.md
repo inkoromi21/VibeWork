@@ -6,16 +6,14 @@
 
 ## Именование
 
-| Контекст | Форма |
-|----------|--------|
-| Продукт в UI и текстах | **VibeWork** |
-| Python-пакет | `wibe_work` (`miniapp/backend/wibe_work/`) |
-| БД, cookie, пути на VPS | `vibework` (нижний регистр) |
-| Telegram | @VibeWorks_bot |
+- **VibeWork** — продукт в UI и текстах
+- **`wibe_work`** — Python-пакет (`miniapp/backend/wibe_work/`)
+- **`vibework`** — БД, cookie, пути на VPS (нижний регистр)
+- **@VibeWorks_bot** — Telegram-бот (имя с «s»)
 
 ## Архитектура
 
-**Режим по умолчанию:** `python miniapp/run.py` → `wibe_work.main`, порт **8000**, одна SQLite (путь — `DATABASE_PATH` в `.env`, иначе `miniapp/data/`).
+**Режим по умолчанию:** `python miniapp/run.py` → `wibe_work.main`, порт **8000**, SQLite (`DATABASE_PATH` в `.env` или `miniapp/data/`).
 
 ```
 miniapp/run.py
@@ -25,37 +23,34 @@ miniapp/run.py
     └── website/frontend/  статика /static/* + старый лендинг → GET /
 ```
 
-| URL | Что отдаётся |
-|-----|----------------|
-| `/miniapp/` | **Основной продукт** — `miniapp/frontend/index.html`, API `/vibework/...` |
-| `/` | **Старый веб-клиент** — `website/frontend/index.html` + `script.js` |
-| `/static/...` | CSS/JS из `website/frontend/` (нужны и Mini App) |
-| `/register`, `/reset-password`, `/admin` | Отдельные страницы |
-| `/docs` | OpenAPI |
+**Маршруты (локально :8000):**
 
-Для Telegram Web App в BotFather указывайте **`https://<домен>/miniapp/`**, не корень `/`.
+- **`/miniapp/`** — основной продукт (`miniapp/frontend/index.html`, API `/vibework/...`)
+- **`/`** — старый веб-клиент (`website/frontend/index.html`, `script.js`)
+- **`/static/...`** — CSS/JS из `website/frontend/` (нужны Mini App)
+- **`/register`**, **`/reset-password`**, **`/admin`** — отдельные страницы
+- **`/docs`** — OpenAPI
 
-Конфигурация: **`.env` в корне репозитория** — шаблон [.env.example](.env.example), полный список [docs/ENV.md](docs/ENV.md).
+В BotFather для Web App укажите **`https://<домен>/miniapp/`**, не корень `/`.
 
-## Запуск через Docker (рекомендуется для проверки жюри)
+Конфигурация: **`.env` в корне`** — шаблон [.env.example](.env.example), описание [docs/ENV.md](docs/ENV.md).
 
-Нужны [Docker](https://docs.docker.com/get-docker/) и Docker Compose v2.
+## Запуск через Docker
+
+Нужны [Docker](https://docs.docker.com/get-docker/) и Compose v2.
 
 ```bash
 cp .env.example .env
-# при необходимости отредактируйте .env (LLM, Telegram — опционально)
 docker compose up --build
 ```
 
-| URL | Назначение |
-|-----|------------|
-| http://127.0.0.1:8000/miniapp/ | Основной интерфейс |
-| http://127.0.0.1:8000/docs | OpenAPI |
-| http://127.0.0.1:8000/api/health | Проверка, что API поднялся |
+После старта:
 
-Остановка: `docker compose down`. Файл БД — в volume `vibework_data` (`/data/vibework.db` в контейнере).
+- http://127.0.0.1:8000/miniapp/ — интерфейс
+- http://127.0.0.1:8000/docs — API
+- http://127.0.0.1:8000/api/health — проверка процесса
 
-Проверка на другой машине: `git clone` → `cp .env.example .env` → `docker compose up --build` (те же шаги).
+Остановка: `docker compose down`. БД в volume `vibework_data` (`/data/vibework.db` в контейнере). JSON-каталоги обучения — из образа.
 
 ## Быстрый старт без Docker
 
@@ -66,38 +61,34 @@ cp .env.example .env
 python miniapp/run.py
 ```
 
-Проверка: `http://127.0.0.1:8000/miniapp/`, `http://127.0.0.1:8000/docs`, `GET /api/health/llm` (поля `llm_configured`, `ok`, `model`).
+Проверка: `/miniapp/`, `/docs`, `GET /api/health/llm` (поля `llm_configured`, `ok`, `model`).
 
 ## Разработка
 
-| Задача | Команда |
-|--------|---------|
-| API + UI (Docker) | `docker compose up --build` |
-| API + UI (локально) | `python miniapp/run.py` |
-| Бот (API уже запущен) | `python miniapp/bot/bot.py` |
-| API + бот + website :8765 | `bash "launch files/launch-stack.sh"` или `launch files\launch-stack.bat` |
-| Тесты | `./scripts/verify.sh` или `pytest tests/miniapp -q` |
+- **API + UI (Docker):** `docker compose up --build`
+- **API + UI (локально):** `python miniapp/run.py`
+- **Бот** (API уже запущен): `python miniapp/bot/bot.py`
+- **Полный dev-стек** (API, бот, website :8765): `bash "launch files/launch-stack.sh"` или `launch files\launch-stack.bat`
+- **Тесты:** `./scripts/verify.sh` или `pytest tests/miniapp -q`
 
 Изолированный веб без Mini App — [website/README.md](website/README.md).
 
 ## LLM
 
-OpenAI-совместимый `CHAT_API_URL` + `CHAT_API_KEY` + `CHAT_MODEL` в корневом `.env`. Промпты: `miniapp/backend/wibe_work/services/llm_prompts.py`. Логика вызова: `llm_client.py`.
+В `.env`: `CHAT_API_URL`, `CHAT_API_KEY`, `CHAT_MODEL` (OpenAI-совместимый API). Код: `miniapp/backend/wibe_work/services/llm_client.py`, промпты: `llm_prompts.py`.
 
 ## Продакшен
 
-HTTPS, уникальный `JWT_SECRET`, CORS, `HH_USER_AGENT`. Nginx: [deploy/VPS-HTTPS.md](deploy/VPS-HTTPS.md).
+Уникальный `JWT_SECRET`, HTTPS, CORS, `HH_USER_AGENT`. Nginx: [deploy/VPS-HTTPS.md](deploy/VPS-HTTPS.md).
 
 ## Документация
 
-| Файл | О чём |
-|------|--------|
-| [miniapp/README.md](miniapp/README.md) | Каталог `miniapp/` |
-| [miniapp/bot/README.md](miniapp/bot/README.md) | Telegram-бот |
-| [website/README.md](website/README.md) | Legacy UI и изолированный сервер |
-| [docs/ENV.md](docs/ENV.md) | Переменные окружения |
-| [docs/LEARNING_INTEGRATIONS.md](docs/LEARNING_INTEGRATIONS.md) | Обучение, Rutube, VK |
-| [SECURITY.md](SECURITY.md) | Уязвимости |
+- [miniapp/README.md](miniapp/README.md) — каталог `miniapp/`
+- [miniapp/bot/README.md](miniapp/bot/README.md) — Telegram-бот
+- [website/README.md](website/README.md) — legacy UI и изолированный сервер
+- [docs/ENV.md](docs/ENV.md) — переменные окружения
+- [docs/LEARNING_INTEGRATIONS.md](docs/LEARNING_INTEGRATIONS.md) — обучение, Rutube, VK
+- [SECURITY.md](SECURITY.md) — уязвимости
 
 ## Структура репозитория
 
@@ -107,16 +98,16 @@ VibeWork/
 ├── docker-compose.yml
 ├── .env.example
 ├── miniapp/
-│   ├── run.py                 # вход :8000
-│   ├── backend/wibe_work/     # FastAPI-пакет
-│   ├── frontend/              # Mini App (HTML)
-│   ├── data/                  # JSON, SQLite по умолчанию
+│   ├── run.py
+│   ├── backend/wibe_work/
+│   ├── frontend/
+│   ├── data/
 │   └── bot/
 ├── website/
-│   ├── app/                   # /api/*, мосты к wibe_work
-│   └── frontend/              # /static, лендинг /
+│   ├── app/
+│   └── frontend/
 ├── tests/miniapp|website/
-├── scripts/                   # verify.sh, check_integrations.py
+├── scripts/
 ├── deploy/
 └── docs/
 ```

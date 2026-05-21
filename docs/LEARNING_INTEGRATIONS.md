@@ -1,64 +1,38 @@
-# Обучение: интеграции и что нужно настроить вручную
+# Обучение: интеграции
 
-## Уже работает без ключей
+## Без ключей (уже в продукте)
 
-| Источник | Как подключено |
-|----------|----------------|
-| roadmap.sh, Odin, freeCodeCamp, CS50, MDN, DevDocs | Каталог `miniapp/data/learning_catalog.json` |
-| Stepik, SQL Academy, Figma, HubSpot, Atlassian, Kaggle, HF, Google, DL.AI | Тот же каталог |
-| Microsoft Learn, LinkedIn, Udemy, LeetCode | Ссылки в каталоге (без live API) |
-| **Rutube** | Поиск `rutube.ru/api/search/video/` + витрина [education](https://rutube.ru/api/feeds/education?format=json) ([ShowcaseTutorial](https://github.com/rutube/ShowcaseTutorial)) — **без ключа** |
-| **VK Video** | [video.search](https://dev.vk.com/ru/method/video.search) + опционально [video.get](https://dev.vk.com/ru/method/video.get) по `VK_VIDEO_OWNER_IDS` — нужен `VK_ACCESS_TOKEN` |
-| **Exercism** | API `api.exercism.org` — задачи на шаг |
-| **Codewars** | Публичный API kata |
-| **ESCO** | API ESCO (включено по умолчанию: `ESCO_API_ENABLED=1`) |
-| Пути по шагам | `miniapp/data/learning_paths.json` |
-| Прогресс шагов | SQLite `learning_progress`, API `POST /vibework/learning/progress/{user_id}` |
+- **Каталог** — `miniapp/data/learning_catalog.json` (roadmap.sh, Stepik, MDN, Figma, HubSpot, Kaggle, …)
+- **Пути по шагам** — `miniapp/data/learning_paths.json`
+- **Rutube** — поиск и витрина [education](https://rutube.ru/api/feeds/education?format=json) ([ShowcaseTutorial](https://github.com/rutube/ShowcaseTutorial)); фильтр по треку пользователя
+- **Exercism**, **Codewars** — задачи на шагах
+- **ESCO** — по умолчанию `ESCO_API_ENABLED=1`
+- **Прогресс** — SQLite `learning_progress`, `POST /vibework/learning/progress/{user_id}`
 
-## Нужны ключи / регистрация (опционально, усиливают подбор)
+## С ключами (опционально)
 
-| Переменная `.env` | Сервис | Зачем | Где получить |
-|-------------------|--------|-------|--------------|
-| `VK_ACCESS_TOKEN` | VK API | Поиск видео в путях обучения (дополняет Rutube) | [vk.com/apps](https://vk.com/apps) → приложение → сервисный ключ |
-| `VK_VIDEO_OWNER_IDS` | VK `video.get` | Видео из альбомов указанных сообществ (id со знаком `-`) | ID сообщества в URL группы |
-| `VK_API_VERSION` | VK API | Версия API (по умолчанию `5.199`) | — |
-| `GITHUB_TOKEN` | GitHub REST | Поиск репозиториев-проектов (выше лимит без 403) | GitHub → Settings → Developer settings → PAT |
-| `ONET_USERNAME` + `ONET_PASSWORD` | O*NET Web Services | Профессии/навыки (США) | [onetcenter.org](https://www.onetcenter.org/webowners/) |
-| `ESCO_API_ENABLED=0` | ESCO | Отключить запросы к EU API при блокировках | — |
+- **`VK_ACCESS_TOKEN`** — [vk.com/apps](https://vk.com/apps), поиск видео (дополняет Rutube)
+- **`VK_VIDEO_OWNER_IDS`** — альбомы сообществ для `video.get`
+- **`GITHUB_TOKEN`** — GitHub PAT, поиск репозиториев-проектов
+- **`ONET_USERNAME`**, **`ONET_PASSWORD`** — [onetcenter.org](https://www.onetcenter.org/webowners/)
+- **`ESCO_API_ENABLED=0`** — отключить ESCO при блокировках
 
-## Нельзя полностью подключить через публичный API
+## Без публичного API (только ссылки в каталоге)
 
-| Сервис | Причина | Что сделано вместо |
-|--------|---------|-------------------|
-| **LinkedIn Learning** | Нет каталога для сторонних приложений | Ссылка в каталоге |
-| **Udemy** | Affiliate/Business API по заявке, платные курсы | Ссылка в каталоге |
-| **Kaggle Learn** | Нет API списка микрокурсов | Ссылка в каталоге |
-| **LeetCode** | Нет публичного API задач | Ссылка на Explore |
-| **Microsoft Learn** | Catalog API требует Azure App | Прямые ссылки на learning paths |
-| **DevDocs** | Нет официального API для продакшена | Ссылка devdocs.io |
-| **The Odin Project / FCC** | Curriculum на GitHub, без API | Ссылки + путь в `learning_paths.json` |
-| **DeepLearning.AI** | Курсы на платформе партнёра | Ссылки на short courses |
-| **Figma / Google Design / HubSpot / Atlassian** | Нет course API | Ссылки в каталоге |
+LinkedIn Learning, Udemy, LeetCode, Microsoft Learn Catalog, DevDocs API, Odin/FCC curriculum — в продукте прямые ссылки и пути в JSON, не live-каталоги.
 
-## API статус
+## Статус и метрики
 
-`GET /vibework/learning/status` — какие интеграции сконфигурированы.
+- **`GET /vibework/learning/status`** — что сконфигурировано
+- В разборе: `learning_path.metrics` — `coverage_percent`, `current_step_index`, `total_steps`, `completed_steps`
 
-## Метрики пути
-
-В разборе (`learning_path.metrics`):
-
-- `coverage_percent` — доля шагов со статусом `done`
-- `current_step_index` — первый незавершённый шаг
-- `total_steps` / `completed_steps`
-
-Пользователь отмечает шаги кнопками «В работе» / «Готово» в разделе «Разбор».
+Шаги отмечаются в разделе «Разбор» («В работе» / «Готово»).
 
 ## Деплой
 
-После `git pull` перезапустите API. Новые таблицы создаются при первом запросе прогресса.
+После `git pull` перезапустите API. Таблицы прогресса создаются при первом запросе.
 
-Добавьте в **корневой** `.env` (см. [ENV.md](ENV.md)):
+Пример блока в корневом `.env` (см. [ENV.md](ENV.md)):
 
 ```env
 VK_ACCESS_TOKEN=

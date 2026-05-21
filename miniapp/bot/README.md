@@ -24,3 +24,5 @@ python miniapp/bot/bot.py
 Со стеком: `bash "launch files/launch-stack.sh"` или `launch files\launch-stack.bat`.
 
 Конфигурация: [README в корне](../../README.md), [docs/ENV.md](../../docs/ENV.md).
+
+Docker (API в контейнере): из корня `docker compose up --build`, затем бот на хосте — `python miniapp/bot/bot.py`.

@@ -61,7 +61,5 @@ curl -sI https://vibeworkrussia.ru/ | head -5
 
 ## Файлы в репозитории
 
-| Файл | Назначение |
-|------|------------|
-| [nginx/vibework.conf](nginx/vibework.conf) | Прокси на `127.0.0.1:8000` |
-| [setup-https.sh](setup-https.sh) | Установка пакетов, конфиг, приглашение certbot |
+- [nginx/vibework.conf](nginx/vibework.conf) — прокси на `127.0.0.1:8000`
+- [setup-https.sh](setup-https.sh) — установка пакетов, конфиг, приглашение certbot

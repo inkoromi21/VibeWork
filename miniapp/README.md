@@ -1,29 +1,26 @@
 # miniapp/
 
-Ядро продукта: пакет **`wibe_work`**, Mini App, данные, бот. HTTP-вход — **`python miniapp/run.py`** из **корня репозитория** (не из этого каталога).
+Ядро продукта: **`wibe_work`**, Mini App, данные, бот. HTTP-вход — **`python miniapp/run.py`** из **корня репозитория** (не из этого каталога).
 
-Общая архитектура и запуск: [README в корне](../README.md). Переменные: [docs/ENV.md](../docs/ENV.md).
+- Архитектура и Docker: [README в корне](../README.md)
+- Переменные: [docs/ENV.md](../docs/ENV.md)
 
-## Маршруты (при `run.py`)
+## Маршруты (при `run.py` на :8000)
 
-| Путь | Файл / API |
-|------|------------|
-| `/miniapp/` | `frontend/index.html` |
-| `/vibework/...` | `backend/wibe_work/routers/assessment_routes.py` — анкета, тест, разбор, чат |
-| `/career/...` | `career_routes.py` — hh, вакансии, отчёт |
-| `/static/...` | Статика из `../website/frontend/` |
+- **`/miniapp/`** — `frontend/index.html`
+- **`/vibework/...`** — анкета, тест, разбор, чат (`routers/assessment_routes.py`)
+- **`/career/...`** — hh.ru, вакансии, отчёт (`career_routes.py`)
+- **`/static/...`** — статика из `../website/frontend/`
 
-## Каталог
+## Содержимое каталога
 
-| Путь | Назначение |
-|------|------------|
-| `run.py` | uvicorn → `wibe_work.main:app`, :8000 |
-| `backend/wibe_work/` | Роутеры, SQLite, сервисы (LLM, learning, hh) |
-| `frontend/` | Mini App; `admin/`, `reset-password.html` |
-| `data/` | `learning_paths.json`, `mts_role_matrix.json`, БД по умолчанию |
-| `bot/` | [bot/README.md](bot/README.md) |
-| `terminal_theme.py` | Вывод в консоль для `run.py` и бота |
-| `scripts/` | Утилиты (не рантайм) |
+- **`run.py`** — uvicorn → `wibe_work.main:app`
+- **`backend/wibe_work/`** — FastAPI, SQLite, LLM, learning, hh
+- **`frontend/`** — Mini App; `admin/`, `reset-password.html`
+- **`data/`** — `learning_paths.json`, `mts_role_matrix.json`; SQLite по умолчанию
+- **`bot/`** — [bot/README.md](bot/README.md)
+- **`terminal_theme.py`** — вывод в консоль для `run.py` и бота
+- **`scripts/`** — утилиты (не рантайм)
 
 ## Запуск
 
@@ -31,3 +28,5 @@
 # из корня репозитория
 python miniapp/run.py
 ```
+
+Или из корня: `docker compose up --build` (см. корневой README).
