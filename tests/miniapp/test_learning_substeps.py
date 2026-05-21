@@ -11,7 +11,11 @@ sys.path.insert(0, str(_REPO / "miniapp" / "backend"))
 
 from wibe_work.services.learning.engine import merge_learning_progress_in_snapshot
 from wibe_work.services.learning.progress import apply_progress_to_steps, compute_metrics, set_step_status
-from wibe_work.services.learning.substeps import attach_substeps_to_step, build_substeps_for_step
+from wibe_work.services.learning.substeps import (
+    attach_substeps_to_step,
+    build_substeps_for_step,
+    is_legacy_goal_substep,
+)
 
 
 def test_build_substeps_from_resources() -> None:
@@ -23,6 +27,33 @@ def test_build_substeps_from_resources() -> None:
     assert subs[0]["sub_id"] == "res0"
     assert subs[0]["title"] == "Курс A"
     assert not any(s["sub_id"] == "goal" for s in subs)
+
+
+def test_attach_strips_legacy_goal_substep() -> None:
+    step = attach_substeps_to_step(
+        {
+            "step_id": "be-1",
+            "goal": "Понять структуру пути",
+            "substeps": [
+                {
+                    "sub_id": "goal",
+                    "title": "Понять цель этапа",
+                    "description": "Понять структуру пути",
+                    "status": "pending",
+                },
+                {
+                    "sub_id": "res0",
+                    "title": "Roadmap",
+                    "url": "https://roadmap.sh/backend",
+                    "status": "pending",
+                },
+            ],
+            "resources": [{"title": "Roadmap", "url": "https://roadmap.sh/backend"}],
+        }
+    )
+    subs = step["substeps"]
+    assert not any(is_legacy_goal_substep(s) for s in subs)
+    assert subs[0]["sub_id"] == "res0"
 
 
 def test_substep_progress_updates_parent_and_metrics() -> None:

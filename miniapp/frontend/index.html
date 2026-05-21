@@ -6068,9 +6068,23 @@
         return data.learning_path || null;
     }
 
+    function isLegacyGoalSubstep(sub) {
+        const id = String(sub.sub_id != null ? sub.sub_id : '').toLowerCase();
+        const title = String(sub.title || '').trim().toLowerCase();
+        if (id === 'goal') return true;
+        return (
+            title === 'понять цель этапа' ||
+            title === 'понять цель' ||
+            title.indexOf('понять цель') === 0
+        );
+    }
+
     function ensureSubstepsForStep(st) {
         if (st.substeps && st.substeps.length) {
-            return st.substeps;
+            const filtered = st.substeps.filter(function (sub) {
+                return sub && !isLegacyGoalSubstep(sub);
+            });
+            if (filtered.length) return filtered;
         }
         const subs = [];
         const goal = String(st.goal || '').trim();

@@ -6,6 +6,25 @@ from typing import Any, Dict, List
 
 SUBSTEP_SEP = "__"
 
+_LEGACY_GOAL_SUB_IDS = frozenset({"goal"})
+_LEGACY_GOAL_SUB_TITLES = frozenset(
+    {
+        "понять цель этапа",
+        "понять цель",
+    }
+)
+
+
+def is_legacy_goal_substep(sub: Dict[str, Any]) -> bool:
+    """Подшаг «Понять цель» из старых снимков разбора — не показываем."""
+    sid = str(sub.get("sub_id") or "").strip().lower()
+    if sid in _LEGACY_GOAL_SUB_IDS:
+        return True
+    title = str(sub.get("title") or "").strip().lower()
+    if title in _LEGACY_GOAL_SUB_TITLES:
+        return True
+    return title.startswith("понять цель")
+
 
 def substep_storage_id(step_id: str, sub_id: str) -> str:
     return f"{step_id}{SUBSTEP_SEP}{sub_id}"
@@ -53,7 +72,19 @@ def build_substeps_for_step(
 
 def attach_substeps_to_step(step: Dict[str, Any]) -> Dict[str, Any]:
     row = dict(step)
-    if not row.get("substeps"):
+    existing = row.get("substeps")
+    if isinstance(existing, list) and existing:
+        filtered = [
+            s for s in existing if isinstance(s, dict) and not is_legacy_goal_substep(s)
+        ]
+        if filtered:
+            row["substeps"] = filtered
+        else:
+            row["substeps"] = build_substeps_for_step(
+                goal=row.get("goal"),
+                resources=row.get("resources"),
+            )
+    else:
         row["substeps"] = build_substeps_for_step(
             goal=row.get("goal"),
             resources=row.get("resources"),

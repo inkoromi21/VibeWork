@@ -87,7 +87,7 @@ python miniapp/run.py
 - [miniapp/bot/README.md](miniapp/bot/README.md) — Telegram-бот
 - [website/README.md](website/README.md) — legacy UI и изолированный сервер
 - [docs/ENV.md](docs/ENV.md) — переменные окружения
-- [docs/LEARNING_INTEGRATIONS.md](docs/LEARNING_INTEGRATIONS.md) — обучение, Rutube, VK
+- [docs/LEARNING_INTEGRATIONS.md](docs/LEARNING_INTEGRATIONS.md) — обучение и внешние API (VK Video и др.)
 - [SECURITY.md](SECURITY.md) — уязвимости
 
 ## Структура репозитория

@@ -173,9 +173,6 @@ def _pick_materials(
             scored.append((score, m))
         else:
             h = heuristic_material_score(m, track=track)
-            provider = (m.get("provider") or "").strip().lower()
-            if provider == "rutube":
-                continue
             if h >= 8:
                 scored.append((float(h), m))
     scored.sort(key=lambda x: -x[0])

@@ -58,7 +58,7 @@ _ENTERTAINMENT_MARKERS = (
     "распаковка",
 )
 
-# Поиск Rutube по треку (если запрос из JSON слишком общий)
+# Поиск видео по треку (если запрос из JSON слишком общий)
 TRACK_SEARCH_QUERIES: Dict[str, str] = {
     "backend": "python backend разработка курс урок",
     "frontend": "javascript frontend веб разработка курс",
@@ -211,23 +211,12 @@ def heuristic_material_score(
         if hits >= 2:
             return 14 + hits
         if hits == 1:
-            edu = sum(1 for m in _EDUCATION_MARKERS if m in b)
-            if card.get("provider") == "rutube":
-                return 8 if edu >= 1 else 0
             return 8
-        # Rutube без маркеров трека — отбрасываем (часто витрина «Обучение»)
-        if card.get("provider") == "rutube":
-            return 0
 
     edu = sum(1 for m in _EDUCATION_MARKERS if m in b)
     if edu >= 2:
-        sc = 6 + edu
-        if card.get("provider") == "rutube" and sphere == "it_dev":
-            return 0
-        return sc
+        return 6 + edu
     if sphere == "it_dev" and tr in ("backend", "frontend", "devops", "data", "qa"):
-        return 0
-    if card.get("provider") == "rutube":
         return 0
     return 4 if edu else 2
 
@@ -245,15 +234,12 @@ def filter_materials_heuristic(
         sc = heuristic_material_score(
             m, track=track, sphere=sphere, plan_direction=plan_direction
         )
-        need = min_score
-        if (m.get("provider") or "").strip().lower() == "rutube":
-            need = max(min_score, 8)
-        if sc >= need:
+        if sc >= min_score:
             out.append(m)
     return out
 
 
-_MATERIAL_LLM_SYSTEM = """Ты фильтруешь учебные материалы (в т.ч. Rutube) для VibeWork.
+_MATERIAL_LLM_SYSTEM = """Ты фильтруешь учебные материалы для VibeWork.
 
 Ответ — ТОЛЬКО JSON: {"keep": [1, 2]} — номера 1-based из списка.
 

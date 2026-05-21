@@ -75,7 +75,7 @@ EMAIL_FROM = os.environ.get("EMAIL_FROM", "").strip()
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
 RESEND_BASE_URL = os.environ.get("RESEND_BASE_URL", "https://api.resend.com").strip()
 
-# Обучение: внешние API (опционально; без ключей работают каталог, Rutube, Exercism/Codewars)
+# Обучение: внешние API (опционально; без ключей — каталог, Exercism/Codewars)
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "").strip()
 ONET_USERNAME = os.environ.get("ONET_USERNAME", "").strip()
 ONET_PASSWORD = os.environ.get("ONET_PASSWORD", "").strip()

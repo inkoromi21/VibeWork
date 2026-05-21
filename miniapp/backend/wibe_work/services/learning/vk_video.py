@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import requests
 
 from wibe_work.config import VK_ACCESS_TOKEN, VK_API_VERSION, VK_VIDEO_OWNER_IDS
-from wibe_work.services.learning.rutube import _course_score
+from wibe_work.services.learning.video_scoring import course_score
 
 _log = logging.getLogger(__name__)
 _TIMEOUT = 12
@@ -54,7 +54,12 @@ def _video_page_url(owner_id: int, video_id: int) -> str:
     return f"https://vk.com/video{owner_id}_{video_id}"
 
 
-def _item_to_card(item: Dict[str, Any], *, query: str = "") -> Optional[Dict[str, Any]]:
+def _item_to_card(
+    item: Dict[str, Any],
+    *,
+    query: str = "",
+    track: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
     try:
         owner_id = int(item.get("owner_id"))
         video_id = int(item.get("id"))
@@ -63,7 +68,9 @@ def _item_to_card(item: Dict[str, Any], *, query: str = "") -> Optional[Dict[str
     url = _video_page_url(owner_id, video_id)
     title = str(item.get("title") or "Видео VK").strip()
     desc = str(item.get("description") or "")[:300]
-    score = _course_score(title, query)
+    score = course_score(title, query, description=desc, track=track)
+    if score < 6:
+        return None
     kind = "курс" if score >= 8 else "видео"
     return {
         "title": title[:200],
@@ -78,7 +85,12 @@ def _item_to_card(item: Dict[str, Any], *, query: str = "") -> Optional[Dict[str
     }
 
 
-def vk_video_search(query: str, limit: int = 3) -> List[Dict[str, Any]]:
+def vk_video_search(
+    query: str,
+    limit: int = 3,
+    *,
+    track: Optional[str] = None,
+) -> List[Dict[str, Any]]:
     """Поиск публичных видео (video.search)."""
     q = (query or "").strip()
     if not q or not VK_ACCESS_TOKEN:
@@ -96,7 +108,7 @@ def vk_video_search(query: str, limit: int = 3) -> List[Dict[str, Any]]:
     items = list(resp.get("items") or [])
     scored: List[Tuple[float, Dict[str, Any]]] = []
     for item in items:
-        card = _item_to_card(item, query=q)
+        card = _item_to_card(item, query=q, track=track)
         if card:
             scored.append((float(card.pop("_score", 0)), card))
     scored.sort(key=lambda x: -x[0])
@@ -118,6 +130,7 @@ def vk_video_get_from_owners(
     limit: int = 3,
     *,
     owner_ids: Optional[List[int]] = None,
+    track: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Видео из альбомов сообществ (video.get).
@@ -134,7 +147,7 @@ def vk_video_get_from_owners(
         if not resp:
             continue
         for item in resp.get("items") or []:
-            card = _item_to_card(item, query=q)
+            card = _item_to_card(item, query=q, track=track)
             if not card:
                 continue
             u = card.get("url") or ""
@@ -142,7 +155,12 @@ def vk_video_get_from_owners(
                 continue
             seen.add(u)
             if q:
-                score = _course_score(str(card.get("title") or ""), q)
+                score = course_score(
+                    str(card.get("title") or ""),
+                    q,
+                    description=str(card.get("description") or ""),
+                    track=track,
+                )
                 if score < 1 and not any(
                     w in (card.get("title") or "").lower()
                     for w in re.split(r"\s+", q)
@@ -164,7 +182,7 @@ def vk_search_for_learning(
     prefer_course: bool = True,
 ) -> List[Dict[str, Any]]:
     """Поиск VK Video для шагов обучения."""
-    del track, sphere
+    del sphere
     q = (query or "").strip()
     if not q:
         q = "обучение курс"
@@ -178,12 +196,59 @@ def vk_search_for_learning(
                 seen.add(u)
                 merged.append(c)
 
-    add(vk_video_search(q, limit=limit + 1))
+    add(vk_video_search(q, limit=limit + 1, track=track))
     if len(merged) < limit and VK_VIDEO_OWNER_IDS:
-        add(vk_video_get_from_owners(q, limit=limit))
+        add(vk_video_get_from_owners(q, limit=limit, track=track))
     if prefer_course:
         merged.sort(
-            key=lambda c: _course_score(str(c.get("title") or ""), q),
+            key=lambda c: course_score(
+                str(c.get("title") or ""),
+                q,
+                description=str(c.get("description") or ""),
+                track=track,
+            ),
             reverse=True,
         )
     return merged[:limit]
+
+
+def video_search_for_learning(
+    query: str,
+    *,
+    track: Optional[str] = None,
+    sphere: Optional[str] = None,
+    limit: int = 3,
+    plan_direction: str = "",
+    step_title: str = "",
+) -> List[Dict[str, Any]]:
+    """Видео для шага пути: VK Video (нужен VK_ACCESS_TOKEN)."""
+    from wibe_work.services.learning.material_relevance import (
+        build_learning_search_query,
+        filter_materials_for_context,
+    )
+    from wibe_work.services.llm_client import llm_configured
+
+    if not VK_ACCESS_TOKEN:
+        return []
+
+    q = build_learning_search_query(
+        query,
+        track=track,
+        sphere=sphere or "",
+        step_title=step_title,
+    )
+    plan_hint = (plan_direction or "").strip()
+    cards = vk_search_for_learning(
+        q or query,
+        track=track,
+        sphere=sphere,
+        limit=limit + 6,
+        prefer_course=True,
+    )
+    return filter_materials_for_context(
+        cards,
+        track=track,
+        sphere=sphere or "",
+        plan_direction=plan_hint,
+        use_llm=llm_configured(),
+    )[:limit]

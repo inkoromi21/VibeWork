@@ -14,25 +14,25 @@ from wibe_work.services.learning.material_relevance import (
     heuristic_material_score,
     is_entertainment_or_sport,
 )
-from wibe_work.services.learning.rutube import _course_score, _item_to_card
+from wibe_work.services.learning.video_scoring import course_score
 
 
 def test_football_video_rejected() -> None:
     card = {
         "title": "Разбор матча Реал — Барселона",
         "description": "Голы и моменты",
-        "provider": "rutube",
+        "provider": "vk",
     }
     assert is_entertainment_or_sport(card)
     assert heuristic_material_score(card, track="backend") == 0
-    assert _course_score(card["title"], "python backend курс", description=card["description"]) < 0
+    assert course_score(card["title"], "python backend курс", description=card["description"]) < 0
 
 
 def test_backend_accepts_python_course() -> None:
     card = {
         "title": "Python для начинающих — полный курс",
         "description": "Уроки программирования",
-        "provider": "rutube",
+        "provider": "vk",
     }
     assert heuristic_material_score(card, track="backend") >= 8
     assert filter_materials_heuristic([card], track="backend")
@@ -52,20 +52,22 @@ def test_vague_query_replaced_by_track() -> None:
     assert "python" in q.lower() or "backend" in q.lower()
 
 
-def test_rutube_random_education_feed_rejected() -> None:
+def test_off_topic_education_feed_rejected() -> None:
     card = {
         "title": "Полный курс кулинарии для начинающих",
         "description": "Уроки готовки",
-        "provider": "rutube",
+        "provider": "vk",
     }
     assert heuristic_material_score(card, track="backend") == 0
 
 
-def test_rutube_item_to_card_skips_irrelevant() -> None:
-    item = {
-        "id": "abc1234567890123456789012345678",
-        "title": "Футбол. Обзор тура",
-        "description": "Матч",
-        "video_url": "https://rutube.ru/video/abc1234567890123456789012345678/",
-    }
-    assert _item_to_card(item, query="python курс") is None
+def test_course_score_skips_irrelevant_title() -> None:
+    assert (
+        course_score(
+            "Футбол. Обзор тура",
+            "python курс",
+            description="Матч",
+            track="backend",
+        )
+        < 6
+    )

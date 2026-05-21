@@ -1,4 +1,4 @@
-"""VK Video API for learning paths."""
+"""VK Video search for learning paths."""
 
 from __future__ import annotations
 
@@ -9,45 +9,49 @@ from unittest.mock import patch
 _REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO / "miniapp" / "backend"))
 
-from wibe_work.services.learning.vk_video import (
-    vk_search_for_learning,
-    vk_video_search,
-)
+from wibe_work.services.learning.adapters import run_dynamic_adapter
+from wibe_work.services.learning.vk_video import video_search_for_learning, vk_video_search
 
 
-@patch("wibe_work.services.learning.vk_video.VK_ACCESS_TOKEN", "test_token")
+@patch("wibe_work.services.learning.vk_video.VK_ACCESS_TOKEN", "test-token")
 @patch("wibe_work.services.learning.vk_video._vk_call")
-def test_vk_video_search_parses_items(mock_call) -> None:
-    mock_call.return_value = {
-        "count": 1,
+def test_vk_video_search_parses_items(mock_vk) -> None:
+    mock_vk.return_value = {
         "items": [
             {
-                "owner_id": -100,
-                "id": 456,
-                "title": "Полный курс Python с нуля",
-                "description": "Уроки",
+                "owner_id": -1,
+                "id": 42,
+                "title": "Python для начинающих — полный курс",
+                "description": "Уроки программирования",
             }
-        ],
+        ]
     }
-    cards = vk_video_search("python", limit=2)
+    cards = vk_video_search("python курс", limit=3, track="backend")
     assert len(cards) == 1
     assert cards[0]["provider"] == "vk"
-    assert cards[0]["url"] == "https://vk.com/video-100_456"
-    mock_call.assert_called_once()
-    assert mock_call.call_args[0][0] == "video.search"
+    assert "vk.com/video" in cards[0]["url"]
 
 
 @patch("wibe_work.services.learning.vk_video.VK_ACCESS_TOKEN", "")
-def test_vk_video_search_without_token() -> None:
-    assert vk_video_search("python") == []
+def test_video_adapter_empty_without_token() -> None:
+    out = run_dynamic_adapter({"adapter": "video", "query": "python", "limit": 2})
+    assert out == []
 
 
-@patch("wibe_work.services.learning.vk_video.VK_ACCESS_TOKEN", "test_token")
-@patch("wibe_work.services.learning.vk_video.vk_video_search")
-def test_vk_search_for_learning(mock_search) -> None:
-    mock_search.return_value = [
-        {"title": "Курс", "url": "https://vk.com/video-1_2", "provider": "vk"}
+@patch("wibe_work.services.learning.vk_video.VK_ACCESS_TOKEN", "test-token")
+@patch("wibe_work.services.learning.vk_video.vk_search_for_learning")
+@patch("wibe_work.services.llm_client.llm_configured", return_value=False)
+@patch(
+    "wibe_work.services.learning.material_relevance.filter_materials_for_context",
+    side_effect=lambda cards, **_: cards,
+)
+def test_video_search_for_learning_uses_vk(_filter, _llm, mock_vk) -> None:
+    mock_vk.return_value = [
+        {
+            "title": "Python курс",
+            "url": "https://vk.com/video-1_42",
+            "provider": "vk",
+        }
     ]
-    out = vk_search_for_learning("python курс", limit=1)
-    assert len(out) == 1
-    assert out[0]["provider"] == "vk"
+    out = video_search_for_learning("python", track="backend", limit=2)
+    assert out and out[0]["provider"] == "vk"

@@ -4,14 +4,13 @@
 
 - **Каталог** — `miniapp/data/learning_catalog.json` (roadmap.sh, Stepik, MDN, Figma, HubSpot, Kaggle, …)
 - **Пути по шагам** — `miniapp/data/learning_paths.json`
-- **Rutube** — поиск и витрина [education](https://rutube.ru/api/feeds/education?format=json) ([ShowcaseTutorial](https://github.com/rutube/ShowcaseTutorial)); фильтр по треку пользователя
 - **Exercism**, **Codewars** — задачи на шагах
 - **ESCO** — по умолчанию `ESCO_API_ENABLED=1`
 - **Прогресс** — SQLite `learning_progress`, `POST /vibework/learning/progress/{user_id}`
 
 ## С ключами (опционально)
 
-- **`VK_ACCESS_TOKEN`** — [vk.com/apps](https://vk.com/apps), поиск видео (дополняет Rutube)
+- **`VK_ACCESS_TOKEN`** — [vk.com/apps](https://vk.com/apps), поиск видео на шагах с адаптером `video`
 - **`VK_VIDEO_OWNER_IDS`** — альбомы сообществ для `video.get`
 - **`GITHUB_TOKEN`** — GitHub PAT, поиск репозиториев-проектов
 - **`ONET_USERNAME`**, **`ONET_PASSWORD`** — [onetcenter.org](https://www.onetcenter.org/webowners/)

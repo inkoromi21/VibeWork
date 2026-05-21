@@ -203,25 +203,16 @@ def onet_occupation_hints(keyword: str, limit: int = 3) -> List[Dict[str, Any]]:
 
 def run_dynamic_adapter(spec: Dict[str, Any]) -> List[Dict[str, Any]]:
     adapter = str(spec.get("adapter") or "").strip().lower()
-    if adapter in ("video", "video_ru", "rutube"):
-        from wibe_work.services.learning.rutube import video_search_preferred
+    if adapter in ("video", "video_ru", "vk", "vk_video"):
+        from wibe_work.services.learning.vk_video import video_search_for_learning
 
-        return video_search_preferred(
+        return video_search_for_learning(
             str(spec.get("query") or ""),
             limit=int(spec.get("limit") or 3),
             track=spec.get("track"),
             sphere=spec.get("sphere"),
             plan_direction=str(spec.get("plan_direction") or ""),
             step_title=str(spec.get("step_title") or ""),
-        )
-    if adapter in ("vk", "vk_video"):
-        from wibe_work.services.learning.vk_video import vk_search_for_learning
-
-        return vk_search_for_learning(
-            str(spec.get("query") or ""),
-            limit=int(spec.get("limit") or 3),
-            track=spec.get("track"),
-            sphere=spec.get("sphere"),
         )
     if adapter == "exercism":
         return exercism_track_exercises(str(spec.get("track") or "python"))
@@ -240,11 +231,6 @@ def integration_status() -> Dict[str, Any]:
     from wibe_work.config import VK_ACCESS_TOKEN, VK_VIDEO_OWNER_IDS
 
     return {
-        "rutube": {
-            "configured": True,
-            "needs": None,
-            "docs": "https://github.com/rutube/ShowcaseTutorial",
-        },
         "vk_video": {
             "configured": bool(VK_ACCESS_TOKEN),
             "needs": "VK_ACCESS_TOKEN (сервисный ключ приложения VK)",

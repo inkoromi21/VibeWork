@@ -56,7 +56,7 @@ def main() -> int:
 
     print("\nLearning status:")
     st = get_integration_status()
-    for name in ("rutube", "vk_video", "github", "exercism", "codewars", "onet", "esco"):
+    for name in ("vk_video", "github", "exercism", "codewars", "onet", "esco"):
         block = st.get(name, {})
         if isinstance(block, dict):
             conf = block.get("configured", block.get("preferred"))
