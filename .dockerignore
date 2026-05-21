@@ -1,0 +1,40 @@
+# Git и IDE
+.git
+.gitignore
+.cursor
+.idea
+.vscode
+
+# Локальные окружения и секреты
+.env
+.env.*
+!.env.example
+venv
+.venv
+env
+ENV
+website/.venv
+website/venv
+
+# БД и кэши (в контейнере — volume)
+*.db
+*.db-journal
+*.sqlite3
+miniapp/data/*.db
+
+# Python / тесты
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+htmlcov
+.coverage
+*.egg-info
+
+# Прочее
+*.log
+.DS_Store
+Thumbs.db
+launch files
+agent-transcripts

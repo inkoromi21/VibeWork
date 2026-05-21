@@ -1,0 +1,27 @@
+# Запуск: docker compose up --build
+# UI: http://127.0.0.1:8000/miniapp/  ·  API docs: http://127.0.0.1:8000/docs
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vibework-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      VIBEWORK_ENV: dev
+      PUBLIC_BASE_URL: http://127.0.0.1:8000
+      CORS_ALLOW_ORIGINS: http://127.0.0.1:8000,http://localhost:8000
+      DATABASE_PATH: /data/vibework.db
+      HH_USER_AGENT: VibeWork/1.0 (docker@localhost)
+    volumes:
+      # Только SQLite; JSON-каталоги остаются из образа (miniapp/data/*.json)
+      - vibework_data:/data
+    restart: unless-stopped
+
+volumes:
+  vibework_data:

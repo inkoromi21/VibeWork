@@ -68,6 +68,11 @@ def test_llm_health_payload_has_ok_field(monkeypatch) -> None:
 def test_zai_key_resolves_zai_url(monkeypatch) -> None:
     monkeypatch.setenv("USE_OLLAMA", "0")
     monkeypatch.setenv("CHAT_API_URL", "")
+    monkeypatch.setenv("DEEPSEEK_API_URL", "")
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("CHAT_PROVIDER", raising=False)
     monkeypatch.setenv("CHAT_API_KEY", "abc.defghijklmnop")
     monkeypatch.setenv("CHAT_MODEL", "")
     cfg = get_llm_settings()

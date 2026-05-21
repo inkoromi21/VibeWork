@@ -35,14 +35,34 @@ miniapp/run.py
 
 Для Telegram Web App в BotFather указывайте **`https://<домен>/miniapp/`**, не корень `/`.
 
-Конфигурация: **`.env` в корне репозитория** — полный список в [docs/ENV.md](docs/ENV.md).
+Конфигурация: **`.env` в корне репозитория** — шаблон [.env.example](.env.example), полный список [docs/ENV.md](docs/ENV.md).
 
-## Быстрый старт
+## Запуск через Docker (рекомендуется для проверки жюри)
+
+Нужны [Docker](https://docs.docker.com/get-docker/) и Docker Compose v2.
+
+```bash
+cp .env.example .env
+# при необходимости отредактируйте .env (LLM, Telegram — опционально)
+docker compose up --build
+```
+
+| URL | Назначение |
+|-----|------------|
+| http://127.0.0.1:8000/miniapp/ | Основной интерфейс |
+| http://127.0.0.1:8000/docs | OpenAPI |
+| http://127.0.0.1:8000/api/health | Проверка, что API поднялся |
+
+Остановка: `docker compose down`. Файл БД — в volume `vibework_data` (`/data/vibework.db` в контейнере).
+
+Проверка на другой машине: `git clone` → `cp .env.example .env` → `docker compose up --build` (те же шаги).
+
+## Быстрый старт без Docker
 
 ```bash
 python3 -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r miniapp/requirements.txt
-# создайте .env в корне (см. docs/ENV.md)
+cp .env.example .env
 python miniapp/run.py
 ```
 
@@ -52,7 +72,8 @@ python miniapp/run.py
 
 | Задача | Команда |
 |--------|---------|
-| API + UI | `python miniapp/run.py` |
+| API + UI (Docker) | `docker compose up --build` |
+| API + UI (локально) | `python miniapp/run.py` |
 | Бот (API уже запущен) | `python miniapp/bot/bot.py` |
 | API + бот + website :8765 | `bash "launch files/launch-stack.sh"` или `launch files\launch-stack.bat` |
 | Тесты | `./scripts/verify.sh` или `pytest tests/miniapp -q` |
@@ -82,6 +103,9 @@ HTTPS, уникальный `JWT_SECRET`, CORS, `HH_USER_AGENT`. Nginx: [deploy/
 
 ```
 VibeWork/
+├── Dockerfile
+├── docker-compose.yml
+├── .env.example
 ├── miniapp/
 │   ├── run.py                 # вход :8000
 │   ├── backend/wibe_work/     # FastAPI-пакет

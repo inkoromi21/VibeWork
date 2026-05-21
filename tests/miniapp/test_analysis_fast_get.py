@@ -89,6 +89,7 @@ def test_get_analysis_skips_full_learning_rebuild(client: TestClient) -> None:
         uid,
         {
             "analyzed_at": "2026-01-01",
+            "role_confirmation": {"status": "accepted"},
             "readiness": {"score": 55, "label": "Средний"},
             "style_radar": {"axes": []},
             "learning_path": {
@@ -265,4 +266,7 @@ def test_quiz_analyze_accepts_extra_stale_question_ids(client: TestClient) -> No
         json={"answers": answers, "interest": "it_dev"},
     )
     assert r.status_code == 200, r.text
-    assert r.json().get("readiness") is not None
+    body = r.json()
+    # Полный разбор в ответе после подтверждения роли; сразу после analyze — только proposal.
+    assert body.get("role_confirmation", {}).get("status") == "pending"
+    assert body.get("role_confirmation", {}).get("proposal")
