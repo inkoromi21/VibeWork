@@ -11,6 +11,7 @@ from wibe_work.services.llm_client import fetch_llm_completion, llm_configured
 from wibe_work.services.llm_prompts import (
     build_analysis_user_prompt,
     narrative_system_for_grade,
+    polish_analysis_narrative,
 )
 from wibe_work.services.aptitude_quiz import get_pro_weights_matrix_for_interest, letter_to_index
 from wibe_work.questionnaire_fields import INTEREST_SPHERES
@@ -1150,12 +1151,12 @@ def _analysis_narrative_llm(
         return "", "mock", None
     text, notice = fetch_llm_completion(
         prompt,
-        max_tokens=560,
-        temperature=0.42,
+        max_tokens=380,
+        temperature=0.2,
         system_prompt=system,
     )
     if text:
-        return text, "llm", None
+        return polish_analysis_narrative(text), "llm", None
     return "", "mock", notice
 
 

@@ -32,17 +32,6 @@ _COURSE_MARKERS = (
     "разбор",
 )
 
-_TRACK_SEARCH_QUERIES: Dict[str, str] = {
-    "backend": "python backend разработка курс",
-    "frontend": "javascript frontend веб курс",
-    "devops": "devops docker kubernetes курс",
-    "data": "sql python аналитика данных курс",
-    "qa": "тестирование qa автоматизация курс",
-    "design": "figma ux ui дизайн курс",
-    "marketing": "маркетинг smm курс",
-    "sales": "продажи b2b курс",
-}
-
 _FEED_BY_SPHERE: Dict[str, str] = {
     "it_dev": "education",
     "data": "education",
@@ -76,22 +65,67 @@ def _video_page_url(item: Dict[str, Any]) -> str:
     return f"https://rutube.ru/video/{vid}/" if vid else ""
 
 
-def _course_score(title: str, query: str) -> float:
+def _course_score(
+    title: str,
+    query: str,
+    *,
+    description: str = "",
+    track: Optional[str] = None,
+) -> float:
+    from wibe_work.services.learning.material_relevance import (
+        _TRACK_POSITIVE,
+        is_entertainment_or_sport,
+    )
+
     t = (title or "").lower()
+    desc = (description or "").lower()
+    blob = f"{t} {desc}"
+    if is_entertainment_or_sport({"title": title, "description": description}):
+        return -100.0
     q = (query or "").lower()
     score = 0.0
+    q_hits = 0
     for w in re.split(r"\s+", q):
-        if len(w) > 2 and w in t:
-            score += 2.5
+        if len(w) > 3 and w in blob:
+            score += 3.0
+            q_hits += 1
+        elif len(w) > 2 and w in t:
+            score += 1.5
+            q_hits += 1
+    tr = (track or "").strip().lower()
+    track_hits = 0
+    if tr:
+        for kw in _TRACK_POSITIVE.get(tr, ()):
+            if kw in blob:
+                track_hits += 1
+                score += 2.0
+    edu_markers = 0
     for m in _COURSE_MARKERS:
         if m in t:
-            score += 6.0
+            edu_markers += 1
+            score += 2.0
     if "полный курс" in t or "курс с нуля" in t or "плейлист" in t:
-        score += 4.0
-    return score
+        score += 3.0
+    if "разбор" in t and q_hits == 0 and track_hits == 0:
+        score -= 12.0
+    # Минимум: 2 совпадения с запросом ИЛИ (1 + маркер курса + трек)
+    if q_hits >= 2 or (q_hits >= 1 and edu_markers >= 1 and track_hits >= 1):
+        return score
+    if q_hits >= 1 and edu_markers >= 2 and track_hits >= 1:
+        return score
+    if q and q_hits == 0 and track_hits == 0:
+        return -50.0
+    if edu_markers >= 1 and track_hits >= 2:
+        return score
+    return -20.0
 
 
-def _item_to_card(item: Dict[str, Any], *, query: str = "") -> Optional[Dict[str, Any]]:
+def _item_to_card(
+    item: Dict[str, Any],
+    *,
+    query: str = "",
+    track: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
     url = _video_page_url(item)
     if not url:
         return None
@@ -104,7 +138,10 @@ def _item_to_card(item: Dict[str, Any], *, query: str = "") -> Optional[Dict[str
         )
     elif not desc:
         desc = "Видеоурок на Rutube — кратко просмотрите и выпишите главную мысль для шага."
-    kind = "курс" if _course_score(title, query) >= 8 else "видео"
+    sc = _course_score(title, query, description=desc, track=track)
+    if sc < 6:
+        return None
+    kind = "курс" if sc >= 8 else "видео"
     return {
         "title": title[:200],
         "url": url,
@@ -114,11 +151,16 @@ def _item_to_card(item: Dict[str, Any], *, query: str = "") -> Optional[Dict[str
         "source_type": "api",
         "is_free": True,
         "language": "ru",
-        "_score": _course_score(title, query),
+        "_score": sc,
     }
 
 
-def rutube_search_videos(query: str, limit: int = 3) -> List[Dict[str, Any]]:
+def rutube_search_videos(
+    query: str,
+    limit: int = 3,
+    *,
+    track: Optional[str] = None,
+) -> List[Dict[str, Any]]:
     q = (query or "").strip()
     if not q:
         return []
@@ -130,7 +172,7 @@ def rutube_search_videos(query: str, limit: int = 3) -> List[Dict[str, Any]]:
         items = list(data.get("results") or [])
         scored: List[Tuple[float, Dict[str, Any]]] = []
         for item in items:
-            card = _item_to_card(item, query=q)
+            card = _item_to_card(item, query=q, track=track)
             if card:
                 scored.append((float(card.pop("_score", 0)), card))
         scored.sort(key=lambda x: -x[0])
@@ -154,6 +196,7 @@ def rutube_showcase_feed_videos(
     query: str,
     limit: int = 3,
     *,
+    track: Optional[str] = None,
     max_resource_fetches: int = 4,
 ) -> List[Dict[str, Any]]:
     """
@@ -193,7 +236,7 @@ def rutube_showcase_feed_videos(
             if not vid or vid in seen_ids:
                 continue
             seen_ids.add(vid)
-            card = _item_to_card(item, query=q)
+            card = _item_to_card(item, query=q, track=track)
             if card:
                 scored.append((float(card.pop("_score", 0)), card))
 
@@ -208,13 +251,23 @@ def rutube_search_for_learning(
     sphere: Optional[str] = None,
     limit: int = 3,
     prefer_course: bool = True,
+    plan_direction: str = "",
+    step_title: str = "",
 ) -> List[Dict[str, Any]]:
-    """Поиск + витрина «Обучение»; приоритет заголовкам с «курс» / «урок»."""
-    q = (query or "").strip()
-    if track and track in _TRACK_SEARCH_QUERIES and not q:
-        q = _TRACK_SEARCH_QUERIES[track]
-    if not q:
-        q = "обучение курс"
+    """Поиск Rutube; витрина только если поиск пустой."""
+    from wibe_work.services.learning.material_relevance import (
+        build_learning_search_query,
+        filter_materials_for_context,
+    )
+    from wibe_work.services.llm_client import llm_configured
+
+    q = build_learning_search_query(
+        query,
+        track=track,
+        sphere=sphere or "",
+        step_title=step_title,
+    )
+    plan_hint = (plan_direction or step_title or "").strip()
 
     merged: List[Dict[str, Any]] = []
     seen: Set[str] = set()
@@ -226,21 +279,38 @@ def rutube_search_for_learning(
                 seen.add(u)
                 merged.append(c)
 
-    search_limit = limit + 2 if prefer_course else limit
-    add_cards(rutube_search_videos(q, limit=search_limit))
+    search_limit = max(limit + 3, limit * 2) if prefer_course else limit
+    add_cards(rutube_search_videos(q, limit=search_limit, track=track))
 
-    feed_slug = _FEED_BY_SPHERE.get((sphere or "").strip(), "education")
-    if prefer_course and len(merged) < limit:
+    if prefer_course and len(merged) < limit and track:
+        feed_slug = _FEED_BY_SPHERE.get((sphere or "").strip(), "education")
         add_cards(
-            rutube_showcase_feed_videos(feed_slug, q, limit=limit, max_resource_fetches=5)
+            rutube_showcase_feed_videos(
+                feed_slug,
+                q,
+                limit=limit,
+                track=track,
+                max_resource_fetches=3,
+            )
         )
 
     if prefer_course:
         merged.sort(
-            key=lambda c: _course_score(str(c.get("title") or ""), q),
+            key=lambda c: _course_score(
+                str(c.get("title") or ""),
+                q,
+                description=str(c.get("description") or ""),
+                track=track,
+            ),
             reverse=True,
         )
-    return merged[:limit]
+    return filter_materials_for_context(
+        merged[: limit + 6],
+        track=track,
+        sphere=sphere or "",
+        plan_direction=plan_hint,
+        use_llm=llm_configured(),
+    )[:limit]
 
 
 def video_search_preferred(
@@ -249,12 +319,20 @@ def video_search_preferred(
     *,
     track: Optional[str] = None,
     sphere: Optional[str] = None,
+    plan_direction: str = "",
+    step_title: str = "",
 ) -> List[Dict[str, Any]]:
     """Видео для пути обучения: Rutube (без ключа), при VK_ACCESS_TOKEN — доп. VK Video."""
     from wibe_work.config import VK_ACCESS_TOKEN
 
     rutube_cards = rutube_search_for_learning(
-        query, track=track, sphere=sphere, limit=limit, prefer_course=True
+        query,
+        track=track,
+        sphere=sphere,
+        limit=limit,
+        prefer_course=True,
+        plan_direction=plan_direction,
+        step_title=step_title,
     )
     if not VK_ACCESS_TOKEN:
         return rutube_cards

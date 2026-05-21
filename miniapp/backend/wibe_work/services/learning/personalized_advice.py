@@ -14,6 +14,10 @@ from wibe_work.services.learning.assessment_signals import (
 )
 from wibe_work.services.learning.catalog import resource_to_card, resources_by_id
 from wibe_work.services.learning.engine import build_learning_path_payload
+from wibe_work.services.learning.material_relevance import (
+    filter_materials_for_context,
+    heuristic_material_score,
+)
 from wibe_work.services.llm_client import fetch_llm_completion, llm_configured
 from wibe_work.services.llm_prompts import (
     advice_json_system_for_grade,
@@ -106,6 +110,7 @@ def _pool_materials(
     preparation: str,
     learning_path: Optional[Dict[str, Any]],
     signals: Optional[Dict[str, Any]] = None,
+    use_llm_filter: bool = False,
 ) -> List[Dict[str, Any]]:
     merged: List[Dict[str, Any]] = []
     seen: Set[str] = set()
@@ -122,7 +127,14 @@ def _pool_materials(
         sphere, track, preparation, limit=6, signals=signals
     ):
         add(c)
-    return merged[:14]
+    plan_hint = str((signals or {}).get("best_plan_name") or "")
+    return filter_materials_for_context(
+        merged,
+        track=track,
+        sphere=sphere,
+        plan_direction=plan_hint,
+        use_llm=use_llm_filter,
+    )[:14]
 
 
 def _material_card(m: Dict[str, Any]) -> Dict[str, Any]:
@@ -144,6 +156,7 @@ def _pick_materials(
     keywords: Tuple[str, ...],
     limit: int = 2,
     used_urls: Optional[Set[str]] = None,
+    track: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     used = used_urls if used_urls is not None else set()
     scored: List[Tuple[float, Dict[str, Any]]] = []
@@ -158,10 +171,13 @@ def _pick_materials(
         score = sum(3.0 for kw in keywords if kw and kw in blob)
         if score > 0:
             scored.append((score, m))
-    if not scored and materials:
-        for m in materials:
-            if (m.get("url") or "") not in used:
-                scored.append((0.5, m))
+        else:
+            h = heuristic_material_score(m, track=track)
+            provider = (m.get("provider") or "").strip().lower()
+            if provider == "rutube":
+                continue
+            if h >= 8:
+                scored.append((float(h), m))
     scored.sort(key=lambda x: -x[0])
     picked: List[Dict[str, Any]] = []
     for _, m in scored[:limit]:
@@ -286,6 +302,7 @@ def _rule_based_plan_advice(
                         keywords=skill_kw + (track or "", "курс", "урок"),
                         limit=2,
                         used_urls=used,
+                        track=track,
                     ),
                     section="С чего начать",
                 ),
@@ -319,7 +336,9 @@ def _rule_based_plan_advice(
             "steps": [
                 _step(
                     learn_text.get(preparation, learn_text["medium"]),
-                    _pick_materials(materials, keywords=learn_kw, limit=2, used_urls=used),
+                    _pick_materials(
+                        materials, keywords=learn_kw, limit=2, used_urls=used, track=track
+                    ),
                     section="Обучение",
                 ),
             ],
@@ -339,6 +358,7 @@ def _rule_based_plan_advice(
                         keywords=(track or "", "stepik", "roadmap", "курс"),
                         limit=1,
                         used_urls=used,
+                        track=track,
                     ),
                     section="Резюме и отклики",
                 ),
@@ -374,12 +394,34 @@ def _parse_llm_advice_json(raw: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def _allowed_material_urls(materials: List[Dict[str, Any]]) -> Set[str]:
+    return {(m.get("url") or "").strip() for m in materials if (m.get("url") or "").strip()}
+
+
+def _clamp_materials_to_pool(
+    mats: List[Dict[str, Any]],
+    allowed: Set[str],
+    pool: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    by_url = {(m.get("url") or "").strip(): m for m in pool if m.get("url")}
+    out: List[Dict[str, Any]] = []
+    for m in mats:
+        url = (m.get("url") or "").strip()
+        if not url or url not in allowed:
+            continue
+        base = by_url.get(url, m)
+        out.append(_material_card(base))
+    return out
+
+
 def _merge_llm_plan(
     plan_id: str,
     plan: Dict[str, Any],
     llm_block: Dict[str, Any],
     *,
     fallback: Dict[str, Any],
+    allowed_urls: Optional[Set[str]] = None,
+    material_pool: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     def _parse_step(item: Any, section: str = "") -> Optional[Dict[str, Any]]:
         if isinstance(item, str):
@@ -394,6 +436,8 @@ def _merge_llm_plan(
         for m in item.get("materials") or []:
             if isinstance(m, dict) and m.get("url"):
                 mats.append(_material_card(m))
+        if allowed_urls is not None and material_pool is not None:
+            mats = _clamp_materials_to_pool(mats, allowed_urls, material_pool)
         sec = str(item.get("section") or section or "").strip()
         return _step(text, mats, section=sec)
 
@@ -487,12 +531,19 @@ def build_individual_advice(
         )
 
     by_plan: Dict[str, Any] = {}
-    materials_global = _pool_materials(
+    materials_global = filter_materials_for_context(
+        _pool_materials(
+            sphere=sphere,
+            track=base_track or _infer_track_from_plan(_plan_label(plans[0]) if plans else ""),
+            preparation=preparation_level,
+            learning_path=learning_path,
+            signals=signals,
+            use_llm_filter=False,
+        ),
+        track=base_track,
         sphere=sphere,
-        track=base_track or _infer_track_from_plan(_plan_label(plans[0]) if plans else ""),
-        preparation=preparation_level,
-        learning_path=learning_path,
-        signals=signals,
+        plan_direction=str(signals.get("best_plan_name") or ""),
+        use_llm=True,
     )
 
     # LLM: один запрос на все планы
@@ -528,14 +579,23 @@ def build_individual_advice(
 
     for p in plans:
         pid = str(p.get("id") or "A")
-        track = _infer_track_from_plan(_plan_label(p))
-        mats = _pool_materials(
+        track = _infer_track_from_plan(_plan_label(p)) or base_track
+        plan_name = _plan_label(p)
+        mats = filter_materials_for_context(
+            _pool_materials(
+                sphere=sphere,
+                track=track,
+                preparation=preparation_level,
+                learning_path=learning_path,
+                signals=signals,
+                use_llm_filter=False,
+            ),
+            track=track,
             sphere=sphere,
-            track=track or base_track,
-            preparation=preparation_level,
-            learning_path=learning_path,
-            signals=signals,
+            plan_direction=plan_name,
+            use_llm=True,
         )
+        allowed = _allowed_material_urls(mats)
         fallback = _rule_based_plan_advice(
             p,
             preparation=preparation_level,
@@ -549,7 +609,14 @@ def build_individual_advice(
         )
         llm_block = llm_by_plan.get(pid) if isinstance(llm_by_plan, dict) else None
         if isinstance(llm_block, dict) and llm_block.get("steps"):
-            by_plan[pid] = _merge_llm_plan(pid, p, llm_block, fallback=fallback)
+            by_plan[pid] = _merge_llm_plan(
+                pid,
+                p,
+                llm_block,
+                fallback=fallback,
+                allowed_urls=allowed,
+                material_pool=mats,
+            )
         else:
             by_plan[pid] = fallback
 

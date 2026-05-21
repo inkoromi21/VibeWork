@@ -32,11 +32,23 @@ def test_coach_system_differs_by_grade() -> None:
 
 
 def test_narrative_system_school_and_vocational() -> None:
-    assert "школьник" in narrative_system_for_grade("school", GRADE_SCHOOL).lower()
-    assert "спо" in narrative_system_for_grade("career", GRADE_VOCATIONAL).lower()
-    assert narrative_system_for_grade("career", GRADE_UNIVERSITY) != narrative_system_for_grade(
-        "career", GRADE_VOCATIONAL
-    )
+    school = narrative_system_for_grade("school", GRADE_SCHOOL).lower()
+    voc = narrative_system_for_grade("career", GRADE_VOCATIONAL).lower()
+    uni = narrative_system_for_grade("career", GRADE_UNIVERSITY).lower()
+    assert "школьник" in school or "8–11" in school
+    assert "спо" in voc or "колледж" in voc
+    assert uni != voc
+    for blob in (school, voc, uni):
+        assert "только русский" in blob
+        assert "420" in blob or "420 знаков" in blob
+
+
+def test_polish_analysis_narrative_truncates() -> None:
+    from wibe_work.services.llm_prompts import polish_analysis_narrative
+
+    long = "А. " * 200
+    out = polish_analysis_narrative(long, max_chars=100)
+    assert len(out) <= 101
 
 
 def test_select_addenda_school_blocks_jobs_topic() -> None:

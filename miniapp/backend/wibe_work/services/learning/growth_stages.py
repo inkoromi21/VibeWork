@@ -178,6 +178,7 @@ def build_growth_stages(
             keywords=("курс", "intro", "roadmap", "основ", track or "карьер"),
             limit=2,
             used_urls=used_urls,
+            track=track,
         ),
         limit=4,
     )
@@ -224,6 +225,7 @@ def build_growth_stages(
             keywords=("практик", "exercism", "git", "stepik", track or ""),
             limit=2,
             used_urls=used_urls,
+            track=track,
         ),
         limit=5,
     )
@@ -266,6 +268,7 @@ def build_growth_stages(
             keywords=("portfolio", "github", "ваканс", "отклик", track or ""),
             limit=2,
             used_urls=used_urls,
+            track=track,
         ),
         limit=5,
     )

@@ -1,113 +1,69 @@
-# Веб-клиент и пакет `website`
+# website/
 
-В этом каталоге находятся **статический фронтенд** VibeWork (`frontend/`) и **изолированное FastAPI-приложение** (`app/`), которое можно запускать отдельно от основного стека.
+Два назначения каталога:
 
-## Два режима работы
+1. **`frontend/`** — общая статика (`/static/...`) и **старый лендинг** на `GET /` (при `miniapp/run.py`).
+2. **`app/`** — legacy HTTP API `/api/*` и мосты к `wibe_work` (разбор, learning, симулятор).
 
-### 1. Рекомендуемый: единый сервер (`miniapp/run.py`)
+Основной UI продукта — **`miniapp/frontend/`** на `/miniapp/`. См. [корневой README](../README.md).
 
-В повседневной разработке статика из **`website/frontend/`** раздаётся процессом **`python miniapp/run.py`** (порт **8000**). Запросы к **`/api/...`** обрабатываются тем же приложением, что и API мини-приложения; используется **единая SQLite** мини-приложения. Регистрация и профиль совместимы с сценарием Telegram Mini App.
+## Режимы запуска
 
-**Точка входа:** корень репозитория → см. [README в корне](../README.md).
+### Unified (как в проде)
 
-### 2. Изолированный сервер (`website/main.py`)
+Из корня репозитория:
 
-Отдельный процесс на порту **8765** (по умолчанию) — для отладки только веб-пакета без поднятия полного `miniapp`. В этом режиме **нет URL `/miniapp/`** и API `/vibework/...` — для Telegram Mini App это выглядит как «открывается только сайт».
+```bash
+python miniapp/run.py
+```
 
-**Полный стек из каталога `website/`** (как `miniapp/run.py`: корень `/`, мини-приложение `/miniapp/`, общая БД):
+Один процесс: `/miniapp/`, `/vibework/...`, `/api/...`, `/static/...`, общая SQLite. **`.env` только в корне** — [docs/ENV.md](../docs/ENV.md).
+
+### Изолированный (отладка только `website/app`)
+
+```bash
+cd website
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python main.py    # порт 8765 по умолчанию
+```
+
+Нет `/miniapp/` и `/vibework/...`. Своя БД: `website/data/vibework.db`, cookie-сессии в `app/`.
+
+### Full stack через `website/main.py`
+
+Тот же API, что `miniapp/run.py`:
 
 ```bash
 cd website
 pip install -r requirements.txt -r requirements-unified.txt
-set VIBEWORK_FULL_STACK=1          # Windows CMD
-set PORT=8000                      # по желанию; иначе 8765
+export VIBEWORK_FULL_STACK=1   # Windows: set VIBEWORK_FULL_STACK=1
+export PORT=8000               # опционально
 python main.py
 ```
 
-В `.env` для бота задайте **`PUBLIC_BASE_URL=http://127.0.0.1:8000`** (или ваш порт), **`WEBSITE_URL`** на тот же хост. В [@BotFather](https://t.me/BotFather) у Web App / меню бота URL должен оканчиваться на **`/miniapp/`**, а не на `/`.
+На **Python 3.14 (Windows)** при ошибках сборки pydantic используйте 3.11–3.12 или см. версии в `requirements.txt`.
 
-Изолированный режим (по умолчанию без переменной) — своя БД и механизм сессий (см. код в `app/`).
+## `frontend/`
 
-```bash
-cd website
-python3 -m venv .venv
-source .venv/bin/activate          # Windows: .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-cp .env.example .env               # при необходимости
-python main.py
-```
+| Файл | Использование |
+|------|----------------|
+| `style.css`, `miniapp-shell.css`, `vw_shared_ui.js`, … | Подключаются из Mini App как `/static/...` |
+| `index.html`, `script.js` | Старый клиент на `/` |
+| `register.html` | `GET /register` |
 
-**Python 3.14 на Windows:** в `requirements.txt` заданы `pydantic>=2.11` и совместимый `pydantic-core`, чтобы ставились **готовые колёса** и не требовалась сборка Rust. Если установка всё же падает, используйте **Python 3.12 или 3.11**.
+## `app/` (кратко)
 
-Браузер: **http://127.0.0.1:8765**
+| Модуль | Роль |
+|--------|------|
+| `career_advisor.py` | Чат, jobs, обёртка `/api/analyze` |
+| `analysis_bridge.py` | Веб-payload → `wibe_work.services.career_analysis` |
+| `*_bridge.py` | Learning, симулятор, quiz bundle |
+| `aptitude_quiz_content.py` | Банк вопросов теста (импорт через bridge в wibe_work) |
+| `hh_client.py` | hh.ru для legacy `/api/*` |
+| `mts_matrix.json` | Каталог для `/api/mts/tracks` (отдельно от `miniapp/data/mts_role_matrix.json`) |
+| `orm_models.py`, `account_auth_routes.py` | Только **изолированный** `main.py` |
 
-На Windows порт **8000** иногда занят системой; для изолированного сервера по умолчанию выбран **8765**. Свой порт:
+Примеры API: `/api/analyze`, `/api/chat`, `/api/jobs`, `/api/simulator/start` — полный список в `/docs` запущенного процесса.
 
-```bash
-# Windows CMD
-set PORT=9000
-python main.py
-```
-
-Через uvicorn напрямую:
-
-```bash
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8765 --reload
-```
-
----
-
-## Переменные окружения
-
-При работе **только** из каталога `website/` ключи для LLM и интеграций задаются в **`website/.env`**.
-
-При работе через **`miniapp/run.py`** используйте **корневой `.env`** репозитория — там же задаются `HH_USER_AGENT`, параметры LLM и прочее (см. корневой README).
-
-Пример переменных для облачного чата (изолированный режим):
-
-| Переменная | Назначение |
-|------------|------------|
-| `DEEPSEEK_API_KEY` | Ключ API; без ключа возможны заглушки без внешних запросов |
-| `DEEPSEEK_API_URL` | По умолчанию `https://api.deepseek.com/v1/chat/completions` |
-| `DEEPSEEK_MODEL` | По умолчанию `deepseek-chat` |
-
-Для запросов к **hh.ru** в продакшене задайте **`HH_USER_AGENT`** в формате из официальной документации API.
-
----
-
-## API пакета `app`
-
-Эндпоинты соответствуют потребностям фронтенда. При unified-запуске через порт **8000** они доступны там же.
-
-Примеры областей (полный список — в **`/docs`** у запущенного процесса):
-
-- разбор и аналитика (`/api/analyze` и связанные маршруты);
-- вакансии и матчинг (`/api/jobs`, `/api/jobs/match`);
-- симулятор (`/api/simulator/start`, `/api/simulator/step`);
-- каталог МТС-треков (`/api/mts/tracks`, `/api/mts/preview`);
-- здоровье: `GET /api/health`, `GET /api/health/llm`.
-
-При **`miniapp/run.py` на порту 8000** те же префиксы `/api/...` обслуживаются общим приложением вместе с API мини-приложения (один OpenAPI в `/docs`).
-
----
-
-## Учётные записи и данные
-
-| Режим | Хранилище |
-|-------|-----------|
-| **`miniapp/run.py`** | SQLite мини-приложения; см. `DATABASE_PATH` в корневом `.env` |
-| **`python main.py` в `website/`** | Отдельный файл, по умолчанию **`website/data/vibework.db`**, cookie-сессии, маршруты регистрации в `app/` |
-
-Без авторизации фронтенд может использовать черновик профиля в **localStorage** браузера.
-
----
-
-## Структура
-
-| Компонент | Описание |
-|-----------|----------|
-| `app/main.py` | FastAPI: CORS, монтирование статики `frontend/` |
-| `app/career_advisor.py` | Логика разбора, чата, матчинга |
-| `app/hh_client.py` | Клиент API hh.ru |
-| `app/sqlite_async_session.py`, `orm_models.py`, `account_auth_routes.py` | Сессии и пользователи для **изолированного** запуска сайта |
-| `frontend/` | HTML/CSS/JS веб-интерфейса |
+Переменные LLM в unified-режиме — **`CHAT_API_*`** в корневом `.env`, не `website/.env`. Пример для изолированного режима: `.env.example` в этом каталоге.

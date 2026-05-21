@@ -94,7 +94,22 @@ def _enrich_step_resources(
             dyn["track"] = track
         if sphere and "sphere" not in dyn:
             dyn["sphere"] = sphere
-        for card in run_dynamic_adapter(dyn):
+        if not dyn.get("step_title"):
+            dyn["step_title"] = str(step.get("title") or "")
+        if signals and not dyn.get("plan_direction"):
+            dyn["plan_direction"] = str(signals.get("best_plan_name") or "")
+        from wibe_work.services.learning.material_relevance import filter_materials_for_context
+        from wibe_work.services.llm_client import llm_configured
+
+        dyn_track = dyn.get("track") or track
+        plan_hint = str(dyn.get("plan_direction") or step.get("title") or "")
+        for card in filter_materials_for_context(
+            run_dynamic_adapter(dyn),
+            track=dyn_track,
+            sphere=sphere or "",
+            plan_direction=plan_hint,
+            use_llm=llm_configured(),
+        ):
             add(card)
 
     return out[:8]

@@ -17,8 +17,14 @@ from wibe_work.services.learning.rutube import (
 
 
 def test_course_score_prefers_course_title() -> None:
-    assert _course_score("Полный курс Python с нуля", "python") > _course_score(
-        "Интервью про Python", "python"
+    assert _course_score(
+        "Полный курс Python с нуля",
+        "python backend курс",
+        track="backend",
+    ) > _course_score(
+        "Интервью про Python",
+        "python backend курс",
+        track="backend",
     )
 
 
@@ -34,7 +40,12 @@ def test_rutube_search_parses_video_url(mock_get) -> None:
             }
         ]
     }
-    cards = rutube_search_for_learning("python backend", limit=2, prefer_course=False)
+    cards = rutube_search_for_learning(
+        "python backend",
+        limit=2,
+        prefer_course=False,
+        track="backend",
+    )
     assert len(cards) == 1
     assert cards[0]["provider"] == "rutube"
     assert "rutube.ru/video/" in cards[0]["url"]

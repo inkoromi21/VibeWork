@@ -211,6 +211,8 @@ def run_dynamic_adapter(spec: Dict[str, Any]) -> List[Dict[str, Any]]:
             limit=int(spec.get("limit") or 3),
             track=spec.get("track"),
             sphere=spec.get("sphere"),
+            plan_direction=str(spec.get("plan_direction") or ""),
+            step_title=str(spec.get("step_title") or ""),
         )
     if adapter in ("vk", "vk_video"):
         from wibe_work.services.learning.vk_video import vk_search_for_learning
